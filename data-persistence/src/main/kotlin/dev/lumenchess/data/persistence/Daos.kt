@@ -49,6 +49,8 @@ interface GameDao {
     @Query("SELECT id FROM games WHERE contentFingerprint = :fingerprint ORDER BY createdAtEpochMillis, id") suspend fun gameIdsByFingerprint(fingerprint: String): List<String>
     @Query("SELECT id FROM games WHERE contentFingerprint IS NULL ORDER BY id") suspend fun gameIdsMissingFingerprint(): List<String>
     @Query("UPDATE games SET contentFingerprint = :fingerprint WHERE id = :id AND contentFingerprint IS NULL") suspend fun setFingerprintIfMissing(id: String, fingerprint: String): Int
+    @Query("UPDATE games SET contentFingerprint = :fingerprint WHERE id = :id") suspend fun overwriteFingerprint(id: String, fingerprint: String?): Int
+    @Query("UPDATE game_nodes SET parentNodeId = :parentNodeId WHERE id = :id") suspend fun overwriteParent(id: String, parentNodeId: String?): Int
     @Query("SELECT * FROM game_headers WHERE gameId = :gameId ORDER BY orderIndex") suspend fun headersForGame(gameId: String): List<GameHeaderEntity>
     @Query("SELECT * FROM game_nodes WHERE gameId = :gameId ORDER BY parentNodeId, siblingOrder, id") suspend fun nodesForGame(gameId: String): List<GameNodeEntity>
     @Query("SELECT * FROM game_node_comments WHERE gameId = :gameId ORDER BY nodeId, kind, orderIndex, id") suspend fun commentsForGame(gameId: String): List<GameNodeCommentEntity>
