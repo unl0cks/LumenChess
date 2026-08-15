@@ -9,15 +9,17 @@ Updated: 2026-08-15. Exact records are required for every shipped dependency/sou
 | Android Gradle Plugin | 9.3.0 | Google Android build tooling; current stable channel | Apache-2.0 / component notices | Build tooling |
 | Gradle | 9.5.0 | Gradle binary distribution; standard generated wrapper retained with CI wrapper validation enabled | Apache-2.0 | Build tooling |
 | Kotlin | 2.3.21 plugin line | JetBrains Kotlin; version used by Google's current Compose Compiler setup guidance | Apache-2.0 | Kotlin/JVM and Compose compiler plugin |
+| Kotlin Symbol Processing | 2.3.10 | `google/ksp` release `2.3.10` | Apache-2.0 | Room3 Kotlin code generation in `data-persistence` |
 | Jetpack Compose BOM | 2026.06.00 | AndroidX stable BOM | Apache-2.0 | UI version alignment |
 | Android SDK Platform | Android 17 / API 37 (`platforms;android-37.0`) | Google Android SDK; Gradle uses `compileSdk = 37`, `targetSdk = 37`; SDK repository package uses the 37.0 identifier | Android SDK license | Locked initial platform target |
 | Android SDK Command-Line Tools | build 15859902 | Current Google Linux command-line-tools download on 2026-08-15 | Android SDK license | CI SDK package resolution |
 | Android SDK Build Tools | 36.0.0 | Google Android SDK; AGP 9.3 documented default | Android SDK license | Android packaging/build tools |
-| Android 17 emulator image | `system-images;android-37.0;google_apis_ps16k;x86_64` | Google Android SDK system image; Google-hosted Chromium AVD config records API 37 r5 | Android SDK/system-image licenses | Gate A Compose instrumentation tests |
-| Android NDK | 28.2.13676358 | Google Android NDK; AGP 9.3 documented default | Android NDK licenses/notices | Pinned baseline for later native engine integration; no M0-M5 native source yet |
+| Android 17 emulator image | `system-images;android-37.0;google_apis_ps16k;x86_64` | Google Android SDK system image; Google-hosted Chromium AVD config records API 37 r5 | Android SDK/system-image licenses | Gate A and Room instrumentation tests |
+| Android NDK | 28.2.13676358 | Google Android NDK; AGP 9.3 documented default | Android NDK licenses/notices | Pinned baseline for later native engine integration; no M0-M8 native source yet |
 | AndroidX Activity | 1.13.0 | AndroidX | Apache-2.0 | Compose activity host |
 | AndroidX Lifecycle | 2.11.0 | AndroidX | Apache-2.0 | Lifecycle/ViewModel baseline |
-| Room | 2.8.4 | AndroidX | Apache-2.0 | Persistence from M8 |
+| AndroidX Room3 | 3.0.1 | AndroidX Room3 stable release, 2026-07-29 | Apache-2.0 | Canonical Room persistence from M8 |
+| AndroidX SQLite | 2.7.0 | AndroidX SQLite stable release, 2026-07-01 | Apache-2.0 | `AndroidSQLiteDriver` backing Room3 |
 | DataStore | 1.2.1 | AndroidX | Apache-2.0 | Preferences/settings from M9 |
 | WorkManager | 2.11.2 | AndroidX | Apache-2.0 | Persistent queues from M36 |
 | AndroidX Test Runner | 1.7.0 | AndroidX stable test line | Apache-2.0 | Instrumented test runtime |
@@ -45,6 +47,16 @@ Authoritative Android/Google sources checked on 2026-08-15:
 - Compose BOM (current stable BOM 2026.06.00): https://developer.android.com/develop/ui/compose/bom
 - Gradle distribution/wrapper checksum reference: https://gradle.org/release-checksums/
 
+## M8 persistence verification sources
+
+Authoritative AndroidX/KSP sources checked on 2026-08-15:
+
+- Room3 stable release table and dependency declarations (`androidx.room3:room3-*:3.0.1`, released 2026-07-29): https://developer.android.com/jetpack/androidx/releases/room3
+- Room 2.x to Room 3 migration guidance (Room3 package/artifact rename, KSP requirement, coroutine DAOs, and `SQLiteDriver` APIs): https://developer.android.com/training/data-storage/room/migration-2-to-3
+- Room schema export and migration testing guidance (`room3-testing`, checked-in schema JSON, and Room Gradle Plugin schema directory): https://developer.android.com/training/data-storage/room/migrating-db-versions
+- AndroidX SQLite stable release table (`2.7.0`, released 2026-07-01): https://developer.android.com/jetpack/androidx/releases/sqlite
+- Kotlin Symbol Processing release `2.3.10`: https://github.com/google/ksp/releases
+
 The existence of an AGP 9.4 release-notes page is not evidence that 9.4 is stable. Google's current Android Studio channel table identifies AGP 9.3.0 as Stable, while the 9.4 release notes currently enumerate `9.4.0-alpha*` builds.
 
 Gate A's API 37 CI failure was ultimately a package-identifier mismatch. Both the runner's older sdkmanager and current command-line tools build 15859902 rejected `platforms;android-37`. Google's SDK packaging for this release uses `platforms;android-37.0`; a Google-hosted Chromium packaging change explicitly corrected the missing decimal. The Gradle-facing Android API level remains 37, so `compileSdk = 37` and `targetSdk = 37` stay unchanged.
@@ -54,6 +66,8 @@ CI still pins current command-line tools because Google's SDK Platform guidance 
 The imported snapshot's custom Gradle bootstrap JAR was also rejected by `gradle/actions/setup-gradle` wrapper validation. It has been replaced with Gradle-generated wrapper artifacts; the validation check remains enabled rather than being bypassed.
 
 When Gate A first executed the existing Compose instrumentation test on Android 17, the test runtime failed before reaching LumenChess assertions because an older transitive Espresso implementation reflected `InputManager.getInstance()`. AndroidX Espresso 3.7.0 is the current stable release and explicitly fixes that path by using `getSystemService`; Gate A therefore pins `espresso-core:3.7.0` directly for Android tests rather than changing or weakening the existing test.
+
+M8 uses Room3 rather than the previously planned Room 2.x line because Room3 3.0.1 is now the current stable AndroidX Room generation. Room3 requires KSP and `SQLiteDriver` APIs, so the persistence module uses KSP 2.3.10 with Kotlin 2.3.21 and `AndroidSQLiteDriver` from AndroidX SQLite 2.7.0. Room schema export stays enabled and the generated version-1 schema is version-controlled to make future migration testing an explicit project requirement rather than an optional later cleanup.
 
 ## Distribution gate
 This file records provenance; it is not legal advice. Before any public APK/AAB distribution, verify the complete transitive/shipped dependency set, required notices/source-offer obligations, and the compatibility of the chosen LumenChess license/distribution model.
