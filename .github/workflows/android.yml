@@ -26,9 +26,9 @@ jobs:
             "system-images;android-37.0;google_apis_ps16k;x86_64" \
             --channel=3
       - uses: gradle/actions/setup-gradle@v4
-      - name: Verify Gate A build and JVM tests
-        run: ./gradlew :core-chess:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
-      - name: Run Compose instrumentation tests on Android 17
+      - name: Verify Gate A, chess core, Room module, lint, and assemblies
+        run: ./gradlew :core-chess:test :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Run instrumentation tests on Android 17
         run: |
           echo "no" | avdmanager create avd \
             --force \
@@ -81,4 +81,4 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-          ./gradlew :app:connectedDebugAndroidTest
+          ./gradlew :data-persistence:connectedDebugAndroidTest :app:connectedDebugAndroidTest

@@ -37,6 +37,7 @@ dependencies {
     debugImplementation(platform(libs.compose.bom))
 
     implementation(project(":core-chess"))
+    implementation(project(":data-persistence"))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.compose.ui)
