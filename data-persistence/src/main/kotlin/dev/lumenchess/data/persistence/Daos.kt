@@ -118,9 +118,27 @@ interface ReviewDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertPly(entity: ReviewPlyEntity)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertHeavy(entity: ReviewHeavyAnalysisEntity)
     @Query("DELETE FROM review_heavy_analysis WHERE reviewPlyId IN (SELECT id FROM review_plies WHERE reviewId = :reviewId)") suspend fun deleteHeavyForReview(reviewId: String): Int
-    @Query("SELECT * FROM review_heavy_analysis ORDER BY createdAtEpochMillis, id") suspend fun heavyOldestFirst(): List<ReviewHeavyAnalysisEntity>
+    @Query("SELECT id FROM review_heavy_analysis ORDER BY createdAtEpochMillis, id") suspend fun heavyIdsOldestFirst(): List<String>
+    @Query(
+        """
+        SELECT id FROM review_heavy_analysis
+        WHERE createdAtEpochMillis < :cutoffEpochMillis
+        ORDER BY createdAtEpochMillis, id
+        LIMIT :limit
+        """,
+    )
+    suspend fun heavyIdsOlderThan(cutoffEpochMillis: Long, limit: Int): List<String>
+    @Query(
+        """
+        SELECT id FROM review_heavy_analysis
+        ORDER BY createdAtEpochMillis DESC, id DESC
+        LIMIT :limit OFFSET :maxRetainedCount
+        """,
+    )
+    suspend fun heavyIdsBeyondNewest(maxRetainedCount: Int, limit: Int): List<String>
     @Query("DELETE FROM review_heavy_analysis WHERE id IN (:ids)") suspend fun deleteHeavyByIds(ids: List<String>): Int
     @Query("SELECT COUNT(*) FROM reviews WHERE gameId = :gameId") suspend fun countReviewsForGame(gameId: String): Int
+    @Query("SELECT COUNT(*) FROM review_plies WHERE gameId = :gameId") suspend fun countReviewPliesForGame(gameId: String): Int
     @Query("SELECT COUNT(*) FROM review_heavy_analysis") suspend fun countHeavy(): Int
 }
 
