@@ -8,7 +8,20 @@ import androidx.room3.Query
 @Dao
 interface ParticipantDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insert(entity: ParticipantEntity)
+    @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertExternalIdentity(entity: ParticipantExternalIdentityEntity)
     @Query("SELECT * FROM participants WHERE id = :id") suspend fun byId(id: String): ParticipantEntity?
+    @Query(
+        """
+        SELECT * FROM participant_external_identities
+        WHERE sourceType = :sourceType AND sourceAccountScope = :sourceAccountScope AND externalParticipantId = :externalParticipantId
+        """,
+    )
+    suspend fun externalIdentity(
+        sourceType: String,
+        sourceAccountScope: String,
+        externalParticipantId: String,
+    ): ParticipantExternalIdentityEntity?
+    @Query("SELECT COUNT(*) FROM participant_external_identities WHERE participantId = :participantId") suspend fun externalIdentityCount(participantId: String): Int
     @Query("SELECT COUNT(*) FROM participants") suspend fun countAll(): Int
 }
 
@@ -33,6 +46,9 @@ interface GameDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertAnnotations(entities: List<GameNodeAnnotationEntity>)
 
     @Query("SELECT * FROM games WHERE id = :id") suspend fun gameById(id: String): GameEntity?
+    @Query("SELECT id FROM games WHERE contentFingerprint = :fingerprint ORDER BY createdAtEpochMillis, id") suspend fun gameIdsByFingerprint(fingerprint: String): List<String>
+    @Query("SELECT id FROM games WHERE contentFingerprint IS NULL ORDER BY id") suspend fun gameIdsMissingFingerprint(): List<String>
+    @Query("UPDATE games SET contentFingerprint = :fingerprint WHERE id = :id AND contentFingerprint IS NULL") suspend fun setFingerprintIfMissing(id: String, fingerprint: String): Int
     @Query("SELECT * FROM game_headers WHERE gameId = :gameId ORDER BY orderIndex") suspend fun headersForGame(gameId: String): List<GameHeaderEntity>
     @Query("SELECT * FROM game_nodes WHERE gameId = :gameId ORDER BY parentNodeId, siblingOrder, id") suspend fun nodesForGame(gameId: String): List<GameNodeEntity>
     @Query("SELECT * FROM game_node_comments WHERE gameId = :gameId ORDER BY nodeId, kind, orderIndex, id") suspend fun commentsForGame(gameId: String): List<GameNodeCommentEntity>
@@ -59,8 +75,40 @@ interface GameDao {
 interface SourceDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertSources(entities: List<GameSourceEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertMetadata(entities: List<GameSourceMetadataEntity>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertMetadata(entities: List<GameSourceMetadataEntity>)
     @Query("SELECT * FROM game_sources WHERE gameId = :gameId ORDER BY id") suspend fun forGame(gameId: String): List<GameSourceEntity>
     @Query("SELECT * FROM game_source_metadata WHERE sourceId IN (:sourceIds) ORDER BY sourceId, key") suspend fun metadataForSources(sourceIds: List<String>): List<GameSourceMetadataEntity>
+    @Query(
+        """
+        SELECT * FROM game_sources
+        WHERE sourceType = :sourceType AND sourceAccountScope = :sourceAccountScope AND externalGameId = :externalGameId
+        LIMIT 1
+        """,
+    )
+    suspend fun byStrongIdentity(sourceType: String, sourceAccountScope: String, externalGameId: String): GameSourceEntity?
+    @Query(
+        """
+        UPDATE game_sources
+        SET externalUrl = COALESCE(:externalUrl, externalUrl),
+            importedAtEpochMillis = CASE
+                WHEN importedAtEpochMillis IS NULL THEN :importedAtEpochMillis
+                WHEN :importedAtEpochMillis IS NULL THEN importedAtEpochMillis
+                ELSE MIN(importedAtEpochMillis, :importedAtEpochMillis)
+            END,
+            lastSyncedAtEpochMillis = CASE
+                WHEN lastSyncedAtEpochMillis IS NULL THEN :lastSyncedAtEpochMillis
+                WHEN :lastSyncedAtEpochMillis IS NULL THEN lastSyncedAtEpochMillis
+                ELSE MAX(lastSyncedAtEpochMillis, :lastSyncedAtEpochMillis)
+            END
+        WHERE id = :id
+        """,
+    )
+    suspend fun refreshSource(
+        id: String,
+        externalUrl: String?,
+        importedAtEpochMillis: Long?,
+        lastSyncedAtEpochMillis: Long?,
+    ): Int
     @Query("SELECT COUNT(*) FROM game_sources WHERE gameId = :gameId") suspend fun countForGame(gameId: String): Int
 }
 
@@ -70,6 +118,8 @@ interface ReviewDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertPly(entity: ReviewPlyEntity)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertHeavy(entity: ReviewHeavyAnalysisEntity)
     @Query("DELETE FROM review_heavy_analysis WHERE reviewPlyId IN (SELECT id FROM review_plies WHERE reviewId = :reviewId)") suspend fun deleteHeavyForReview(reviewId: String): Int
+    @Query("SELECT * FROM review_heavy_analysis ORDER BY createdAtEpochMillis, id") suspend fun heavyOldestFirst(): List<ReviewHeavyAnalysisEntity>
+    @Query("DELETE FROM review_heavy_analysis WHERE id IN (:ids)") suspend fun deleteHeavyByIds(ids: List<String>): Int
     @Query("SELECT COUNT(*) FROM reviews WHERE gameId = :gameId") suspend fun countReviewsForGame(gameId: String): Int
     @Query("SELECT COUNT(*) FROM review_heavy_analysis") suspend fun countHeavy(): Int
 }
