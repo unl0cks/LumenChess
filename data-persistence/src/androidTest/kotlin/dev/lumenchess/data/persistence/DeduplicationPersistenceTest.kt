@@ -79,12 +79,13 @@ class DeduplicationPersistenceTest {
 
     @Test
     fun identicalContentAloneNeverAutoMergesIndependentCanonicalSaves() = runBlocking {
-        val tree = Pgn.parseGame("[Event \"one\"]\n[Result \"*\"]\n\n1. Nf3 d5 *")
-        val first = repository.saveGame(PersistGameRequest(tree))
-        val second = repository.saveGame(PersistGameRequest(tree.withHeaders(linkedMapOf("Event" to "two"))))
+        val firstTree = Pgn.parseGame("[Event \"one\"]\n[Result \"*\"]\n\n1. Nf3 d5 *")
+        val secondTree = Pgn.parseGame("[Event \"two\"]\n[Result \"*\"]\n\n1. Nf3 d5 *")
+        val first = repository.saveGame(PersistGameRequest(firstTree))
+        val second = repository.saveGame(PersistGameRequest(secondTree))
 
         assertNotEquals(first, second)
-        val candidates = repository.findContentCandidates(tree)
+        val candidates = repository.findContentCandidates(firstTree)
         assertEquals(setOf(first, second), candidates.toSet())
         assertEquals(2, database.gameDao().countGames())
     }
