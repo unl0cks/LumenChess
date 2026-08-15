@@ -106,15 +106,21 @@ class PersistenceRecoveryTest {
         database = LumenDatabaseFactory.open(context, fileDatabaseName)
         repository = GamePersistenceRepository(database)
         val tree = Pgn.parseGame("[Result \"*\"]\n\n1. e4 c5 2. Nf3 *")
+        val expectedFingerprint = GameContentFingerprint.compute(tree)
         val id = repository.persistExternalGame(
             PersistGameRequest(tree),
             GameSourceDraft(GameSourceType.LICHESS, externalGameId = "reopen", sourceAccountId = "acct"),
         )
+        val fingerprintBeforeClose = database.gameDao().gameById(id.value)!!.contentFingerprint
+        assertEquals(expectedFingerprint, fingerprintBeforeClose)
         database.close()
 
         database = LumenDatabaseFactory.open(context, fileDatabaseName)
         repository = GamePersistenceRepository(database)
+        val fingerprintAfterReopen = database.gameDao().gameById(id.value)!!.contentFingerprint
         val loaded = requireNotNull(repository.loadGame(id))
+        assertEquals(fingerprintBeforeClose, fingerprintAfterReopen)
+        assertEquals(expectedFingerprint, fingerprintAfterReopen)
         assertEquals(tree.mainline().map { it.move }, loaded.tree.mainline().map { it.move })
         assertEquals(id, repository.persistExternalGame(PersistGameRequest(tree), GameSourceDraft(GameSourceType.LICHESS, externalGameId = "reopen", sourceAccountId = "acct")))
     }
