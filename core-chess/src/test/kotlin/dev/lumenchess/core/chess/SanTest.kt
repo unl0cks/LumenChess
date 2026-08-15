@@ -18,7 +18,7 @@ class SanTest {
     @Test
     fun capturesAndPawnCapturesUseCanonicalSan() {
         val pieceCapture = standard("7k/8/8/3p4/8/8/8/3QK3 w - - 0 1")
-        assertSan(pieceCapture, "d1d5", "Qxd5+")
+        assertSan(pieceCapture, "d1d5", "Qxd5")
 
         val pawnCapture = standard("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1")
         assertSan(pawnCapture, "e4d5", "exd5")
