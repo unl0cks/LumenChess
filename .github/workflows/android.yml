@@ -92,4 +92,8 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-          ./gradlew :data-persistence:connectedDebugAndroidTest :app:connectedDebugAndroidTest
+          if ! ./gradlew :data-persistence:connectedDebugAndroidTest :app:connectedDebugAndroidTest; then
+            echo "==== Android instrumentation XML reports ===="
+            find data-persistence/build app/build -type f \( -name 'TEST-*.xml' -o -name '*.xml' \) -path '*androidTest-results*' -print -exec cat {} \; || true
+            exit 1
+          fi
