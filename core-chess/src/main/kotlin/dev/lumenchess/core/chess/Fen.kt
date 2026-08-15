@@ -1,7 +1,7 @@
 package dev.lumenchess.core.chess
 
 object Fen {
-    fun parse(fen: String): Position {
+    fun parse(fen: String, variant: Variant = Variant.STANDARD): Position {
         val fields = fen.trim().split(Regex("\\s+"))
         require(fields.size == 6) { "FEN must contain 6 fields" }
 
@@ -11,17 +11,15 @@ object Fen {
             "b" -> Color.BLACK
             else -> throw IllegalArgumentException("Invalid active color: ${fields[1]}")
         }
-        val castling = parseCastling(fields[2])
+        validateKings(board)
+        val castling = parseCastling(fields[2], board, variant)
         val ep = parseEnPassant(fields[3], side, board)
         val halfmove = fields[4].toIntOrNull() ?: throw IllegalArgumentException("Invalid halfmove clock")
         val fullmove = fields[5].toIntOrNull() ?: throw IllegalArgumentException("Invalid fullmove number")
         require(halfmove >= 0) { "Halfmove clock cannot be negative" }
         require(fullmove >= 1) { "Fullmove number must be at least 1" }
 
-        validateKings(board)
-        validateStandardCastling(board, castling)
-
-        return Position(board, side, castling, ep, halfmove, fullmove)
+        return Position(board, side, castling, ep, halfmove, fullmove, variant)
     }
 
     fun serialize(position: Position): String {
@@ -42,8 +40,12 @@ object Fen {
             }
         }
         val side = if (position.sideToMove == Color.WHITE) "w" else "b"
+        val castling = when (position.variant) {
+            Variant.STANDARD -> position.castlingRights.toFen()
+            Variant.CHESS960 -> serializeChess960Castling(position.castlingRights)
+        }
         val ep = position.enPassantSquare?.algebraic ?: "-"
-        return "$boardField $side ${position.castlingRights.toFen()} $ep ${position.halfmoveClock} ${position.fullmoveNumber}"
+        return "$boardField $side $castling $ep ${position.halfmoveClock} ${position.fullmoveNumber}"
     }
 
     private fun parseBoard(value: String): List<Piece?> {
@@ -69,13 +71,111 @@ object Fen {
         return board
     }
 
-    private fun parseCastling(value: String): CastlingRights {
+    private fun parseCastling(value: String, board: List<Piece?>, variant: Variant): CastlingRights = when (variant) {
+        Variant.STANDARD -> parseStandardCastling(value, board)
+        Variant.CHESS960 -> parseChess960Castling(value, board)
+    }
+
+    private fun parseStandardCastling(value: String, board: List<Piece?>): CastlingRights {
         if (value == "-") return CastlingRights()
         require(value.isNotEmpty()) { "Invalid castling field" }
         require(value.toSet().size == value.length) { "Duplicate castling right" }
         require(value.all { it in "KQkq" }) { "Invalid castling right: $value" }
-        return CastlingRights('K' in value, 'Q' in value, 'k' in value, 'q' in value)
+        val rights = CastlingRights('K' in value, 'Q' in value, 'k' in value, 'q' in value)
+        validateStandardCastling(board, rights)
+        return rights
     }
+
+    private fun parseChess960Castling(value: String, board: List<Piece?>): CastlingRights {
+        if (value == "-") return CastlingRights()
+        require(value.isNotEmpty()) { "Invalid castling field" }
+        require(value.length <= 4) { "A position cannot have more than four castling rights" }
+        require(value.toSet().size == value.length) { "Duplicate castling right" }
+
+        var whiteKingSide: Square? = null
+        var whiteQueenSide: Square? = null
+        var blackKingSide: Square? = null
+        var blackQueenSide: Square? = null
+
+        fun assign(color: Color, side: CastleSide, rook: Square) {
+            when (color to side) {
+                Color.WHITE to CastleSide.KING_SIDE -> {
+                    require(whiteKingSide == null) { "Duplicate white kingside castling right" }
+                    whiteKingSide = rook
+                }
+                Color.WHITE to CastleSide.QUEEN_SIDE -> {
+                    require(whiteQueenSide == null) { "Duplicate white queenside castling right" }
+                    whiteQueenSide = rook
+                }
+                Color.BLACK to CastleSide.KING_SIDE -> {
+                    require(blackKingSide == null) { "Duplicate black kingside castling right" }
+                    blackKingSide = rook
+                }
+                Color.BLACK to CastleSide.QUEEN_SIDE -> {
+                    require(blackQueenSide == null) { "Duplicate black queenside castling right" }
+                    blackQueenSide = rook
+                }
+                else -> error("Unreachable color/castle-side combination")
+            }
+        }
+
+        for (token in value) {
+            val color = if (token.isUpperCase()) Color.WHITE else Color.BLACK
+            val upper = token.uppercaseChar()
+            require(upper == 'K' || upper == 'Q' || upper in 'A'..'H') { "Invalid Chess960 castling right: $token" }
+            val king = kingSquare(board, color)
+            val homeRank = if (color == Color.WHITE) 0 else 7
+            require(king.rank == homeRank) { "Chess960 castling right requires the king on its home rank" }
+
+            val rook = when (upper) {
+                'K' -> findXFenRook(board, color, king, CastleSide.KING_SIDE)
+                'Q' -> findXFenRook(board, color, king, CastleSide.QUEEN_SIDE)
+                else -> {
+                    val candidate = Square.of(upper - 'A', homeRank)
+                    require(board[candidate.index] == Piece(color, PieceType.ROOK)) {
+                        "Chess960 castling right $token requires a ${color.name.lowercase()} rook on ${candidate.algebraic}"
+                    }
+                    candidate
+                }
+            }
+
+            val side = when {
+                rook.file > king.file -> CastleSide.KING_SIDE
+                rook.file < king.file -> CastleSide.QUEEN_SIDE
+                else -> throw IllegalArgumentException("Castling rook cannot share the king file")
+            }
+            if (upper == 'K') require(side == CastleSide.KING_SIDE) { "K/k castling right has no kingside rook" }
+            if (upper == 'Q') require(side == CastleSide.QUEEN_SIDE) { "Q/q castling right has no queenside rook" }
+            assign(color, side, rook)
+        }
+
+        return CastlingRights(
+            whiteKingSideRook = whiteKingSide,
+            whiteQueenSideRook = whiteQueenSide,
+            blackKingSideRook = blackKingSide,
+            blackQueenSideRook = blackQueenSide,
+        )
+    }
+
+    private fun findXFenRook(board: List<Piece?>, color: Color, king: Square, side: CastleSide): Square {
+        val homeRank = if (color == Color.WHITE) 0 else 7
+        val files: IntProgression = when (side) {
+            CastleSide.KING_SIDE -> 7 downTo (king.file + 1)
+            CastleSide.QUEEN_SIDE -> 0 until king.file
+        }
+        for (file in files) {
+            val square = Square.of(file, homeRank)
+            if (board[square.index] == Piece(color, PieceType.ROOK)) return square
+        }
+        throw IllegalArgumentException("X-FEN ${if (side == CastleSide.KING_SIDE) "K" else "Q"} right has no matching rook")
+    }
+
+    private fun serializeChess960Castling(rights: CastlingRights): String = buildString {
+        rights.whiteKingSideRook?.let { append(('A'.code + it.file).toChar()) }
+        rights.whiteQueenSideRook?.let { append(('A'.code + it.file).toChar()) }
+        rights.blackKingSideRook?.let { append(('a'.code + it.file).toChar()) }
+        rights.blackQueenSideRook?.let { append(('a'.code + it.file).toChar()) }
+    }.ifEmpty { "-" }
 
     private fun parseEnPassant(value: String, side: Color, board: List<Piece?>): Square? {
         if (value == "-") return null
@@ -94,6 +194,9 @@ object Fen {
         val blackKings = board.count { it == Piece(Color.BLACK, PieceType.KING) }
         require(whiteKings == 1 && blackKings == 1) { "Position must contain exactly one king per side" }
     }
+
+    private fun kingSquare(board: List<Piece?>, color: Color): Square =
+        Square.fromIndex(board.indexOf(Piece(color, PieceType.KING)).also { require(it >= 0) })
 
     private fun validateStandardCastling(board: List<Piece?>, rights: CastlingRights) {
         if (rights.whiteKingSide || rights.whiteQueenSide) {
