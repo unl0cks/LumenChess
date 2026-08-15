@@ -39,7 +39,7 @@ val MIGRATION_1_2 = Migration(1, 2) { connection ->
     )
 
     connection.execSQL(
-        "CREATE INDEX IF NOT EXISTS `index_review_heavy_analysis_createdAtEpochMillis` " +
-            "ON `review_heavy_analysis` (`createdAtEpochMillis`)",
+        "CREATE INDEX IF NOT EXISTS `index_review_heavy_analysis_createdAtEpochMillis_id` " +
+            "ON `review_heavy_analysis` (`createdAtEpochMillis`, `id`)",
     )
 }
