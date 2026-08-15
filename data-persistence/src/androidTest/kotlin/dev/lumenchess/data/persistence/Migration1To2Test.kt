@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -93,6 +94,26 @@ class Migration1To2Test {
         assertEquals("remote-value", scalarText(v2, "SELECT value FROM game_source_metadata WHERE sourceId='src-1' AND key='remote-key'"))
         assertFalse(scalarIsNull(v2, "SELECT gameId FROM rating_events WHERE id='rating-1'"))
         v2.close()
+    }
+
+    @Test
+    fun migrationRefusesAmbiguousPreexistingStrongSourceIdentityInsteadOfGuessing() = runBlocking {
+        val v1 = helper.createDatabase(1)
+        v1.execSQL(
+            "INSERT INTO games VALUES ('g-a','STANDARD','rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',NULL,NULL,1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)",
+        )
+        v1.execSQL(
+            "INSERT INTO games VALUES ('g-b','STANDARD','rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)",
+        )
+        v1.execSQL("INSERT INTO game_sources VALUES ('source-a','g-a','LICHESS','same-external-id',NULL,1,NULL,'same-account')")
+        v1.execSQL("INSERT INTO game_sources VALUES ('source-b','g-b','LICHESS','same-external-id',NULL,2,NULL,'same-account')")
+        v1.close()
+
+        val error = runCatching {
+            helper.runMigrationsAndValidate(2, listOf(MIGRATION_1_2)).close()
+        }.exceptionOrNull()
+
+        assertNotNull(error)
     }
 
     private fun scalarLong(connection: androidx.sqlite.SQLiteConnection, sql: String): Long =
