@@ -28,6 +28,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Verify Gate A, chess core, Room module, lint, and assemblies
         run: ./gradlew :core-chess:test :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Inspect generated Room schema
+        run: |
+          find data-persistence/schemas -type f -print | sort
+          while IFS= read -r schema; do
+            echo "===== ${schema} ====="
+            cat "$schema"
+          done < <(find data-persistence/schemas -type f -print | sort)
       - name: Run instrumentation tests on Android 17
         run: |
           echo "no" | avdmanager create avd \
