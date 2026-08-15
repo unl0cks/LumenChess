@@ -52,7 +52,7 @@ This deliberately prefers false-negative duplicates over false-positive merges. 
 
 Refreshing an already-known strong source identity updates only provenance-owned fields. Incoming source metadata keys are upserted; absent previously stored keys remain. Import/sync timestamps are merged deterministically (earliest import, latest sync), and a supplied source URL may refresh the source record.
 
-A source refresh does not rewrite the canonical tree, PGN headers, comments, branches, NAGs, annotations, participant associations, review summaries, or rating history. If the same strong source identity arrives with a different semantic chess fingerprint, persistence fails with a conflict rather than replacing user-owned canonical data.
+A source refresh does not rewrite the canonical tree, PGN headers, comments, branches, NAGs, annotations, participant associations, review summaries, rating history, or typed canonical game metadata such as result, termination, rated state, timestamps, or time-control fields. Those canonical values remain first-persisted/explicitly-owned in M9; a future source-aware correction policy must be explicit rather than silently preferring the latest remote representation. If the same strong source identity arrives with a different semantic chess fingerprint, persistence fails with a conflict rather than replacing user-owned canonical data.
 
 ### Participant identity
 
