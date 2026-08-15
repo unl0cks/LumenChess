@@ -17,7 +17,7 @@ jobs:
         with:
           cmdline-tools-version: 15859902
       - name: Install Android 17 SDK and pinned NDK
-        run: sdkmanager "platforms;android-37" "build-tools;36.0.0" "ndk;28.2.13676358" --channel=3
+        run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;28.2.13676358" --channel=3
       - uses: gradle/actions/setup-gradle@v4
       - name: Verify Gate A
         run: ./gradlew :core-chess:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
