@@ -41,6 +41,12 @@ class SanTest {
     }
 
     @Test
+    fun promotionCheckmateIsGeneratedAndParsed() {
+        val position = standard("2k5/P7/2K5/8/8/8/8/8 w - - 0 1")
+        assertSan(position, "a7a8q", "a8=Q#")
+    }
+
+    @Test
     fun enPassantIsARegularPawnCaptureInSan() {
         val position = standard("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 2")
         assertSan(position, "e5d6", "exd6")
