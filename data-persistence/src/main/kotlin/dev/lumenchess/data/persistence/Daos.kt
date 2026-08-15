@@ -39,6 +39,7 @@ interface GameDao {
     @Query("SELECT * FROM game_node_nags WHERE gameId = :gameId ORDER BY nodeId, orderIndex") suspend fun nagsForGame(gameId: String): List<GameNodeNagEntity>
     @Query("SELECT * FROM game_node_annotations WHERE gameId = :gameId ORDER BY nodeId, key") suspend fun annotationsForGame(gameId: String): List<GameNodeAnnotationEntity>
     @Query("SELECT id FROM game_nodes WHERE gameId = :gameId ORDER BY id") suspend fun nodeIdsForGame(gameId: String): List<String>
+    @Query("SELECT COUNT(*) FROM games") suspend fun countGames(): Int
     @Query("SELECT COUNT(*) FROM game_nodes WHERE gameId = :gameId") suspend fun countNodes(gameId: String): Int
     @Query("DELETE FROM games WHERE id = :id") suspend fun deleteGame(id: String): Int
     @Query(
