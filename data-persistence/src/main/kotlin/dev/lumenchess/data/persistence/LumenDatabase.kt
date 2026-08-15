@@ -9,6 +9,7 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
 @Database(
     entities = [
         ParticipantEntity::class,
+        ParticipantExternalIdentityEntity::class,
         GameEntity::class,
         GameHeaderEntity::class,
         GameNodeEntity::class,
@@ -23,7 +24,7 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         SavedPositionEntity::class,
         RatingEventEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class LumenDatabase : RoomDatabase() {
@@ -41,6 +42,7 @@ object LumenDatabaseFactory {
     fun open(context: Context, name: String = DEFAULT_NAME): LumenDatabase =
         Room.databaseBuilder(context.applicationContext, LumenDatabase::class.java, name)
             .setDriver(AndroidSQLiteDriver())
+            .addMigrations(MIGRATION_1_2)
             .build()
 
     fun inMemory(context: Context): LumenDatabase =
