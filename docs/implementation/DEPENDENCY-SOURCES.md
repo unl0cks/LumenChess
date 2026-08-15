@@ -7,12 +7,13 @@ Updated: 2026-08-15. Exact records are required for every shipped dependency/sou
 | Stockfish | `sf_18` | `official-stockfish/Stockfish` commit `cb3d4ee9b47d0c5aae855b12379378ea1439675c` | GPL-3.0-or-later | Mandatory engine; integration begins M13 |
 | Reckless | `v0.9.0` | `codedeliveryservice/Reckless` commit `0e92358f5acd66e5ac77b1bf558202e47c515435` | AGPL-3.0 | Mandatory engine; integration begins M14 |
 | Android Gradle Plugin | 9.3.0 | Google Android build tooling; current stable channel | Apache-2.0 / component notices | Build tooling |
-| Gradle | 9.5.0 | Gradle distribution; AGP 9.3 documented minimum/default | Apache-2.0 | Build tooling |
+| Gradle | 9.5.0 | Gradle binary distribution; standard generated wrapper retained with CI wrapper validation enabled | Apache-2.0 | Build tooling |
 | Kotlin | 2.3.21 plugin line | JetBrains Kotlin; version used by Google's current Compose Compiler setup guidance | Apache-2.0 | Kotlin/JVM and Compose compiler plugin |
 | Jetpack Compose BOM | 2026.06.00 | AndroidX stable BOM | Apache-2.0 | UI version alignment |
 | Android SDK Platform | Android 17 / API 37 (`platforms;android-37.0`) | Google Android SDK; Gradle uses `compileSdk = 37`, `targetSdk = 37`; SDK repository package uses the 37.0 identifier | Android SDK license | Locked initial platform target |
 | Android SDK Command-Line Tools | build 15859902 | Current Google Linux command-line-tools download on 2026-08-15 | Android SDK license | CI SDK package resolution |
 | Android SDK Build Tools | 36.0.0 | Google Android SDK; AGP 9.3 documented default | Android SDK license | Android packaging/build tools |
+| Android 17 emulator image | `system-images;android-37.0;google_apis_ps16k;x86_64` | Google Android SDK system image; Google-hosted Chromium AVD config records API 37 r5 | Android SDK/system-image licenses | Gate A Compose instrumentation tests |
 | Android NDK | 28.2.13676358 | Google Android NDK; AGP 9.3 documented default | Android NDK licenses/notices | Pinned baseline for later native engine integration; no M0-M5 native source yet |
 | AndroidX Activity | 1.13.0 | AndroidX | Apache-2.0 | Compose activity host |
 | AndroidX Lifecycle | 2.11.0 | AndroidX | Apache-2.0 | Lifecycle/ViewModel baseline |
@@ -34,16 +35,21 @@ Authoritative Android/Google sources checked on 2026-08-15:
 - SDK Platform release notes (newest SDK components require the most recent Command-Line Tools): https://developer.android.com/tools/releases/platforms
 - Current Android Studio / command-line-tools download page (Linux build 15859902): https://developer.android.com/studio/
 - `sdkmanager` package-path and channel syntax: https://developer.android.com/tools/sdkmanager
-- Google-hosted Chromium Android SDK roll showing Android SDK 37.0, Build Tools 37.0.0, and platform package `android-37.0`: https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/adc8a6a38dc3af937727cb6c0102b60186aeb2a7
+- Android Emulator release notes (API 37 phone AVDs require at least 4 GB RAM): https://developer.android.com/studio/releases/emulator
+- Google-hosted Chromium Android SDK roll showing Android SDK 37.0, Build Tools 37.0.0, and API 37 system images: https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/558f465abde520c47e52eb6dcfff15bd75994cf8
 - Google-hosted Chromium correction explicitly renaming `android-37` to `android-37.0` because the decimal was missing: https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/1584c97931e42d0edb9335a657f0f4ba9484c43f
+- Google-hosted Chromium Android 17 AVD config (`system-images;android-37.0;google_apis_ps16k;x86_64`, r5): https://chromium.googlesource.com/chromium/src/+/main/tools/android/avd/proto/android_37_google_apis_ps16k_x64.textpb
 - Compose Compiler Gradle plugin (Kotlin/Compose compiler plugin 2.3.21): https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler
 - Compose BOM (current stable BOM 2026.06.00): https://developer.android.com/develop/ui/compose/bom
+- Gradle distribution/wrapper checksum reference: https://gradle.org/release-checksums/
 
 The existence of an AGP 9.4 release-notes page is not evidence that 9.4 is stable. Google's current Android Studio channel table identifies AGP 9.3.0 as Stable, while the 9.4 release notes currently enumerate `9.4.0-alpha*` builds.
 
-Gate A's API 37 CI failure was ultimately a package-identifier mismatch. Both the runner's older sdkmanager and current command-line tools build 15859902 rejected `platforms;android-37`. Google's SDK packaging for this release uses `platforms;android-37.0`; a Google-hosted Chromium packaging change explicitly corrected the missing decimal. The Gradle-facing Android API level remains 37, so `compileSdk = 37` and `targetSdk = 37` stay unchanged unless AGP itself proves otherwise during Gate A verification.
+Gate A's API 37 CI failure was ultimately a package-identifier mismatch. Both the runner's older sdkmanager and current command-line tools build 15859902 rejected `platforms;android-37`. Google's SDK packaging for this release uses `platforms;android-37.0`; a Google-hosted Chromium packaging change explicitly corrected the missing decimal. The Gradle-facing Android API level remains 37, so `compileSdk = 37` and `targetSdk = 37` stay unchanged.
 
 CI still pins current command-line tools because Google's SDK Platform guidance requires current tools to expose the newest components, but the command-line-tools version was not the root cause of the failed package lookup.
+
+The imported snapshot's custom Gradle bootstrap JAR was also rejected by `gradle/actions/setup-gradle` wrapper validation. It has been replaced with Gradle-generated wrapper artifacts; the validation check remains enabled rather than being bypassed.
 
 ## Distribution gate
 This file records provenance; it is not legal advice. Before any public APK/AAB distribution, verify the complete transitive/shipped dependency set, required notices/source-offer obligations, and the compatibility of the chosen LumenChess license/distribution model.

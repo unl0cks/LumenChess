@@ -12,7 +12,9 @@ Android's Android 17 documentation identifies the platform as API level 37 and s
 
 Gate A confirmed the distinction empirically: both the runner's older sdkmanager and current command-line tools build 15859902 rejected `platforms;android-37`. The latter rules out stale command-line tools as the root cause. Current command-line tools remain pinned because Google's SDK Platform guidance requires the most recent tools to expose the newest SDK components.
 
-Current Compose guidance uses Kotlin/Compose compiler plugin 2.3.21 and the stable Compose BOM 2026.06.00.
+The imported M0-M5 snapshot also contained a hand-written `gradle-wrapper.jar` bootstrap rather than a standard Gradle-generated wrapper. `gradle/actions/setup-gradle` correctly rejected that unknown JAR during wrapper validation. Gate A replaced the custom bootstrap with Gradle-generated wrapper artifacts and kept wrapper validation enabled; bypassing the validation check was explicitly rejected as the wrong fix.
+
+Current Compose guidance uses Kotlin/Compose compiler plugin 2.3.21 and the stable Compose BOM 2026.06.00. The existing M2 Compose semantics test is an instrumented Android test, so Gate A CI also needs a real Android 17 emulator rather than merely compiling the test APK. Google's current Android 17 x86_64 test image is `system-images;android-37.0;google_apis_ps16k;x86_64`; API 37 phone AVDs require at least 4 GB RAM.
 
 ## Decision
 Initial build baseline:
@@ -21,6 +23,7 @@ Initial build baseline:
 - `minSdk = 37` during the first compatibility phase; M47 may lower this after the foundation is stable.
 - Android Gradle Plugin 9.3.0 (current Stable channel).
 - Gradle 9.5.0 (AGP 9.3 documented minimum/default).
+- Standard Gradle-generated wrapper artifacts with wrapper validation left enabled.
 - JDK 17 toolchain.
 - Kotlin / Compose Compiler Gradle plugin 2.3.21.
 - Compose BOM 2026.06.00.
@@ -28,7 +31,8 @@ Initial build baseline:
 - Android SDK Command-Line Tools build 15859902 in CI.
 - Android SDK Build Tools 36.0.0 (AGP 9.3 documented default).
 - NDK 28.2.13676358 retained as the pinned baseline for later native engine work. No M0-M5 native source currently depends on the NDK.
-- Headless CI enables sdkmanager channel 3 while the Android 17 package remains on a preview-capable SDK channel.
+- Headless CI enables sdkmanager channel 3 while the Android 17 packages remain on a preview-capable SDK channel.
+- Compose instrumentation tests execute on `system-images;android-37.0;google_apis_ps16k;x86_64` with a 4 GB AVD.
 
 ## Verification sources
 - https://developer.android.com/studio/preview/features
@@ -39,17 +43,23 @@ Initial build baseline:
 - https://developer.android.com/tools/releases/platforms
 - https://developer.android.com/studio/
 - https://developer.android.com/tools/sdkmanager
+- https://developer.android.com/studio/run/emulator-troubleshooting
+- https://developer.android.com/studio/releases/emulator
 - https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/adc8a6a38dc3af937727cb6c0102b60186aeb2a7
 - https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/1584c97931e42d0edb9335a657f0f4ba9484c43f
+- https://chromium.googlesource.com/chromium/src/+/main/tools/android/avd/proto/android_37_google_apis_ps16k_x64.textpb
 - https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler
 - https://developer.android.com/develop/ui/compose/bom
+- https://gradle.org/release-checksums/
 
 ## Consequences
 - The locked Android 17/API 37 product target is preserved; Gate A does not downgrade the app to API 36 to work around CI package discovery.
 - The build uses Google's current stable AGP line rather than an AGP preview assumption.
 - Gradle is pinned to the version explicitly paired with AGP 9.3 by Google's compatibility table.
 - CI uses the SDK repository's actual Android 17 platform identifier, `platforms;android-37.0`, while Gradle continues to use API level 37.
-- CI pins current command-line tools rather than inheriting the older setup action default, even though stale tools were not the root cause of this failure.
+- CI pins current command-line tools rather than inheriting the older setup action default, even though stale tools were not the root cause of the failed platform lookup.
+- The nonstandard wrapper bootstrap is removed; Gradle's normal wrapper scripts/JAR are used and CI's wrapper-integrity validation remains active.
+- The existing Compose semantics test is executed on an Android 17 16 KB-page-size emulator image instead of only being compiled.
 - Early implementation remains free to use Android 17 APIs without pretending older versions are currently supported.
 - Broader compatibility remains a deliberate later pass, not accidental scope creep.
 - Native artifacts must be tested for modern Android packaging/16KB requirements before distribution.

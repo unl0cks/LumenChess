@@ -4,9 +4,6 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -19,25 +16,42 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 15859902
-      - name: Install Android 17 SDK and pinned NDK
-        run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;28.2.13676358" --channel=3
-      - name: Repair official Gradle wrapper once
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+          packages: platform-tools emulator
+      - name: Install Android 17 SDK, test image, and pinned NDK
         run: |
-          bootstrap_dir="$(mktemp -d)"
-          cd "$bootstrap_dir"
-          printf 'rootProject.name = "wrapper-bootstrap"\n' > settings.gradle
-          gradle wrapper --gradle-version 9.5.0 --distribution-type bin
-          cp gradlew gradlew.bat "$GITHUB_WORKSPACE/"
-          cp gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties "$GITHUB_WORKSPACE/gradle/wrapper/"
-          cd "$GITHUB_WORKSPACE"
-          if ! git diff --quiet -- gradlew gradlew.bat gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add gradlew gradlew.bat gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties
-            git commit -m "fix: replace bootstrap with official Gradle wrapper"
-            git push origin HEAD:main
-          fi
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "system-images;android-37.0;google_apis_ps16k;x86_64" \
+            --channel=3
       - uses: gradle/actions/setup-gradle@v4
-      - name: Verify Gate A
+      - name: Verify Gate A build and JVM tests
         run: ./gradlew :core-chess:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Run Compose instrumentation tests on Android 17
+        run: |
+          echo "no" | avdmanager create avd \
+            --force \
+            --name gate-a \
+            --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+          fi
+
+          emulator \
+            -avd gate-a \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -gpu swangle_indirect \
+            -memory 4096 \
+            > "$RUNNER_TEMP/gate-a-emulator.log" 2>&1 &
+
+          adb wait-for-device
+          timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          ./gradlew :app:connectedDebugAndroidTest
