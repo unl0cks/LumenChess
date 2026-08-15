@@ -108,7 +108,7 @@ class PgnTest {
             [Result "*"]
 
             1. e4 e5
-            (1... c5 {Sicilian} $1 2. Nf3 (2. d4 $5) Nc6)
+            (1... c5 {Sicilian} $1 2. Nf3 (2. d4 {center} $5) Nc6)
             (1... e6?!)
             2. Nf3 *
             """.trimIndent(),
@@ -123,6 +123,7 @@ class PgnTest {
         val c5Children = game.childrenOf(siblings[1].id)
         assertEquals(listOf("Nf3", "d4"), c5Children.map { it.san })
         assertEquals(listOf(Nag(5)), c5Children[1].nags)
+        assertEquals(listOf("center"), c5Children[1].comments)
         assertEquals("Nc6", game.mainlineChildOf(c5Children[0].id)?.san)
     }
 
@@ -309,7 +310,7 @@ class PgnTest {
             [Result "*"]
 
             1. e4 e5
-            (1... c5 {Sicilian} $1 2. Nf3 (2. d4 $5) Nc6)
+            (1... c5 {Sicilian} $1 2. Nf3 (2. d4 {center} $5) Nc6)
             (1... e6?!)
             2. Nf3 *
             """.trimIndent(),
