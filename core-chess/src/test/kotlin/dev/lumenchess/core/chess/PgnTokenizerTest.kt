@@ -9,7 +9,7 @@ class PgnTokenizerTest {
     @Test
     fun tokenizesTagsEscapedStringsMovetextCommentsNagsAndRavs() {
         val input = """
-            [Event "A \\"quoted\\" \\\\ path"]
+            [Event "A \"quoted\" \\ path"]
             [Result "1-0"]
 
             1. e4 {brace comment} e5 $1 (1... c5?! ;line comment
