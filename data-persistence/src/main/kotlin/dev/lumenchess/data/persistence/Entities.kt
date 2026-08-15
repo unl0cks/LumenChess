@@ -219,7 +219,7 @@ data class ReviewPlyEntity(
 @Entity(
     tableName = "review_heavy_analysis",
     foreignKeys = [ForeignKey(entity = ReviewPlyEntity::class, parentColumns = ["id"], childColumns = ["reviewPlyId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("reviewPlyId"), Index("createdAtEpochMillis")],
+    indices = [Index("reviewPlyId"), Index(value = ["createdAtEpochMillis", "id"])],
 )
 data class ReviewHeavyAnalysisEntity(
     @PrimaryKey val id: String,
