@@ -33,8 +33,19 @@ class DeduplicationPersistenceTest {
     fun tearDown() = database.close()
 
     @Test
-    fun repeatedStrongSourceIdentityIsIdempotentAndPreservesCanonicalUuid() = runBlocking {
-        val tree = Pgn.parseGame("[Result \"*\"]\n\n1. e4 e5 *")
+    fun repeatedStrongSourceIdentityIsIdempotentAndPreservesCanonicalUuidAndUserData() = runBlocking {
+        val tree = Pgn.parseGame(
+            """
+            [Event "Local rich metadata"]
+            [X-Local "keep-header"]
+            [Result "*"]
+
+            1. e4 {keep comment} e5 (1... c5 $1) *
+            """.trimIndent(),
+        )
+        val remoteRefreshTree = Pgn.parseGame(
+            "[Event \"Remote sparse metadata\"]\n[Result \"*\"]\n\n1. e4 e5 *",
+        )
         val source = GameSourceDraft(
             type = GameSourceType.CHESS_COM,
             externalGameId = "game-42",
@@ -45,7 +56,7 @@ class DeduplicationPersistenceTest {
 
         val first = repository.persistExternalGame(PersistGameRequest(tree), source)
         val second = repository.persistExternalGame(
-            PersistGameRequest(tree),
+            PersistGameRequest(remoteRefreshTree),
             source.copy(lastSyncedAtEpochMillis = 200, metadata = linkedMapOf("remote" to "updated")),
         )
 
@@ -55,6 +66,11 @@ class DeduplicationPersistenceTest {
         val loaded = requireNotNull(repository.loadGame(first))
         assertEquals("updated", loaded.sources.single().metadata["remote"])
         assertEquals("yes", loaded.sources.single().metadata["preserve"])
+        assertEquals("Local rich metadata", loaded.tree.headers["Event"])
+        assertEquals("keep-header", loaded.tree.headers["X-Local"])
+        assertEquals("keep comment", loaded.tree.mainline().first().comments.single())
+        assertEquals(listOf("e5", "c5"), loaded.tree.childrenOf(loaded.tree.mainline().first().id).map { it.san })
+        assertEquals(listOf(1), loaded.tree.childrenOf(loaded.tree.mainline().first().id)[1].nags.map { it.value })
     }
 
     @Test
@@ -181,5 +197,27 @@ class DeduplicationPersistenceTest {
         assertEquals(1, database.gameDao().countGames())
         assertEquals(1, database.sourceDao().countForGame(ids.first().value))
         assertNotNull(database.sourceDao().byStrongIdentity(GameSourceType.CHESS_COM.name, "account-race", "race"))
+    }
+
+    @Test
+    fun indexedCandidateAndStrongIdentityLookupsRemainBoundedAcrossModestLibrary() = runBlocking {
+        val targetTree = Pgn.parseGame("[Result \"*\"]\n\n1. e4 e5 *")
+        repeat(24) { index ->
+            val tree = if (index % 2 == 0) {
+                Pgn.parseGame("[Result \"*\"]\n\n1. d4 d5 2. c4 *")
+            } else {
+                Pgn.parseGame("[Result \"*\"]\n\n1. Nf3 Nf6 2. g3 *")
+            }
+            repository.saveGame(PersistGameRequest(tree))
+        }
+        val first = repository.saveGame(PersistGameRequest(targetTree))
+        val second = repository.saveGame(PersistGameRequest(targetTree))
+        repository.persistExternalGame(
+            PersistGameRequest(Pgn.parseGame("[Result \"*\"]\n\n1. c4 e5 *")),
+            GameSourceDraft(GameSourceType.LICHESS, externalGameId = "bounded-source", sourceAccountId = "acct"),
+        )
+
+        assertEquals(setOf(first, second), repository.findContentCandidates(targetTree).toSet())
+        assertNotNull(database.sourceDao().byStrongIdentity(GameSourceType.LICHESS.name, "acct", "bounded-source"))
     }
 }
