@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -28,6 +31,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Verify Gate A, chess core, Room module, lint, and assemblies
         run: ./gradlew :core-chess:test :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Check in generated Room schema once
+        if: github.ref == 'refs/heads/m8-canonical-room-schema' && github.actor != 'github-actions[bot]'
+        run: |
+          git add data-persistence/schemas
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "M8: check in generated Room schema v1"
+            git push origin HEAD:m8-canonical-room-schema
+          fi
       - name: Inspect generated Room schema
         run: |
           find data-persistence/schemas -type f -print | sort
