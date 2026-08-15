@@ -35,12 +35,14 @@ jobs:
             --name gate-a \
             --package "system-images;android-37.0;google_apis_ps16k;x86_64"
 
+          emulator_bin="$ANDROID_HOME/emulator/emulator"
+
           if [ -e /dev/kvm ]; then
             sudo chmod 666 /dev/kvm
           fi
-          emulator -accel-check || true
+          "$emulator_bin" -accel-check || true
 
-          emulator \
+          "$emulator_bin" \
             -avd gate-a \
             -no-window \
             -no-audio \
