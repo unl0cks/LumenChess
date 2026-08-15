@@ -262,7 +262,7 @@ class PgnTest {
     fun escapedHeaderValuesRoundTripSemantically() {
         val game = Pgn.parseGame(
             """
-            [Event "A \\"quoted\\" \\\\ path"]
+            [Event "A \"quoted\" \\ path"]
             [Result "*"]
 
             1. e4 *
