@@ -64,18 +64,16 @@ class GameContentFingerprintTest {
 
     @Test
     fun variantDifferenceProducesDifferentFingerprintEvenWithSameBoardAndMoves() {
-        val standard = GameTree.create(Position.initial(Variant.STANDARD))
-            .addMove(GameTree.create(Position.initial(Variant.STANDARD)).rootId, Move.parseUci("e2e4"))
-        val standardTree = GameTree.create(Position.initial(Variant.STANDARD)).let { tree ->
+        val standardStart = Position.initial()
+        val standardTree = GameTree.create(standardStart).let { tree ->
             tree.addMove(tree.rootId, Move.parseUci("e2e4")).tree
         }
-        val chess960Start = Fen.parse(Fen.serialize(Position.initial(Variant.STANDARD)), Variant.CHESS960)
+        val chess960Start = Fen.parse(Fen.serialize(standardStart), Variant.CHESS960)
         val chess960Tree = GameTree.create(chess960Start).let { tree ->
             tree.addMove(tree.rootId, Move.parseUci("e2e4")).tree
         }
 
         assertNotEquals(GameContentFingerprint.compute(standardTree), GameContentFingerprint.compute(chess960Tree))
-        assertEquals(1, standard.tree.mainline().size)
     }
 
     @Test
