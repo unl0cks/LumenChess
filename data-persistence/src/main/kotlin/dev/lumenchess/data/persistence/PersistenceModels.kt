@@ -52,6 +52,12 @@ data class ParticipantDraft(
     val engineVersion: String? = null,
 )
 
+data class ParticipantExternalIdentity(
+    val sourceType: GameSourceType,
+    val externalParticipantId: String,
+    val sourceAccountId: String? = null,
+)
+
 data class ParticipantRecord(
     val id: PersistentParticipantId,
     val kind: ParticipantKind,
@@ -129,3 +135,4 @@ data class SavedPositionRecord(
 )
 
 class PersistenceMappingException(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
+class PersistenceConflictException(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
