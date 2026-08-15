@@ -20,9 +20,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .gate-a/chunk-*.bin > /tmp/LumenChess_M0-M5_GateA.zip
+          cat \
+            .gate-a/chunk-000.bin \
+            .gate-a/chunk-001.bin \
+            .gate-a/chunk-002.bin \
+            .gate-a/chunk-003.bin \
+            .gate-a/chunk-004.bin \
+            .gate-a/chunk-005.bin \
+            .gate-a/chunk-006.bin \
+            .gate-a/chunk-007.bin \
+            .gate-a/chunk-008a.bin \
+            .gate-a/chunk-008b.bin \
+            > /tmp/LumenChess_M0-M5_GateA.zip
           actual="$(sha256sum /tmp/LumenChess_M0-M5_GateA.zip | awk '{print $1}')"
           expected="7341dddd527ffe8e6d2f1ac1514a4f59cceafea98bc5201685af925f9211d7d6"
+          echo "actual=$actual"
           test "$actual" = "$expected"
           rm -rf /tmp/gatea
           mkdir -p /tmp/gatea
