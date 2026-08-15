@@ -4,7 +4,7 @@ package dev.lumenchess.core.chess
  * Immutable make/unmake carrier. The core keeps Position immutable, so unmake restores the exact
  * pre-move state rather than attempting to reverse mutations field by field.
  */
-data class MoveTransition private constructor(
+class MoveTransition private constructor(
     val before: Position,
     val move: Move,
     val after: Position,
