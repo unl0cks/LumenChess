@@ -41,6 +41,7 @@ jobs:
           unzip -q /tmp/LumenChess_M0-M5_GateA.zip -d /tmp/gatea
           cp -a /tmp/gatea/LumenChess_M0-M5_GateA/. .
           chmod +x gradlew
+          rm -f .github/workflows/android.yml
           rm -rf .gate-a
           rm -f .github/workflows/bootstrap-gatea.yml
           git config user.name "github-actions[bot]"
