@@ -57,14 +57,14 @@ class SanTest {
 
     @Test
     fun chess960CastlingUsesPositionAwareClassification() {
-        val representative = chess960("4k3/8/8/8/8/8/8/RK2R3 w EA - 0 1")
+        val representative = chess960("7k/8/8/8/8/8/8/RK2R3 w EA - 0 1")
         assertSan(representative, "b1e1", "O-O")
         assertSan(representative, "b1a1", "O-O-O")
 
-        val kingDoesNotMove = chess960("4k3/8/8/8/8/8/8/6KR w H - 0 1")
+        val kingDoesNotMove = chess960("7k/8/8/8/8/8/8/6KR w H - 0 1")
         assertSan(kingDoesNotMove, "g1h1", "O-O")
 
-        val rookDoesNotMove = chess960("4k3/8/8/8/8/8/8/4KR2 w F - 0 1")
+        val rookDoesNotMove = chess960("7k/8/8/8/8/8/8/4KR2 w F - 0 1")
         assertSan(rookDoesNotMove, "e1f1", "O-O")
     }
 
