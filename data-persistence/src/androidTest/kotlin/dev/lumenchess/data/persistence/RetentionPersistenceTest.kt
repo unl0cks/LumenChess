@@ -45,7 +45,7 @@ class RetentionPersistenceTest {
         val fixture = createAnnotatedFixture()
         addHeavyRows(fixture.reviewPlyId, listOf(10L, 20L, 30L))
 
-        val deleted = repository.pruneDisposableAnalysis(
+        val deleted = PersistenceRetention(database).prune(
             HeavyAnalysisRetentionPolicy(olderThanEpochMillis = 25L, maxRetainedCount = null, batchSize = 100),
         )
 
@@ -64,7 +64,7 @@ class RetentionPersistenceTest {
         database.reviewDao().insertHeavy(ReviewHeavyAnalysisEntity("c-new", fixture.reviewPlyId, "pv", "c", 20L))
         database.reviewDao().insertHeavy(ReviewHeavyAnalysisEntity("d-new", fixture.reviewPlyId, "pv", "d", 30L))
 
-        val deleted = repository.pruneDisposableAnalysis(
+        val deleted = PersistenceRetention(database).prune(
             HeavyAnalysisRetentionPolicy(olderThanEpochMillis = null, maxRetainedCount = 2, batchSize = 100),
         )
 
