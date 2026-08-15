@@ -159,7 +159,11 @@ data class ReviewEntity(
         ForeignKey(entity = ReviewEntity::class, parentColumns = ["gameId", "id"], childColumns = ["gameId", "reviewId"], onDelete = ForeignKey.CASCADE),
         ForeignKey(entity = GameNodeEntity::class, parentColumns = ["gameId", "id"], childColumns = ["gameId", "nodeId"], onDelete = ForeignKey.CASCADE),
     ],
-    indices = [Index("reviewId"), Index("nodeId"), Index(value = ["reviewId", "nodeId"], unique = true)],
+    indices = [
+        Index(value = ["gameId", "reviewId"]),
+        Index(value = ["gameId", "nodeId"]),
+        Index(value = ["reviewId", "nodeId"], unique = true),
+    ],
 )
 data class ReviewPlyEntity(
     @PrimaryKey val id: String,
