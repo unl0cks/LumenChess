@@ -47,10 +47,12 @@ class GameTreeTest {
         val nf3 = tree.addMove(e5.nodeId, Move.parseUci("g1f3")); tree = nf3.tree
 
         val c5 = tree.addMove(e4.nodeId, Move.parseUci("c7c5")); tree = c5.tree
-        val nf6 = tree.addMove(c5.nodeId, Move.parseUci("g8f6")); tree = nf6.tree
+        val sicilianNf3 = tree.addMove(c5.nodeId, Move.parseUci("g1f3")); tree = sicilianNf3.tree
+        val nf6 = tree.addMove(sicilianNf3.nodeId, Move.parseUci("g8f6")); tree = nf6.tree
 
         assertEquals(e4.nodeId, tree.parentOf(c5.nodeId)?.id)
-        assertEquals(c5.nodeId, tree.parentOf(nf6.nodeId)?.id)
+        assertEquals(c5.nodeId, tree.parentOf(sicilianNf3.nodeId)?.id)
+        assertEquals(sicilianNf3.nodeId, tree.parentOf(nf6.nodeId)?.id)
         assertEquals(MoveGenerator.applyLegalMove(tree.node(e4.nodeId).position, Move.parseUci("c7c5")), tree.node(c5.nodeId).position)
         assertNotEquals(tree.node(e5.nodeId).position, tree.node(c5.nodeId).position)
         assertEquals(listOf(e5.nodeId, c5.nodeId), tree.childrenOf(e4.nodeId).map { it.id })
