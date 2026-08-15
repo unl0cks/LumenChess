@@ -37,7 +37,7 @@ class GameContentFingerprintTest {
             "[Variant \"Chess960\"]\n[SetUp \"1\"]\n[FEN \"7k/8/8/8/8/8/8/RK2R3 w EA - 0 1\"]\n[Result \"*\"]\n\n1. O-O *",
         )
         val chess960B = Pgn.parseGame(
-            "[Variant \"Chess960\"]\n[SetUp \"1\"]\n[FEN \"7k/8/8/8/8/8/8/RK2R3 w EA - 0 1\"]\n[Result \"*\"]\n\n1. 0-0 *",
+            "[Event \"Presentation only\"]\n[Variant \"Chess960\"]\n[SetUp \"1\"]\n[FEN \"7k/8/8/8/8/8/8/RK2R3 w EA - 0 1\"]\n[Result \"*\"]\n\n1. O-O {ignored} $1 *",
         )
         val customA = Pgn.parseGame(
             "[SetUp \"1\"]\n[FEN \"7k/8/8/8/8/8/8/K7 b - - 0 12\"]\n[Result \"*\"]\n\n12... Kg7 *",
