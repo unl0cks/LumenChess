@@ -20,8 +20,9 @@ Updated: 2026-08-15. Exact records are required for every shipped dependency/sou
 | Room | 2.8.4 | AndroidX | Apache-2.0 | Persistence from M8 |
 | DataStore | 1.2.1 | AndroidX | Apache-2.0 | Preferences/settings from M9 |
 | WorkManager | 2.11.2 | AndroidX | Apache-2.0 | Persistent queues from M36 |
-| AndroidX Test Runner | 1.7.0 | AndroidX | Apache-2.0 | Instrumented test runtime |
-| AndroidX Test JUnit extensions | 1.3.0 | AndroidX | Apache-2.0 | Instrumented JUnit integration |
+| AndroidX Test Runner | 1.7.0 | AndroidX stable test line | Apache-2.0 | Instrumented test runtime |
+| AndroidX Test JUnit extensions | 1.3.0 | AndroidX stable test line | Apache-2.0 | Instrumented JUnit integration |
+| AndroidX Espresso Core | 3.7.0 | AndroidX stable test line; fixes event injection to use `getSystemService` instead of reflective `InputManager.getInstance()` | Apache-2.0 | Compose instrumentation-test runtime on Android 17 |
 | JUnit Jupiter | 5.13.4 | JUnit team | EPL-2.0 | `core-chess` JVM test runner |
 
 ## Build-baseline verification sources
@@ -39,6 +40,7 @@ Authoritative Android/Google sources checked on 2026-08-15:
 - Google-hosted Chromium Android SDK roll showing Android SDK 37.0, Build Tools 37.0.0, and API 37 system images: https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/558f465abde520c47e52eb6dcfff15bd75994cf8
 - Google-hosted Chromium correction explicitly renaming `android-37` to `android-37.0` because the decimal was missing: https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/1584c97931e42d0edb9335a657f0f4ba9484c43f
 - Google-hosted Chromium Android 17 AVD config (`system-images;android-37.0;google_apis_ps16k;x86_64`, r5): https://chromium.googlesource.com/chromium/src/+/main/tools/android/avd/proto/android_37_google_apis_ps16k_x64.textpb
+- AndroidX Test stable-release table and Espresso 3.7.0 release notes: https://developer.android.com/jetpack/androidx/releases/test
 - Compose Compiler Gradle plugin (Kotlin/Compose compiler plugin 2.3.21): https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler
 - Compose BOM (current stable BOM 2026.06.00): https://developer.android.com/develop/ui/compose/bom
 - Gradle distribution/wrapper checksum reference: https://gradle.org/release-checksums/
@@ -50,6 +52,8 @@ Gate A's API 37 CI failure was ultimately a package-identifier mismatch. Both th
 CI still pins current command-line tools because Google's SDK Platform guidance requires current tools to expose the newest components, but the command-line-tools version was not the root cause of the failed package lookup.
 
 The imported snapshot's custom Gradle bootstrap JAR was also rejected by `gradle/actions/setup-gradle` wrapper validation. It has been replaced with Gradle-generated wrapper artifacts; the validation check remains enabled rather than being bypassed.
+
+When Gate A first executed the existing Compose instrumentation test on Android 17, the test runtime failed before reaching LumenChess assertions because an older transitive Espresso implementation reflected `InputManager.getInstance()`. AndroidX Espresso 3.7.0 is the current stable release and explicitly fixes that path by using `getSystemService`; Gate A therefore pins `espresso-core:3.7.0` directly for Android tests rather than changing or weakening the existing test.
 
 ## Distribution gate
 This file records provenance; it is not legal advice. Before any public APK/AAB distribution, verify the complete transitive/shipped dependency set, required notices/source-offer obligations, and the compatibility of the chosen LumenChess license/distribution model.

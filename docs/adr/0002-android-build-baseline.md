@@ -16,6 +16,8 @@ The imported M0-M5 snapshot also contained a hand-written `gradle-wrapper.jar` b
 
 Current Compose guidance uses Kotlin/Compose compiler plugin 2.3.21 and the stable Compose BOM 2026.06.00. The existing M2 Compose semantics test is an instrumented Android test, so Gate A CI also needs a real Android 17 emulator rather than merely compiling the test APK. Google's current Android 17 x86_64 test image is `system-images;android-37.0;google_apis_ps16k;x86_64`; API 37 phone AVDs require at least 4 GB RAM.
 
+When Gate A first executed the existing Compose instrumentation test on Android 17, the test runtime failed before reaching LumenChess assertions because an older transitive Espresso event injector reflected `InputManager.getInstance()`. AndroidX Test's current stable Espresso 3.7.0 explicitly fixes that path by using `getSystemService`, so the test dependency baseline must be corrected rather than changing or weakening the existing test.
+
 ## Decision
 Initial build baseline:
 - `compileSdk = 37`.
@@ -31,6 +33,7 @@ Initial build baseline:
 - Android SDK Command-Line Tools build 15859902 in CI.
 - Android SDK Build Tools 36.0.0 (AGP 9.3 documented default).
 - NDK 28.2.13676358 retained as the pinned baseline for later native engine work. No M0-M5 native source currently depends on the NDK.
+- AndroidX Test Runner 1.7.0, AndroidX Test JUnit extensions 1.3.0, and explicit Espresso Core 3.7.0 for Android 17 instrumentation-test runtime compatibility.
 - Headless CI enables sdkmanager channel 3 while the Android 17 packages remain on a preview-capable SDK channel.
 - Compose instrumentation tests execute on `system-images;android-37.0;google_apis_ps16k;x86_64` with a 4 GB AVD.
 
@@ -48,6 +51,7 @@ Initial build baseline:
 - https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/adc8a6a38dc3af937727cb6c0102b60186aeb2a7
 - https://chromium.googlesource.com/chromium/src/third_party/android_sdk/+/1584c97931e42d0edb9335a657f0f4ba9484c43f
 - https://chromium.googlesource.com/chromium/src/+/main/tools/android/avd/proto/android_37_google_apis_ps16k_x64.textpb
+- https://developer.android.com/jetpack/androidx/releases/test
 - https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler
 - https://developer.android.com/develop/ui/compose/bom
 - https://gradle.org/release-checksums/
@@ -59,6 +63,7 @@ Initial build baseline:
 - CI uses the SDK repository's actual Android 17 platform identifier, `platforms;android-37.0`, while Gradle continues to use API level 37.
 - CI pins current command-line tools rather than inheriting the older setup action default, even though stale tools were not the root cause of the failed platform lookup.
 - The nonstandard wrapper bootstrap is removed; Gradle's normal wrapper scripts/JAR are used and CI's wrapper-integrity validation remains active.
+- The existing Compose semantics test remains unchanged; the AndroidX Test runtime is corrected so the test can reach its real assertions on Android 17.
 - The existing Compose semantics test is executed on an Android 17 16 KB-page-size emulator image instead of only being compiled.
 - Early implementation remains free to use Android 17 APIs without pretending older versions are currently supported.
 - Broader compatibility remains a deliberate later pass, not accidental scope creep.
