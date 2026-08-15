@@ -16,12 +16,38 @@ data class ParticipantEntity(
 )
 
 @Entity(
+    tableName = "participant_external_identities",
+    primaryKeys = ["sourceType", "sourceAccountScope", "externalParticipantId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = ParticipantEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["participantId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("participantId")],
+)
+data class ParticipantExternalIdentityEntity(
+    val sourceType: String,
+    val sourceAccountScope: String,
+    val externalParticipantId: String,
+    val participantId: String,
+)
+
+@Entity(
     tableName = "games",
     foreignKeys = [
         ForeignKey(entity = ParticipantEntity::class, parentColumns = ["id"], childColumns = ["whiteParticipantId"], onDelete = ForeignKey.SET_NULL),
         ForeignKey(entity = ParticipantEntity::class, parentColumns = ["id"], childColumns = ["blackParticipantId"], onDelete = ForeignKey.SET_NULL),
     ],
-    indices = [Index("whiteParticipantId"), Index("blackParticipantId"), Index("createdAtEpochMillis"), Index("playedAtEpochMillis")],
+    indices = [
+        Index("whiteParticipantId"),
+        Index("blackParticipantId"),
+        Index("createdAtEpochMillis"),
+        Index("playedAtEpochMillis"),
+        Index("contentFingerprint"),
+    ],
 )
 data class GameEntity(
     @PrimaryKey val id: String,
@@ -38,6 +64,7 @@ data class GameEntity(
     val timeControlRaw: String?,
     val whiteParticipantId: String?,
     val blackParticipantId: String?,
+    val contentFingerprint: String? = null,
 )
 
 @Entity(
@@ -113,7 +140,13 @@ data class GameNodeAnnotationEntity(val gameId: String, val nodeId: String, val 
 @Entity(
     tableName = "game_sources",
     foreignKeys = [ForeignKey(entity = GameEntity::class, parentColumns = ["id"], childColumns = ["gameId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("gameId"), Index(value = ["sourceType", "externalGameId"])],
+    indices = [
+        Index("gameId"),
+        Index(
+            value = ["sourceType", "sourceAccountScope", "externalGameId"],
+            unique = true,
+        ),
+    ],
 )
 data class GameSourceEntity(
     @PrimaryKey val id: String,
@@ -124,6 +157,7 @@ data class GameSourceEntity(
     val importedAtEpochMillis: Long?,
     val lastSyncedAtEpochMillis: Long?,
     val sourceAccountId: String?,
+    val sourceAccountScope: String = sourceAccountId.orEmpty(),
 )
 
 @Entity(
@@ -185,7 +219,7 @@ data class ReviewPlyEntity(
 @Entity(
     tableName = "review_heavy_analysis",
     foreignKeys = [ForeignKey(entity = ReviewPlyEntity::class, parentColumns = ["id"], childColumns = ["reviewPlyId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("reviewPlyId")],
+    indices = [Index("reviewPlyId"), Index("createdAtEpochMillis")],
 )
 data class ReviewHeavyAnalysisEntity(
     @PrimaryKey val id: String,
