@@ -5,7 +5,7 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -31,25 +31,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Verify Gate A, chess core, Room module, lint, and assemblies
         run: ./gradlew :core-chess:test :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
-      - name: Commit compiler-generated Room v2 schema on M9 branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/m9-persistence-hardening'
+      - name: Verify committed Room schema history is up to date
         run: |
-          schema="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/2.json"
-          test -f "$schema"
-          git add "$schema"
-          if git diff --cached --quiet; then
-            echo "Room v2 schema is already committed."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "build(data): check in generated Room v2 schema"
-            git push origin HEAD:m9-persistence-hardening
-          fi
-      - name: Verify committed Room schema is up to date
-        run: |
-          schema="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/1.json"
-          test -f "$schema"
+          schema_v1="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/1.json"
+          schema_v2="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/2.json"
+          test -f "$schema_v1"
+          test -f "$schema_v2"
           git diff --exit-code -- data-persistence/schemas
+          test -z "$(git status --porcelain --untracked-files=all -- data-persistence/schemas)"
       - name: Run instrumentation tests on Android 17
         run: |
           echo "no" | avdmanager create avd \
