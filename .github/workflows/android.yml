@@ -38,6 +38,7 @@ jobs:
           if [ -e /dev/kvm ]; then
             sudo chmod 666 /dev/kvm
           fi
+          emulator -accel-check || true
 
           emulator \
             -avd gate-a \
@@ -45,12 +46,36 @@ jobs:
             -no-audio \
             -no-boot-anim \
             -no-snapshot \
-            -gpu swangle_indirect \
+            -gpu software \
             -memory 4096 \
             > "$RUNNER_TEMP/gate-a-emulator.log" 2>&1 &
+          emulator_pid=$!
 
-          adb wait-for-device
-          timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          device_ready=0
+          for _ in $(seq 1 45); do
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then
+              echo "Android Emulator exited before ADB became available."
+              cat "$RUNNER_TEMP/gate-a-emulator.log"
+              exit 1
+            fi
+            if adb devices | grep -Eq '^emulator-[0-9]+[[:space:]]+device$'; then
+              device_ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$device_ready" -ne 1 ]; then
+            echo "Android Emulator did not become available to ADB within 90 seconds."
+            cat "$RUNNER_TEMP/gate-a-emulator.log"
+            exit 1
+          fi
+
+          if ! timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'; then
+            echo "Android Emulator did not finish booting within 240 seconds."
+            cat "$RUNNER_TEMP/gate-a-emulator.log"
+            exit 1
+          fi
+
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
