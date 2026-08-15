@@ -1,10 +1,20 @@
 package dev.lumenchess.core.chess
 
+import kotlin.math.abs
+
 object MoveGenerator {
     private val knightDeltas = arrayOf(1 to 2, 2 to 1, 2 to -1, 1 to -2, -1 to -2, -2 to -1, -2 to 1, -1 to 2)
     private val kingDeltas = arrayOf(1 to 0, 1 to 1, 0 to 1, -1 to 1, -1 to 0, -1 to -1, 0 to -1, 1 to -1)
     private val bishopDirs = arrayOf(1 to 1, 1 to -1, -1 to 1, -1 to -1)
     private val rookDirs = arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
+
+    private data class CastlingSpec(
+        val side: CastleSide,
+        val kingFrom: Square,
+        val rookFrom: Square,
+        val kingTo: Square,
+        val rookTo: Square,
+    )
 
     fun legalMoves(position: Position): List<Move> = pseudoLegalMoves(position).filter { move ->
         val mover = position.sideToMove
@@ -16,6 +26,12 @@ object MoveGenerator {
         val legal = legalMoves(position).firstOrNull { it == candidate }
             ?: throw IllegalArgumentException("Illegal move ${candidate.uci} for ${Fen.serialize(position)}")
         return applyUnchecked(position, legal)
+    }
+
+    fun castlingSide(position: Position, move: Move): CastleSide? {
+        val moving = position[move.from] ?: return null
+        if (moving.type != PieceType.KING || moving.color != position.sideToMove) return null
+        return castlingSpecForMove(position, move, moving)?.side
     }
 
     fun isInCheck(position: Position, color: Color): Boolean {
@@ -99,7 +115,7 @@ object MoveGenerator {
                 }
                 PieceType.KING -> {
                     addJumpMoves(position, from, piece.color, kingDeltas, moves)
-                    addCastlingMoves(position, piece.color, moves)
+                    addCastlingMoves(position, from, piece.color, moves)
                 }
             }
         }
@@ -172,70 +188,109 @@ object MoveGenerator {
         }
     }
 
-    private fun addCastlingMoves(position: Position, color: Color, moves: MutableList<Move>) {
-        if (position.variant != Variant.STANDARD) return
-        val rank = if (color == Color.WHITE) 0 else 7
-        val king = Square.of(4, rank)
-        if (position[king] != Piece(color, PieceType.KING) || isInCheck(position, color)) return
-        val rights = position.castlingRights
-        val kingSide = if (color == Color.WHITE) rights.whiteKingSide else rights.blackKingSide
-        val queenSide = if (color == Color.WHITE) rights.whiteQueenSide else rights.blackQueenSide
-        val opponent = color.opposite
+    private fun addCastlingMoves(position: Position, kingFrom: Square, color: Color, moves: MutableList<Move>) {
+        val homeRank = if (color == Color.WHITE) 0 else 7
+        if (kingFrom.rank != homeRank || position[kingFrom] != Piece(color, PieceType.KING)) return
+        if (position.variant == Variant.STANDARD && kingFrom.file != 4) return
+        if (isInCheck(position, color)) return
 
-        if (kingSide) {
-            val f = Square.of(5, rank)
-            val g = Square.of(6, rank)
-            val rook = Square.of(7, rank)
-            if (position[f] == null && position[g] == null && position[rook] == Piece(color, PieceType.ROOK) &&
-                !isSquareAttacked(position, f, opponent) && !isSquareAttacked(position, g, opponent)) {
-                moves += Move(king, g)
-            }
+        for (side in CastleSide.entries) {
+            val spec = castlingSpec(position, color, side, kingFrom) ?: continue
+            if (!canCastle(position, spec, color)) continue
+            val encodedTo = if (position.variant == Variant.CHESS960) spec.rookFrom else spec.kingTo
+            moves += Move(kingFrom, encodedTo)
         }
-        if (queenSide) {
-            val d = Square.of(3, rank)
-            val c = Square.of(2, rank)
-            val b = Square.of(1, rank)
-            val rook = Square.of(0, rank)
-            if (position[d] == null && position[c] == null && position[b] == null && position[rook] == Piece(color, PieceType.ROOK) &&
-                !isSquareAttacked(position, d, opponent) && !isSquareAttacked(position, c, opponent)) {
-                moves += Move(king, c)
-            }
+    }
+
+    private fun castlingSpec(position: Position, color: Color, side: CastleSide, kingFrom: Square): CastlingSpec? {
+        val rookFrom = position.castlingRights.rookSquare(color, side) ?: return null
+        val homeRank = if (color == Color.WHITE) 0 else 7
+        if (kingFrom.rank != homeRank || rookFrom.rank != homeRank) return null
+        if (side == CastleSide.KING_SIDE && rookFrom.file <= kingFrom.file) return null
+        if (side == CastleSide.QUEEN_SIDE && rookFrom.file >= kingFrom.file) return null
+        return CastlingSpec(
+            side = side,
+            kingFrom = kingFrom,
+            rookFrom = rookFrom,
+            kingTo = Square.of(if (side == CastleSide.KING_SIDE) 6 else 2, homeRank),
+            rookTo = Square.of(if (side == CastleSide.KING_SIDE) 5 else 3, homeRank),
+        )
+    }
+
+    private fun castlingSpecForMove(position: Position, move: Move, moving: Piece): CastlingSpec? {
+        if (moving.type != PieceType.KING || move.promotion != null) return null
+        if (move.from.rank != if (moving.color == Color.WHITE) 0 else 7) return null
+        for (side in CastleSide.entries) {
+            val spec = castlingSpec(position, moving.color, side, move.from) ?: continue
+            val encodedTo = if (position.variant == Variant.CHESS960) spec.rookFrom else spec.kingTo
+            if (move.to == encodedTo) return spec
         }
+        return null
+    }
+
+    private fun canCastle(position: Position, spec: CastlingSpec, color: Color): Boolean {
+        if (position[spec.rookFrom] != Piece(color, PieceType.ROOK)) return false
+
+        val pathSquares = (squaresAfterStart(spec.kingFrom, spec.kingTo) + squaresAfterStart(spec.rookFrom, spec.rookTo)).toSet()
+        for (square in pathSquares) {
+            if (square == spec.kingFrom || square == spec.rookFrom) continue
+            if (position[square] != null) return false
+        }
+
+        val opponent = color.opposite
+        for (square in squaresAfterStart(spec.kingFrom, spec.kingTo)) {
+            if (isSquareAttacked(position, square, opponent)) return false
+        }
+        return true
+    }
+
+    private fun squaresAfterStart(from: Square, to: Square): List<Square> {
+        if (from == to) return emptyList()
+        require(from.rank == to.rank) { "Castling path must stay on one rank" }
+        val step = if (to.file > from.file) 1 else -1
+        val result = ArrayList<Square>(abs(to.file - from.file))
+        var file = from.file + step
+        while (true) {
+            result += Square.of(file, from.rank)
+            if (file == to.file) break
+            file += step
+        }
+        return result
     }
 
     private fun applyUnchecked(position: Position, move: Move): Position {
         val board = position.board.toMutableList()
         val moving = board[move.from.index] ?: throw IllegalArgumentException("No piece on ${move.from.algebraic}")
-        var captured = board[move.to.index]
-        board[move.from.index] = null
+        val castling = castlingSpecForMove(position, move, moving)
+        var captured: Piece? = null
+        var capturedSquare: Square? = null
 
-        if (moving.type == PieceType.PAWN && move.to == position.enPassantSquare && captured == null && move.from.file != move.to.file) {
-            val capturedSquare = Square.of(move.to.file, move.from.rank)
-            captured = board[capturedSquare.index]
-            board[capturedSquare.index] = null
-        }
+        if (castling != null) {
+            val rook = board[castling.rookFrom.index]
+                ?: throw IllegalArgumentException("No castling rook on ${castling.rookFrom.algebraic}")
+            board[castling.kingFrom.index] = null
+            board[castling.rookFrom.index] = null
+            board[castling.kingTo.index] = moving
+            board[castling.rookTo.index] = rook
+        } else {
+            captured = board[move.to.index]
+            capturedSquare = move.to
+            board[move.from.index] = null
 
-        if (moving.type == PieceType.KING && kotlin.math.abs(move.to.file - move.from.file) == 2 && position.variant == Variant.STANDARD) {
-            val rank = move.from.rank
-            if (move.to.file == 6) {
-                val rookFrom = Square.of(7, rank)
-                val rookTo = Square.of(5, rank)
-                board[rookTo.index] = board[rookFrom.index]
-                board[rookFrom.index] = null
-            } else if (move.to.file == 2) {
-                val rookFrom = Square.of(0, rank)
-                val rookTo = Square.of(3, rank)
-                board[rookTo.index] = board[rookFrom.index]
-                board[rookFrom.index] = null
+            if (moving.type == PieceType.PAWN && move.to == position.enPassantSquare && captured == null && move.from.file != move.to.file) {
+                val epCapturedSquare = Square.of(move.to.file, move.from.rank)
+                captured = board[epCapturedSquare.index]
+                capturedSquare = epCapturedSquare
+                board[epCapturedSquare.index] = null
             }
-        }
 
-        board[move.to.index] = if (move.promotion != null) Piece(moving.color, move.promotion) else moving
+            board[move.to.index] = if (move.promotion != null) Piece(moving.color, move.promotion) else moving
+        }
 
         var rights = position.castlingRights
-        rights = updateCastlingRights(rights, moving, move.from, move.to, captured)
+        rights = updateCastlingRights(rights, moving, move.from, captured, capturedSquare)
 
-        val newEp = if (moving.type == PieceType.PAWN && kotlin.math.abs(move.to.rank - move.from.rank) == 2) {
+        val newEp = if (castling == null && moving.type == PieceType.PAWN && abs(move.to.rank - move.from.rank) == 2) {
             Square.of(move.from.file, (move.from.rank + move.to.rank) / 2)
         } else null
         val newHalfmove = if (moving.type == PieceType.PAWN || captured != null) 0 else position.halfmoveClock + 1
@@ -252,25 +307,22 @@ object MoveGenerator {
         )
     }
 
-    private fun updateCastlingRights(rights: CastlingRights, moving: Piece, from: Square, to: Square, captured: Piece?): CastlingRights {
-        var wk = rights.whiteKingSide
-        var wq = rights.whiteQueenSide
-        var bk = rights.blackKingSide
-        var bq = rights.blackQueenSide
-
+    private fun updateCastlingRights(
+        rights: CastlingRights,
+        moving: Piece,
+        from: Square,
+        captured: Piece?,
+        capturedSquare: Square?,
+    ): CastlingRights {
+        var updated = rights
         if (moving.type == PieceType.KING) {
-            if (moving.color == Color.WHITE) { wk = false; wq = false } else { bk = false; bq = false }
+            updated = updated.withoutColor(moving.color)
+        } else if (moving.type == PieceType.ROOK) {
+            updated = updated.withoutRook(moving.color, from)
         }
-        if (moving.type == PieceType.ROOK) {
-            when (from.algebraic) {
-                "h1" -> wk = false; "a1" -> wq = false; "h8" -> bk = false; "a8" -> bq = false
-            }
+        if (captured?.type == PieceType.ROOK && capturedSquare != null) {
+            updated = updated.withoutRook(captured.color, capturedSquare)
         }
-        if (captured?.type == PieceType.ROOK) {
-            when (to.algebraic) {
-                "h1" -> wk = false; "a1" -> wq = false; "h8" -> bk = false; "a8" -> bq = false
-            }
-        }
-        return CastlingRights(wk, wq, bk, bq)
+        return updated
     }
 }

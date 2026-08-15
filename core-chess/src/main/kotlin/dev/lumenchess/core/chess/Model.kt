@@ -75,12 +75,55 @@ data class Move(
     }
 }
 
+enum class CastleSide { KING_SIDE, QUEEN_SIDE }
+
 data class CastlingRights(
-    val whiteKingSide: Boolean = false,
-    val whiteQueenSide: Boolean = false,
-    val blackKingSide: Boolean = false,
-    val blackQueenSide: Boolean = false,
+    val whiteKingSideRook: Square?,
+    val whiteQueenSideRook: Square?,
+    val blackKingSideRook: Square?,
+    val blackQueenSideRook: Square?,
 ) {
+    constructor(
+        whiteKingSide: Boolean = false,
+        whiteQueenSide: Boolean = false,
+        blackKingSide: Boolean = false,
+        blackQueenSide: Boolean = false,
+    ) : this(
+        whiteKingSideRook = if (whiteKingSide) Square.parse("h1") else null,
+        whiteQueenSideRook = if (whiteQueenSide) Square.parse("a1") else null,
+        blackKingSideRook = if (blackKingSide) Square.parse("h8") else null,
+        blackQueenSideRook = if (blackQueenSide) Square.parse("a8") else null,
+    )
+
+    val whiteKingSide: Boolean get() = whiteKingSideRook != null
+    val whiteQueenSide: Boolean get() = whiteQueenSideRook != null
+    val blackKingSide: Boolean get() = blackKingSideRook != null
+    val blackQueenSide: Boolean get() = blackQueenSideRook != null
+
+    fun rookSquare(color: Color, side: CastleSide): Square? = when (color to side) {
+        Color.WHITE to CastleSide.KING_SIDE -> whiteKingSideRook
+        Color.WHITE to CastleSide.QUEEN_SIDE -> whiteQueenSideRook
+        Color.BLACK to CastleSide.KING_SIDE -> blackKingSideRook
+        Color.BLACK to CastleSide.QUEEN_SIDE -> blackQueenSideRook
+        else -> error("Unreachable color/castle-side combination")
+    }
+
+    fun withoutColor(color: Color): CastlingRights = when (color) {
+        Color.WHITE -> copy(whiteKingSideRook = null, whiteQueenSideRook = null)
+        Color.BLACK -> copy(blackKingSideRook = null, blackQueenSideRook = null)
+    }
+
+    fun withoutRook(color: Color, square: Square): CastlingRights = when (color) {
+        Color.WHITE -> copy(
+            whiteKingSideRook = whiteKingSideRook.takeUnless { it == square },
+            whiteQueenSideRook = whiteQueenSideRook.takeUnless { it == square },
+        )
+        Color.BLACK -> copy(
+            blackKingSideRook = blackKingSideRook.takeUnless { it == square },
+            blackQueenSideRook = blackQueenSideRook.takeUnless { it == square },
+        )
+    }
+
     fun toFen(): String = buildString {
         if (whiteKingSide) append('K')
         if (whiteQueenSide) append('Q')
@@ -147,9 +190,10 @@ class Position(
 internal object PositionKey {
     private const val SEED = 0x4C554D454E434853L // "LUMENCHS"
     private val pieceKeys = LongArray(12 * 64)
-    private val castlingKeys = LongArray(4)
+    private val castlingRookKeys = LongArray(4 * 64)
     private val epFileKeys = LongArray(8)
     private val blackToMoveKey: Long
+    private val chess960Key: Long
 
     init {
         var state = SEED
@@ -161,9 +205,10 @@ internal object PositionKey {
             return z xor (z ushr 31)
         }
         for (i in pieceKeys.indices) pieceKeys[i] = next()
-        for (i in castlingKeys.indices) castlingKeys[i] = next()
+        for (i in castlingRookKeys.indices) castlingRookKeys[i] = next()
         for (i in epFileKeys.indices) epFileKeys[i] = next()
         blackToMoveKey = next()
+        chess960Key = next()
     }
 
     fun compute(position: Position): Long {
@@ -175,14 +220,18 @@ internal object PositionKey {
             }
         }
         if (position.sideToMove == Color.BLACK) key = key xor blackToMoveKey
-        if (position.castlingRights.whiteKingSide) key = key xor castlingKeys[0]
-        if (position.castlingRights.whiteQueenSide) key = key xor castlingKeys[1]
-        if (position.castlingRights.blackKingSide) key = key xor castlingKeys[2]
-        if (position.castlingRights.blackQueenSide) key = key xor castlingKeys[3]
+        if (position.variant == Variant.CHESS960) key = key xor chess960Key
+        key = key xor castlingKey(0, position.castlingRights.whiteKingSideRook)
+        key = key xor castlingKey(1, position.castlingRights.whiteQueenSideRook)
+        key = key xor castlingKey(2, position.castlingRights.blackKingSideRook)
+        key = key xor castlingKey(3, position.castlingRights.blackQueenSideRook)
         val ep = position.enPassantSquare
         if (ep != null && MoveGenerator.hasLegalEnPassantCapture(position)) {
             key = key xor epFileKeys[ep.file]
         }
         return key
     }
+
+    private fun castlingKey(slot: Int, square: Square?): Long =
+        square?.let { castlingRookKeys[slot * 64 + it.index] } ?: 0L
 }
