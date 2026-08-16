@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -203,7 +201,9 @@ fun LumenChessboard(
                 arrows = arrows,
                 orientation = orientation,
                 palette = palette,
-                modifier = Modifier.matchParentSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag(CHESSBOARD_ARROWS_TEST_TAG),
             )
         }
 
