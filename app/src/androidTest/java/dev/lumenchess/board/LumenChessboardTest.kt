@@ -3,14 +3,12 @@ package dev.lumenchess.board
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.fetchSemanticsNode
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
-import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Fen
 import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.PieceType
@@ -96,7 +94,7 @@ class LumenChessboardTest {
     @Test
     fun chess960VisualCastleDestinationResolvesToCoreCastlingMove() {
         val position = Fen.parse(
-            "7k/8/8/8/8/8/8/RK6 w A - 0 1",
+            "7k/8/8/8/8/8/8/1R2K3 w B - 0 1",
             Variant.CHESS960,
         )
         var emitted: Move? = null
@@ -107,13 +105,13 @@ class LumenChessboardTest {
             }
         }
 
-        composeRule.onNodeWithTag("square-b1").performClick()
+        composeRule.onNodeWithTag("square-e1").performClick()
         composeRule.onNodeWithTag("square-c1").performClick()
 
         composeRule.runOnIdle {
             assertEquals(
                 "UI castling to c1 must emit the Chess960 core encoding king-to-rook-origin",
-                Move.parseUci("b1a1"),
+                Move.parseUci("e1b1"),
                 emitted,
             )
         }
@@ -265,8 +263,11 @@ class LumenChessboardTest {
             }
         }
 
-        composeRule.onNodeWithTag("square-e2").performClick()
-        composeRule.onNodeWithTag("square-e4").performClick()
+        composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).performTouchInput {
+            val cell = width / 8f
+            click(Offset(cell * 4.5f, cell * 6.5f))
+            click(Offset(cell * 4.5f, cell * 4.5f))
+        }
         composeRule.runOnIdle { assertNull(emitted) }
 
         composeRule.onNodeWithContentDescription("e2, White pawn").assertIsDisplayed()
