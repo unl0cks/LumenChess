@@ -18,3 +18,4 @@ rootProject.name = "LumenChess"
 include(":app")
 include(":core-chess")
 include(":data-persistence")
+include(":engine-api")
