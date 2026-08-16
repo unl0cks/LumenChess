@@ -1,8 +1,8 @@
 package dev.lumenchess.engine.host
 
 import android.os.Process
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.core.chess.Fen
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.engine.api.EngineCapabilities
@@ -149,7 +149,10 @@ class EngineHostIsolationTest {
     }
 
     private fun connect(slot: EngineSlot, listener: RecordingListener): EngineHostConnection {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        // Use the target package context so the test exercises the production non-exported service.
+        // ApplicationProvider returns the instrumentation APK context here, which cannot bind to a
+        // non-exported target service and previously hid the actual isolation/lifecycle assertions.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         val connection = EngineHostConnection(context, slot, listener)
         connections += connection
         assertTrue("bindService failed for $slot", connection.bind())
