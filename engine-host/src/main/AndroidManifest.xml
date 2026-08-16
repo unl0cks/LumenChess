@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <service
+            android:name="dev.lumenchess.engine.host.EngineSlotAService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":engine_slot_a" />
+        <service
+            android:name="dev.lumenchess.engine.host.EngineSlotBService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":engine_slot_b" />
+    </application>
+</manifest>
