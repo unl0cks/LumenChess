@@ -29,8 +29,8 @@ jobs:
             "system-images;android-37.0;google_apis_ps16k;x86_64" \
             --channel=3
       - uses: gradle/actions/setup-gradle@v4
-      - name: Verify Gate A, chess core, Room module, lint, and assemblies
-        run: ./gradlew :core-chess:test :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Verify Gate A, chess core, engine API, Room module, lint, and assemblies
+        run: ./gradlew :core-chess:test :engine-api:test :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Verify committed Room schema history is up to date
         run: |
           schema_v1="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/1.json"
