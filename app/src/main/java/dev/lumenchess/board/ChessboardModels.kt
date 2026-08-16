@@ -77,3 +77,4 @@ data class ChessboardPalette(
 }
 
 const val CHESSBOARD_TEST_TAG = "lumen-chessboard"
+const val CHESSBOARD_ARROWS_TEST_TAG = "chessboard-arrows"
