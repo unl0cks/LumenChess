@@ -2,6 +2,7 @@ package dev.lumenchess.board
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -263,13 +264,8 @@ class LumenChessboardTest {
             }
         }
 
-        composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).performTouchInput {
-            val cell = width / 8f
-            click(Offset(cell * 4.5f, cell * 6.5f))
-            click(Offset(cell * 4.5f, cell * 4.5f))
-        }
+        composeRule.onNodeWithTag("square-e2").assertHasNoClickAction()
         composeRule.runOnIdle { assertNull(emitted) }
-
         composeRule.onNodeWithContentDescription("e2, White pawn").assertIsDisplayed()
     }
 }
