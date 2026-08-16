@@ -6,10 +6,12 @@ import androidx.room3.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,6 +28,16 @@ class Migration1To2Test {
         driver = AndroidSQLiteDriver(),
         file = instrumentation.targetContext.getDatabasePath(databaseName),
     )
+
+    @Before
+    fun deleteStaleMigrationFixture() {
+        instrumentation.targetContext.deleteDatabase(databaseName)
+    }
+
+    @After
+    fun deleteMigrationFixture() {
+        instrumentation.targetContext.deleteDatabase(databaseName)
+    }
 
     @Test
     fun migration1To2PreservesCanonicalV1DataAndAddsM9IdentityStructures() = runBlocking {
