@@ -14,6 +14,7 @@ import dev.lumenchess.runtime.RuntimeSnapshot
 import dev.lumenchess.runtime.RuntimeTerminal
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
@@ -43,6 +44,7 @@ class AndroidPlayPersistenceGateway(
     }
     private val liveRepository = LiveGamePersistenceRepository(database)
     private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val closed = AtomicBoolean(false)
 
     @Volatile
     private var listener: Listener? = null
@@ -56,6 +58,7 @@ class AndroidPlayPersistenceGateway(
     }
 
     override fun persist(snapshot: RuntimeSnapshot, setup: ResolvedPlaySetup) {
+        if (closed.get()) return
         executor.execute {
             try {
                 val id = runSuspendBlocking {
@@ -86,6 +89,7 @@ class AndroidPlayPersistenceGateway(
     }
 
     fun loadLastRestorableGame() {
+        if (closed.get()) return
         executor.execute {
             try {
                 val rawId = preferences.getString(KEY_LAST_LIVE_GAME_ID, null)
@@ -105,12 +109,16 @@ class AndroidPlayPersistenceGateway(
 
     /** Ensures all prior persistence effects have finished before a test inspects Room. */
     internal fun flushForTest(onFlushed: () -> Unit) {
+        if (closed.get()) return
         executor.execute { handler.post(onFlushed) }
     }
 
     override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        // Queue close behind all accepted writes so a ViewModel/lifecycle teardown cannot close Room
+        // underneath a snapshot transaction that was already emitted by the authoritative runtime.
+        executor.execute { database.close() }
         executor.shutdown()
-        database.close()
     }
 
     private fun RuntimeTerminal.toPersistedTermination(): PersistedTermination = when (this) {
