@@ -30,6 +30,7 @@ fun SettingsScreen(
     settings: AppearanceSettings,
     onSettingsChange: (AppearanceSettings) -> Unit,
     onOpenBoardAppearance: () -> Unit,
+    onOpenSoundsHaptics: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -43,7 +44,7 @@ fun SettingsScreen(
         Text("SETTINGS", style = MaterialTheme.typography.labelSmall, color = LumenColors.AccentBlueBright)
         Text("Make LumenChess yours", style = MaterialTheme.typography.headlineLarge)
         Text(
-            "Appearance stays presentation-only. Chess rules, clocks and engine state do not live here.",
+            "Appearance and feedback stay presentation-only. Chess rules, clocks and engine state do not live here.",
             style = MaterialTheme.typography.bodyMedium,
             color = LumenColors.OnSurfaceMuted,
         )
@@ -72,10 +73,9 @@ fun SettingsScreen(
         )
         SettingsCategory(
             title = "Sounds & Haptics",
-            subtitle = "Move feedback, event sounds and tactile response",
+            subtitle = "Move feedback, event sounds, custom packs and tactile response",
             tag = "settings-sounds-haptics",
-            onClick = null,
-            trailing = "P4",
+            onClick = onOpenSoundsHaptics,
         )
     }
 }
