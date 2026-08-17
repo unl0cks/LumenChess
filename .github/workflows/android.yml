@@ -137,7 +137,7 @@ jobs:
           "$emulator_bin" \
             -avd engine-checkpoint \
             -no-window -no-audio -no-boot-anim -no-snapshot \
-            -gpu software -memory 4096 \
+            -gpu software -memory 6144 \
             > "$diagnostics/emulator.log" 2>&1 &
           emulator_pid=$!
 
@@ -371,7 +371,7 @@ jobs:
           "$emulator_bin" \
             -avd batch-gate \
             -no-window -no-audio -no-boot-anim -no-snapshot \
-            -gpu software -memory 4096 \
+            -gpu software -memory 6144 \
             > "$RUNNER_TEMP/batch-gate-emulator.log" 2>&1 &
           emulator_pid=$!
           trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
