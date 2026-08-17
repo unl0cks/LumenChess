@@ -37,12 +37,18 @@ dependencies {
     debugImplementation(platform(libs.compose.bom))
 
     implementation(project(":core-chess"))
+    implementation(project(":game-runtime"))
+    implementation(project(":engine-api"))
+    implementation(project(":engine-host"))
     implementation(project(":data-persistence"))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
@@ -51,4 +57,8 @@ dependencies {
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
