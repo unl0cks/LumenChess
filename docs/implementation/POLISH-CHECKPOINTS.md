@@ -12,7 +12,7 @@ Checkpoint: `279bff8b71e99e3c06711500d7ae8e36d7e48c56`
 
 ## P2 — full LumenChess UI redesign
 
-Checkpoint: the latest `checkpoint(P2):` commit containing this entry after all P2 regressions below are resolved.
+Checkpoint: `d3bbd27b8583a7b4b8b685a31dad4c4fff99aa81`
 
 ### Architecture
 
@@ -35,13 +35,47 @@ Checkpoint: the latest `checkpoint(P2):` commit containing this entry after all 
 - The first cumulative API 37 checkpoint then ran 23 instrumentation tests and found one failure in `LumenNavigationTest`: the test incorrectly required text `Arena` to resolve to a single node even though the approved P2 UI intentionally renders both the selected bottom-navigation label and the future-surface heading. Commit `7a2b98c90bea3b15084a44fdb928ffb6d91fed08` corrected only the assertion to require both intentional nodes. No product/runtime behavior changed.
 - The obsolete self-patching workflow used during compiler diagnosis was removed. The device workflow now retains and surfaces instrumentation reports on failure so future device-test regressions are directly identifiable.
 
+### Gate result
+
+The exact P2 checkpoint passed proportional JVM/Play checks, lint/assemblies, ARM64+x86_64 native/16 KiB verification, cumulative API 37 app instrumentation, and universal APK-size reporting.
+
+## P3 — themes, boards, pieces, backgrounds and presets
+
+Checkpoint: the `checkpoint(P3): add LumenChess visual customization` commit containing this entry.
+
+### Architecture
+
+- `AppearanceSettings` is the typed presentation source of truth and is persisted with AndroidX DataStore Preferences 1.2.1.
+- Appearance supports System, Dark, OLED and Light independently of chess runtime state and independently of the selected board palette.
+- `LumenTheme` resolves persisted appearance, accent and background into the Compose color system; the default Lumen identity remains blue.
+- Board palettes and piece sets are injected through a presentation-only `ChessboardPresentationStyle` CompositionLocal. Existing Play board call sites therefore inherit appearance without acquiring preference or runtime ownership.
+- Presets compose board, piece-set and background IDs. Any later component override clears the preset identity while preserving the untouched sibling selections.
+
+### Built-in customization
+
+- Board palettes: Lumen Blue, Midnight OLED and Graphite, including interaction/highlight/arrow colors.
+- Piece sets: original project-owned Lumen vector geometry and Lumen Outline treatment. The previous Unicode device-font glyph renderer has been removed.
+- Backgrounds: Lumen Night, Void and Graphite Haze, each with coherent dark/light treatments.
+- Presets: Lumen, Midnight and Graphite Focus.
+- Settings now exposes System/Dark/OLED/Light and a dedicated Board & Pieces surface with an always-visible board preview and Board/Pieces/Background/Presets tabs.
+- Asset provenance and redistribution notes are recorded in `docs/implementation/P3-ASSET-PROVENANCE.md`.
+
+### Regression coverage
+
+- Preference codec tests cover defaults, defensive fallback, deterministic ARGB storage and no-preset persistence.
+- Customization model tests cover preset composition, individual override behavior and custom board-color fallback.
+- Board instrumentation verifies changing piece treatments does not change legal move submission.
+- Board presentation instrumentation verifies the presentation provider reaches an unchanged board call site.
+- Settings instrumentation exercises OLED appearance, the live preview, preset application, background override and board override.
+- The preview follows the resolved System light/dark theme instead of assuming System means dark.
+
 ### Gate required for this checkpoint
 
-The exact checkpoint SHA must pass:
+The exact P3 checkpoint SHA must pass:
 
 - Android proportional JVM/Play checks, lint and assemblies;
 - ARM64/x86_64 native and 16 KiB verification;
-- cumulative API 37 app instrumentation from `polish-device.yml`, including navigation/preview and existing Play/board regressions;
+- cumulative API 37 app instrumentation, including prior board/Play/P2 regressions and new P3 customization tests;
 - universal APK-size reporting/budgets.
 
-P3 begins only after those exact-SHA checks are green.
+P4 begins only after those exact-SHA checks are green.
