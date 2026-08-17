@@ -45,7 +45,11 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                 val selected = tab == current
                 Column(
                     Modifier.weight(1f).height(56.dp)
-                        .selectable(selected, { onSelect(tab) }, role = Role.Tab)
+                        .selectable(
+                            selected = selected,
+                            onClick = { onSelect(tab) },
+                            role = Role.Tab,
+                        )
                         .semantics { contentDescription = "${tab.label} tab" }
                         .testTag("main-tab-${tab.label.lowercase()}"),
                     horizontalAlignment = Alignment.CenterHorizontally,
