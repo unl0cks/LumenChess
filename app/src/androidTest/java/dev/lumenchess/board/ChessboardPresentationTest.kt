@@ -25,6 +25,6 @@ class ChessboardPresentationTest {
         }
 
         composeRule.onNodeWithTag("square-e2").assertIsDisplayed()
-        composeRule.onNodeWithTag("piece-e2-lumen-outline").fetchSemanticsNode()
+        composeRule.onNodeWithTag("piece-e2-lumen-outline", useUnmergedTree = true).fetchSemanticsNode()
     }
 }
