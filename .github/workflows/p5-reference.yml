@@ -25,11 +25,13 @@ jobs:
       - name: Mark P5 reference verification pending
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification is running'
+            -f description='API37 reference verification is running' \
+            -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -119,20 +121,24 @@ jobs:
         if: steps.verify.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification passed'
+            -f description='API37 reference verification passed' \
+            -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: steps.verify.outcome != 'success'
         env:
           GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification failed'
+            -f description='API37 reference verification failed' \
+            -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
         if: steps.verify.outcome != 'success'
         run: exit 1
