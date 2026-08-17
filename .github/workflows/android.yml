@@ -33,18 +33,24 @@ jobs:
             "ndk;28.2.13676358" \
             "cmake;3.22.1" \
             --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+          rustup run 1.88.0 rustc --version
       - uses: gradle/actions/setup-gradle@v4
       - name: Run proportional JVM and engine-host checkpoint checks
         run: ./gradlew :core-chess:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest
-      - name: Verify Stockfish 18 native ABIs and 16 KiB ELF alignment
+      - name: Verify native engine ABIs and 16 KiB ELF alignment
         run: |
           readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
           test -x "$readelf"
-          for abi in arm64-v8a x86_64; do
-            lib="$(find engine-host/build -type f -path "*/${abi}/liblumen_stockfish18.so" | head -n 1)"
-            test -n "$lib"
-            echo "Verifying $abi: $lib"
-            python - "$readelf" "$lib" <<'PY'
+          for engine in lumen_stockfish18 lumen_reckless09; do
+            for abi in arm64-v8a x86_64; do
+              lib="$(find engine-host/build -type f -path "*/${abi}/lib${engine}.so" | head -n 1)"
+              test -n "$lib"
+              echo "Verifying $engine $abi: $lib"
+              python - "$readelf" "$lib" <<'PY'
           import subprocess
           import sys
           readelf, library = sys.argv[1:]
@@ -60,6 +66,7 @@ jobs:
               raise SystemExit(f"{library} has LOAD alignment below 16 KiB: {aligns}")
           print(f"LOAD alignments: {aligns}")
           PY
+            done
           done
 
   engine-device:
@@ -91,6 +98,11 @@ jobs:
             "cmake;3.22.1" \
             "system-images;android-37.0;google_apis_ps16k;x86_64" \
             --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+          rustup run 1.88.0 rustc --version
       - uses: gradle/actions/setup-gradle@v4
       - name: Run focused engine-host lifecycle tests on Android 17 with diagnostics
         run: |
@@ -303,18 +315,24 @@ jobs:
             "cmake;3.22.1" \
             "system-images;android-37.0;google_apis_ps16k;x86_64" \
             --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+          rustup run 1.88.0 rustc --version
       - uses: gradle/actions/setup-gradle@v4
       - name: Verify cumulative JVM, Android modules, lint, and assemblies
         run: ./gradlew :core-chess:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
-      - name: Verify Stockfish 18 native ABIs and 16 KiB ELF alignment
+      - name: Verify native engine ABIs and 16 KiB ELF alignment
         run: |
           readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
           test -x "$readelf"
-          for abi in arm64-v8a x86_64; do
-            lib="$(find engine-host/build -type f -path "*/${abi}/liblumen_stockfish18.so" | head -n 1)"
-            test -n "$lib"
-            echo "Verifying $abi: $lib"
-            python - "$readelf" "$lib" <<'PY'
+          for engine in lumen_stockfish18 lumen_reckless09; do
+            for abi in arm64-v8a x86_64; do
+              lib="$(find engine-host/build -type f -path "*/${abi}/lib${engine}.so" | head -n 1)"
+              test -n "$lib"
+              echo "Verifying $engine $abi: $lib"
+              python - "$readelf" "$lib" <<'PY'
           import subprocess
           import sys
           readelf, library = sys.argv[1:]
@@ -330,6 +348,7 @@ jobs:
               raise SystemExit(f"{library} has LOAD alignment below 16 KiB: {aligns}")
           print(f"LOAD alignments: {aligns}")
           PY
+            done
           done
       - name: Verify committed Room schema history is up to date
         run: |

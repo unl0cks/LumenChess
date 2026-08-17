@@ -9,5 +9,9 @@
             android:name="dev.lumenchess.engine.host.testing.Stockfish18ReliabilityProbeActivity"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity
+            android:name="dev.lumenchess.engine.host.testing.Reckless09ReliabilityProbeActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 </manifest>

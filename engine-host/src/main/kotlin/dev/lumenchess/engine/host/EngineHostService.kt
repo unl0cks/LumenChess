@@ -115,6 +115,7 @@ abstract class EngineHostService : Service() {
 
     private fun createBackend(engineId: String): UciBackend = when (engineId) {
         Stockfish18Engine.ID -> Stockfish18UciBackend()
+        Reckless09Engine.ID -> Reckless09UciBackend()
         "mock" -> debugMock(MockMode.NORMAL)
         "mock-malformed" -> debugMock(MockMode.MALFORMED)
         "mock-crash" -> debugMock(MockMode.CRASH)

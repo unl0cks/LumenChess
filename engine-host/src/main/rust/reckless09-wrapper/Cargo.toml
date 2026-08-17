@@ -1,0 +1,34 @@
+[package]
+name = "reckless"
+version = "0.9.0"
+edition = "2024"
+build = "build/build.rs"
+publish = false
+
+[lib]
+name = "lumen_reckless09_wrapper"
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+
+[features]
+default = ["syzygy"]
+syzygy = []
+numa = []
+spsa = []
+
+[profile.dev]
+opt-level = 3
+debug = true
+debug-assertions = true
+
+[profile.release]
+lto = "fat"
+panic = "abort"
+codegen-units = 1
+
+[build-dependencies]
+cc = "1.2.19"
+bindgen = "0.71.1"
+
+[dependencies]
+libc = "0.2.175"
