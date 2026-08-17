@@ -48,7 +48,7 @@ class GameFeedbackDispatcherTest {
         )
 
         assertEquals(emptyList<GameFeedbackEvent>(), output.sounds)
-        assertEquals(listOf(GameFeedbackEvent.Move), output.haptics)
+        assertEquals(listOf<GameFeedbackEvent>(GameFeedbackEvent.Move), output.haptics)
     }
 
     @Test
