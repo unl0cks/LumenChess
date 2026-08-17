@@ -30,7 +30,6 @@ data class GameListRow(
 @Dao
 interface GameDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertGame(entity: GameEntity)
-    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun replaceGame(entity: GameEntity)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertHeaders(entities: List<GameHeaderEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertNodes(entities: List<GameNodeEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertComments(entities: List<GameNodeCommentEntity>)
@@ -42,6 +41,31 @@ interface GameDao {
     @Query("SELECT id FROM games WHERE contentFingerprint IS NULL ORDER BY id") suspend fun gameIdsMissingFingerprint(): List<String>
     @Query("UPDATE games SET contentFingerprint = :fingerprint WHERE id = :id AND contentFingerprint IS NULL") suspend fun setFingerprintIfMissing(id: String, fingerprint: String): Int
     @Query("UPDATE games SET contentFingerprint = :fingerprint WHERE id = :id") suspend fun overwriteFingerprint(id: String, fingerprint: String?): Int
+    @Query(
+        """
+        UPDATE games
+        SET result = :result,
+            termination = :termination,
+            playedAtEpochMillis = :playedAtEpochMillis,
+            rated = :rated,
+            timeControlBaseMillis = :timeControlBaseMillis,
+            timeControlIncrementMillis = :timeControlIncrementMillis,
+            timeControlRaw = :timeControlRaw,
+            contentFingerprint = :contentFingerprint
+        WHERE id = :id
+        """,
+    )
+    suspend fun updateLiveSnapshot(
+        id: String,
+        result: String?,
+        termination: String?,
+        playedAtEpochMillis: Long?,
+        rated: Boolean?,
+        timeControlBaseMillis: Long?,
+        timeControlIncrementMillis: Long?,
+        timeControlRaw: String?,
+        contentFingerprint: String,
+    ): Int
     @Query("UPDATE game_nodes SET parentNodeId = :parentNodeId WHERE id = :id") suspend fun overwriteParent(id: String, parentNodeId: String?): Int
     @Query("SELECT * FROM game_headers WHERE gameId = :gameId ORDER BY orderIndex") suspend fun headersForGame(gameId: String): List<GameHeaderEntity>
     @Query("SELECT * FROM game_nodes WHERE gameId = :gameId ORDER BY parentNodeId, siblingOrder, id") suspend fun nodesForGame(gameId: String): List<GameNodeEntity>
