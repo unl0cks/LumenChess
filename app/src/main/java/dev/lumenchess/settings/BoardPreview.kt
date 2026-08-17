@@ -14,22 +14,17 @@ import dev.lumenchess.board.ChessboardInput
 import dev.lumenchess.board.LumenChessboard
 import dev.lumenchess.board.PieceSetCatalog
 import dev.lumenchess.core.chess.Position
-import dev.lumenchess.customization.BackgroundCatalog
 import dev.lumenchess.customization.BoardThemeCatalog
+import dev.lumenchess.design.LumenColors
 
 @Composable
 fun BoardPreview(
     settings: AppearanceSettings,
     modifier: Modifier = Modifier,
 ) {
-    val background = BackgroundCatalog.definition(settings.backgroundId)
-    val isLight = settings.appearance == AppAppearance.LIGHT
-    val top = if (isLight) background.lightTop else background.darkTop
-    val bottom = if (isLight) background.lightBottom else background.darkBottom
-
     Box(
         modifier = modifier
-            .background(Brush.verticalGradient(listOf(top, bottom)))
+            .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .testTag("board-preview")
             .padding(14.dp),
         contentAlignment = Alignment.Center,
