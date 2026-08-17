@@ -1,6 +1,6 @@
 # LumenChess Implementation Plan
 
-**Status:** Approved 2026-08-15.  
+**Status:** Approved 2026-08-15; sequencing amended 2026-08-17 after physical Batch B review.  
 **Source of truth:** `PROJECT-HANDOFF.md`, `docs/design/LumenChess-Full-Design-Spec.md`, `docs/design/DECISIONS.md`, `docs/design/UI-FLOWS.md`, `docs/research/RESEARCH-NOTES.md`.
 
 ## Global invariants
@@ -88,7 +88,7 @@ Do not proceed until M3–M5 are green. Report exact test/perft output and any d
 
 ---
 
-## Later approved milestones (blocked until Gate A review)
+## Later approved milestones
 
 ### M6 — Chess960 legality
 All 960 starts, generalized castling semantics, X-FEN/Shredder-FEN considerations, UCI Chess960 notation and perft/regression corpus.
@@ -135,7 +135,45 @@ First vertical slice: Standard/Chess960, engine, side, Elo/model/time, clean liv
 ### Gate B — Playable runtime
 Correct chess + persistence + both engines + clocks/premoves + clean Play UI.
 
-### M20 — Arena base
+---
+
+## Physical Polish & Customization Batch — inserted before M20
+
+**Required base:** approved/promoted Batch B SHA `06baccdfb3696371750e6d6a5288e50c1add3d24`.  
+**Detailed specification:** `docs/superpowers/specs/2026-08-17-physical-polish-customization-design.md`.
+
+### P1 — Physical-device regressions + APK-size audit
+- Reproduce and permanently regress the physical board Y-axis jump.
+- Stabilize the square BoardStage and ensure transient overlays do not participate in measurement.
+- Audit universal debug APK composition and largest contributors.
+- Add automated APK-size reporting/budgets.
+- Add a narrow ARM64-only physical-debug artifact path while retaining x86_64 CI coverage.
+
+### P2 — Full LumenChess UI redesign
+- Replace provisional M2/M19 developer-style composition with the established LumenChess visual direction.
+- Actively use the committed `LumenChess_UI_Concept_Blue.png` reference plus settled design docs.
+- Polish navigation, Play setup and live Play without pulling Analysis/Review UI forward.
+- Preserve accessibility and stable board geometry.
+
+### P3 — Visual customization — **consumes M41**
+- DataStore-backed presentation/settings source of truth.
+- System/Dark/OLED Dark/Light.
+- Boards / Pieces / Background / Presets with live preview.
+- Reusable piece-set abstraction with a genuinely production-quality default LumenChess set and at least one polished selectable alternative.
+- Record asset provenance/licensing.
+
+### P4 — Sounds/haptics — **consumes M43**
+- Event-observing audio/haptic feedback outside authoritative runtime paths.
+- Polished original/project-owned or redistribution-safe built-in sounds; no crude placeholder beeps.
+- Per-event configuration plus safe local individual/ZIP sound-pack import where feasible.
+- Record asset provenance/licensing.
+
+### Gate P — Physical Polish & Customization
+Run the complete cumulative M0–M19 suite plus P1–P4 tests/checks. Promote only the exact green SHA, run fresh complete `main` CI, then generate an ARM64-only Pixel 8 Pro / Android 17 debug APK from that exact promoted SHA. Physical user approval is mandatory before M20.
+
+---
+
+### M20 — Arena base — **blocked until Gate P physical approval**
 Independent engines/configs, clocks, openings and default eval display.
 
 ### M21 — Manual takeover
@@ -200,14 +238,14 @@ Cached/filterable aggregates backed by canonical library/review/rating data.
 ### M40 — Insights UI
 General, drillable statistics without excessive live-play clutter.
 
-### M41 — Board & Pieces customization
-Boards/Pieces/Background/Presets with live preview and independent app accent.
+### M41 — Board & Pieces customization — **satisfied early by P3; do not reimplement**
+Historical milestone number retained for roadmap continuity. Relevant Boards/Pieces/Background/Presets/live-preview/app-appearance infrastructure is implemented in P3. When this number is reached, only verify that later screens consume the shared P3 architecture; do not duplicate customization work.
 
 ### M42 — Advanced assistance customization
-Optional eval/lines/arrows/moves/material/premove/engine/review settings while fresh-install defaults remain sparse.
+Optional eval/lines/arrows/moves/material/premove/engine/review settings while fresh-install defaults remain sparse. P3 intentionally does not pull these not-yet-existing feature controls forward.
 
-### M43 — Sounds/haptics
-Original/openly licensed built-ins; user-local per-event and ZIP imports.
+### M43 — Sounds/haptics — **satisfied early by P4; do not reimplement**
+Historical milestone number retained for roadmap continuity. Relevant built-in sounds, haptics, per-event configuration and local sound-pack infrastructure are implemented in P4. When this number is reached, only integrate newly existing later-feature events if needed; do not duplicate the P4 system.
 
 ### M44 — Storage lifecycle
 Heavy-cache compaction without silent deletion of canonical user games.
