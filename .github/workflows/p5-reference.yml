@@ -54,18 +54,30 @@ jobs:
           rustup toolchain install 1.88.0 --profile minimal
           rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
       - uses: gradle/actions/setup-gradle@v4
-      - name: Boot Pixel-sized Android 17 emulator
+      - name: Boot Pixel 8 Pro sized Android 17 emulator
         run: |
           echo "no" | avdmanager create avd --force --name p5-reference \
             --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          AVD_CONFIG="$HOME/.android/avd/p5-reference.avd/config.ini"
+          cat >> "$AVD_CONFIG" <<'EOF'
+          hw.lcd.width=1344
+          hw.lcd.height=2992
+          hw.lcd.density=489
+          showDeviceFrame=no
+          EOF
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
           "$ANDROID_HOME/emulator/emulator" -avd p5-reference \
             -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 \
             > "$RUNNER_TEMP/p5-emulator.log" 2>&1 &
           timeout 90 bash -c 'until adb devices | grep -Eq "^emulator-[0-9]+[[:space:]]+device$"; do sleep 2; done'
           timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
-          adb shell wm size 1344x2992
-          adb shell wm density 489
+          adb shell wm size reset
+          adb shell wm density reset
+          SIZE="$(adb shell wm size | tr -d '\r')"
+          DENSITY="$(adb shell wm density | tr -d '\r')"
+          printf '%s\n%s\n' "$SIZE" "$DENSITY"
+          grep -q 'Physical size: 1344x2992' <<< "$SIZE"
+          grep -q 'Physical density: 489' <<< "$DENSITY"
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
@@ -152,6 +164,8 @@ jobs:
             ${{ runner.temp }}/p5-emulator.log
             ${{ runner.temp }}/p5-screenshot-instrumentation.txt
             p5-screenshots/
+            docs/references/LumenChess_UI_Concept_Blue.png
+            docs/references/REFERENCE-MANIFEST.md
             app/build/outputs/androidTest-results/
             app/build/reports/androidTests/
           if-no-files-found: warn
