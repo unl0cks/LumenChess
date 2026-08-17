@@ -28,6 +28,7 @@ import dev.lumenchess.settings.AppearanceSettings
 import dev.lumenchess.settings.BoardAppearanceScreen
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
 import dev.lumenchess.settings.SettingsScreen
+import dev.lumenchess.settings.SoundsHapticsScreen
 import kotlinx.coroutines.launch
 
 internal enum class MainTab(val label: String, val previewCopy: String) {
@@ -38,7 +39,7 @@ internal enum class MainTab(val label: String, val previewCopy: String) {
     Settings("Settings", "Appearance, board, sound and gameplay preferences"),
 }
 
-private enum class SettingsDestination { ROOT, BOARD_APPEARANCE }
+private enum class SettingsDestination { ROOT, BOARD_APPEARANCE, SOUNDS_HAPTICS }
 
 @Composable
 fun LumenChessApp() {
@@ -90,9 +91,16 @@ fun LumenChessApp() {
                                 settings = appearanceSettings,
                                 onSettingsChange = ::persist,
                                 onOpenBoardAppearance = { settingsDestination = SettingsDestination.BOARD_APPEARANCE },
+                                onOpenSoundsHaptics = { settingsDestination = SettingsDestination.SOUNDS_HAPTICS },
                                 modifier = Modifier.fillMaxSize(),
                             )
                             SettingsDestination.BOARD_APPEARANCE -> BoardAppearanceScreen(
+                                settings = appearanceSettings,
+                                onSettingsChange = ::persist,
+                                onBack = { settingsDestination = SettingsDestination.ROOT },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(
                                 settings = appearanceSettings,
                                 onSettingsChange = ::persist,
                                 onBack = { settingsDestination = SettingsDestination.ROOT },
