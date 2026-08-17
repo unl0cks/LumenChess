@@ -10,6 +10,7 @@ import dev.lumenchess.engine.api.EngineStrengthModel
 import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.engine.api.PositionRevision
 import dev.lumenchess.runtime.RuntimeSnapshot
+import dev.lumenchess.runtime.RuntimeTerminal
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +43,7 @@ class PlayRuntimeCoordinatorTest {
         side: PlaySide = PlaySide.WHITE,
         engine: PlayEngine = PlayEngine.STOCKFISH_18,
         variant: Variant = Variant.STANDARD,
+        timeControl: PlayTimeControl = PlayTimeControl(60_000L, 1_000L),
     ) = PlaySetupResolver.resolve(
         PlaySetupConfig(
             variant = variant,
@@ -50,7 +52,7 @@ class PlayRuntimeCoordinatorTest {
             side = side,
             strengthModel = EngineStrengthModel.HYBRID,
             strengthTarget = EngineStrengthTarget.Elo(1400),
-            timeControl = PlayTimeControl(60_000L, 1_000L),
+            timeControl = timeControl,
             strengthSeed = 77L,
         ),
     ) { Color.WHITE }
@@ -73,6 +75,8 @@ class PlayRuntimeCoordinatorTest {
         assertEquals(EngineStrengthModel.HYBRID, request.strength.model)
         assertEquals(EngineStrengthTarget.Elo(1400), request.strength.target)
         assertEquals(77L, request.strength.seed)
+        assertNotNull(request.limits.moveTimeMillis)
+        assertTrue(request.limits.moveTimeMillis!! in 1L..1_500L)
         assertEquals(1L, coordinator.state.positionRevision.value)
     }
 
@@ -157,6 +161,30 @@ class PlayRuntimeCoordinatorTest {
         val replacement = engine.started.last()
         assertFalse(coordinator.state.paused)
         assertTrue(replacement.searchId != first.searchId)
+    }
+
+    @Test
+    fun clockCheckMakesProjectedFlagFallAuthoritativeExactlyOnce() {
+        val time = FakeTime()
+        val persistence = FakePersistence()
+        val coordinator = PlayRuntimeCoordinator.create(
+            setup(timeControl = PlayTimeControl(1_000L, 0L)),
+            time,
+            FakeEngine(),
+            persistence,
+        )
+        coordinator.start()
+        val persistedAfterStart = persistence.snapshots.size
+
+        time.advanceBy(1_000L)
+        coordinator.clockCheck()
+        val persistedAfterTimeout = persistence.snapshots.size
+        coordinator.clockCheck()
+
+        assertEquals(RuntimeTerminal.Timeout(Color.WHITE), coordinator.state.terminal)
+        assertEquals(0L, coordinator.state.clock.whiteRemainingMillis)
+        assertEquals(persistedAfterStart + 1, persistedAfterTimeout)
+        assertEquals(persistedAfterTimeout, persistence.snapshots.size)
     }
 
     @Test
