@@ -10,17 +10,8 @@ interface ParticipantDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insert(entity: ParticipantEntity)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertExternalIdentity(entity: ParticipantExternalIdentityEntity)
     @Query("SELECT * FROM participants WHERE id = :id") suspend fun byId(id: String): ParticipantEntity?
-    @Query(
-        """
-        SELECT * FROM participant_external_identities
-        WHERE sourceType = :sourceType AND sourceAccountScope = :sourceAccountScope AND externalParticipantId = :externalParticipantId
-        """,
-    )
-    suspend fun externalIdentity(
-        sourceType: String,
-        sourceAccountScope: String,
-        externalParticipantId: String,
-    ): ParticipantExternalIdentityEntity?
+    @Query("SELECT * FROM participant_external_identities WHERE sourceType = :sourceType AND sourceAccountScope = :sourceAccountScope AND externalParticipantId = :externalParticipantId")
+    suspend fun externalIdentity(sourceType: String, sourceAccountScope: String, externalParticipantId: String): ParticipantExternalIdentityEntity?
     @Query("SELECT COUNT(*) FROM participant_external_identities WHERE participantId = :participantId") suspend fun externalIdentityCount(participantId: String): Int
     @Query("SELECT COUNT(*) FROM participants") suspend fun countAll(): Int
 }
@@ -39,6 +30,7 @@ data class GameListRow(
 @Dao
 interface GameDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertGame(entity: GameEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun replaceGame(entity: GameEntity)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertHeaders(entities: List<GameHeaderEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertNodes(entities: List<GameNodeEntity>)
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertComments(entities: List<GameNodeCommentEntity>)
@@ -60,16 +52,7 @@ interface GameDao {
     @Query("SELECT COUNT(*) FROM games") suspend fun countGames(): Int
     @Query("SELECT COUNT(*) FROM game_nodes WHERE gameId = :gameId") suspend fun countNodes(gameId: String): Int
     @Query("DELETE FROM games WHERE id = :id") suspend fun deleteGame(id: String): Int
-    @Query(
-        """
-        SELECT g.id, g.variant, g.result, g.createdAtEpochMillis, g.playedAtEpochMillis, g.rated,
-               wp.displayName AS whiteName, bp.displayName AS blackName
-        FROM games g
-        LEFT JOIN participants wp ON wp.id = g.whiteParticipantId
-        LEFT JOIN participants bp ON bp.id = g.blackParticipantId
-        ORDER BY g.createdAtEpochMillis DESC, g.id
-        """,
-    )
+    @Query("SELECT g.id, g.variant, g.result, g.createdAtEpochMillis, g.playedAtEpochMillis, g.rated, wp.displayName AS whiteName, bp.displayName AS blackName FROM games g LEFT JOIN participants wp ON wp.id = g.whiteParticipantId LEFT JOIN participants bp ON bp.id = g.blackParticipantId ORDER BY g.createdAtEpochMillis DESC, g.id")
     suspend fun listGames(): List<GameListRow>
 }
 
@@ -80,37 +63,10 @@ interface SourceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsertMetadata(entities: List<GameSourceMetadataEntity>)
     @Query("SELECT * FROM game_sources WHERE gameId = :gameId ORDER BY id") suspend fun forGame(gameId: String): List<GameSourceEntity>
     @Query("SELECT * FROM game_source_metadata WHERE sourceId IN (:sourceIds) ORDER BY sourceId, key") suspend fun metadataForSources(sourceIds: List<String>): List<GameSourceMetadataEntity>
-    @Query(
-        """
-        SELECT * FROM game_sources
-        WHERE sourceType = :sourceType AND sourceAccountScope = :sourceAccountScope AND externalGameId = :externalGameId
-        LIMIT 1
-        """,
-    )
+    @Query("SELECT * FROM game_sources WHERE sourceType = :sourceType AND sourceAccountScope = :sourceAccountScope AND externalGameId = :externalGameId LIMIT 1")
     suspend fun byStrongIdentity(sourceType: String, sourceAccountScope: String, externalGameId: String): GameSourceEntity?
-    @Query(
-        """
-        UPDATE game_sources
-        SET externalUrl = COALESCE(:externalUrl, externalUrl),
-            importedAtEpochMillis = CASE
-                WHEN importedAtEpochMillis IS NULL THEN :importedAtEpochMillis
-                WHEN :importedAtEpochMillis IS NULL THEN importedAtEpochMillis
-                ELSE MIN(importedAtEpochMillis, :importedAtEpochMillis)
-            END,
-            lastSyncedAtEpochMillis = CASE
-                WHEN lastSyncedAtEpochMillis IS NULL THEN :lastSyncedAtEpochMillis
-                WHEN :lastSyncedAtEpochMillis IS NULL THEN lastSyncedAtEpochMillis
-                ELSE MAX(lastSyncedAtEpochMillis, :lastSyncedAtEpochMillis)
-            END
-        WHERE id = :id
-        """,
-    )
-    suspend fun refreshSource(
-        id: String,
-        externalUrl: String?,
-        importedAtEpochMillis: Long?,
-        lastSyncedAtEpochMillis: Long?,
-    ): Int
+    @Query("UPDATE game_sources SET externalUrl = COALESCE(:externalUrl, externalUrl), importedAtEpochMillis = CASE WHEN importedAtEpochMillis IS NULL THEN :importedAtEpochMillis WHEN :importedAtEpochMillis IS NULL THEN importedAtEpochMillis ELSE MIN(importedAtEpochMillis, :importedAtEpochMillis) END, lastSyncedAtEpochMillis = CASE WHEN lastSyncedAtEpochMillis IS NULL THEN :lastSyncedAtEpochMillis WHEN :lastSyncedAtEpochMillis IS NULL THEN lastSyncedAtEpochMillis ELSE MAX(lastSyncedAtEpochMillis, :lastSyncedAtEpochMillis) END WHERE id = :id")
+    suspend fun refreshSource(id: String, externalUrl: String?, importedAtEpochMillis: Long?, lastSyncedAtEpochMillis: Long?): Int
     @Query("SELECT COUNT(*) FROM game_sources WHERE gameId = :gameId") suspend fun countForGame(gameId: String): Int
 }
 
@@ -121,23 +77,8 @@ interface ReviewDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertHeavy(entity: ReviewHeavyAnalysisEntity)
     @Query("DELETE FROM review_heavy_analysis WHERE reviewPlyId IN (SELECT id FROM review_plies WHERE reviewId = :reviewId)") suspend fun deleteHeavyForReview(reviewId: String): Int
     @Query("SELECT id FROM review_heavy_analysis ORDER BY createdAtEpochMillis, id") suspend fun heavyIdsOldestFirst(): List<String>
-    @Query(
-        """
-        SELECT id FROM review_heavy_analysis
-        WHERE createdAtEpochMillis < :cutoffEpochMillis
-        ORDER BY createdAtEpochMillis, id
-        LIMIT :limit
-        """,
-    )
-    suspend fun heavyIdsOlderThan(cutoffEpochMillis: Long, limit: Int): List<String>
-    @Query(
-        """
-        SELECT id FROM review_heavy_analysis
-        ORDER BY createdAtEpochMillis DESC, id DESC
-        LIMIT :limit OFFSET :maxRetainedCount
-        """,
-    )
-    suspend fun heavyIdsBeyondNewest(maxRetainedCount: Int, limit: Int): List<String>
+    @Query("SELECT id FROM review_heavy_analysis WHERE createdAtEpochMillis < :cutoffEpochMillis ORDER BY createdAtEpochMillis, id LIMIT :limit") suspend fun heavyIdsOlderThan(cutoffEpochMillis: Long, limit: Int): List<String>
+    @Query("SELECT id FROM review_heavy_analysis ORDER BY createdAtEpochMillis DESC, id DESC LIMIT :limit OFFSET :maxRetainedCount") suspend fun heavyIdsBeyondNewest(maxRetainedCount: Int, limit: Int): List<String>
     @Query("DELETE FROM review_heavy_analysis WHERE id IN (:ids)") suspend fun deleteHeavyByIds(ids: List<String>): Int
     @Query("SELECT COUNT(*) FROM reviews WHERE gameId = :gameId") suspend fun countReviewsForGame(gameId: String): Int
     @Query("SELECT COUNT(*) FROM review_plies WHERE gameId = :gameId") suspend fun countReviewPliesForGame(gameId: String): Int
