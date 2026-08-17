@@ -12,6 +12,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.engine.api.EngineStrengthCapability
 import dev.lumenchess.engine.host.testing.EngineHostProbeActivity
+import dev.lumenchess.engine.host.testing.Reckless09ReliabilityProbeActivity
 import dev.lumenchess.engine.host.testing.Stockfish18ReliabilityProbeActivity
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -19,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -100,6 +102,49 @@ class EngineHostIsolationTest {
         assertTrue(details.contains("simultaneous slots isolated"))
     }
 
+    @Test
+    fun reckless09CapabilitiesMatchPinnedRelease() {
+        val capabilities = Reckless09Engine.capabilities
+        assertEquals(setOf(Variant.STANDARD, Variant.CHESS960), capabilities.variants)
+        assertEquals(256, capabilities.multiPv?.maxLines)
+        assertTrue(!capabilities.supportsPonder)
+        assertNull(capabilities.strength)
+        assertEquals("v0.9.0", Reckless09Engine.SOURCE_TAG)
+        assertEquals("0e92358f5acd66e5ac77b1bf558202e47c515435", Reckless09Engine.SOURCE_COMMIT)
+    }
+
+    @Test
+    fun reckless09StandardSearchRunsInIsolatedHostAndPassesCoreValidation() {
+        val details = runRecklessScenario(Reckless09ReliabilityProbeActivity.SCENARIO_STANDARD)
+        assertTrue(details.contains("Reckless 0.9.0 STANDARD"))
+        assertTrue(details.contains("correlation/core validation"))
+    }
+
+    @Test
+    fun reckless09Chess960SearchRunsInIsolatedHostAndPassesCoreValidation() {
+        val details = runRecklessScenario(Reckless09ReliabilityProbeActivity.SCENARIO_CHESS960)
+        assertTrue(details.contains("Reckless 0.9.0 CHESS960"))
+        assertTrue(details.contains("correlation/core validation"))
+    }
+
+    @Test
+    fun reckless09CancellationDiscardsRealTerminalOutputBeforeReplacement() {
+        val details = runRecklessScenario(Reckless09ReliabilityProbeActivity.SCENARIO_CANCEL_REPLACEMENT)
+        assertTrue(details.contains("cancel terminal output discarded"))
+    }
+
+    @Test
+    fun reckless09NativeSessionCanCloseAndReopenInSameIsolatedHost() {
+        val details = runRecklessScenario(Reckless09ReliabilityProbeActivity.SCENARIO_SESSION_REOPEN)
+        assertTrue(details.contains("closed and reopened"))
+    }
+
+    @Test
+    fun reckless09CanRunSimultaneouslyInBothIsolatedSlots() {
+        val details = runRecklessScenario(Reckless09ReliabilityProbeActivity.SCENARIO_DUAL_SLOT)
+        assertTrue(details.contains("simultaneous slots isolated"))
+    }
+
     private fun runEngineHostScenario(scenario: String): String = runTargetProcessScenario(
         activityClassName = EngineHostProbeActivity::class.java.name,
         scenarioKey = EngineHostProbeActivity.EXTRA_SCENARIO,
@@ -115,6 +160,15 @@ class EngineHostIsolationTest {
         receiverKey = Stockfish18ReliabilityProbeActivity.EXTRA_RECEIVER,
         passedKey = Stockfish18ReliabilityProbeActivity.KEY_PASSED,
         detailsKey = Stockfish18ReliabilityProbeActivity.KEY_DETAILS,
+        scenario = scenario,
+    )
+
+    private fun runRecklessScenario(scenario: String): String = runTargetProcessScenario(
+        activityClassName = Reckless09ReliabilityProbeActivity::class.java.name,
+        scenarioKey = Reckless09ReliabilityProbeActivity.EXTRA_SCENARIO,
+        receiverKey = Reckless09ReliabilityProbeActivity.EXTRA_RECEIVER,
+        passedKey = Reckless09ReliabilityProbeActivity.KEY_PASSED,
+        detailsKey = Reckless09ReliabilityProbeActivity.KEY_DETAILS,
         scenario = scenario,
     )
 
