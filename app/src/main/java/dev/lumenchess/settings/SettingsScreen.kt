@@ -1,29 +1,34 @@
 package dev.lumenchess.settings
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.lumenchess.design.LumenColors
+import dev.lumenchess.design.LumenListRow
+import dev.lumenchess.design.LumenPanel
+import dev.lumenchess.design.LumenSegment
+import dev.lumenchess.design.LumenSpacing
+import dev.lumenchess.design.LumenTopBar
 
 @Composable
 fun SettingsScreen(
@@ -38,119 +43,174 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 18.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(LumenSpacing.Lg),
     ) {
-        Text("SETTINGS", style = MaterialTheme.typography.labelSmall, color = LumenColors.AccentBlueBright)
-        Text("Make LumenChess yours", style = MaterialTheme.typography.headlineLarge)
-        Text(
-            "Appearance and feedback stay presentation-only. Chess rules, clocks and engine state do not live here.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = LumenColors.OnSurfaceMuted,
-        )
+        LumenTopBar(title = "Settings")
 
-        SettingsSection("APPEARANCE") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AppearanceChoice("System", AppAppearance.SYSTEM, settings, onSettingsChange, Modifier.weight(1f))
-                AppearanceChoice("Dark", AppAppearance.DARK, settings, onSettingsChange, Modifier.weight(1f))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Appearance", style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurface)
+            LumenPanel(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LumenSegment(
+                        label = "System",
+                        selected = settings.appearance == AppAppearance.SYSTEM,
+                        onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.SYSTEM)) },
+                        modifier = Modifier.weight(1f),
+                        testTag = "appearance-system",
+                    )
+                    LumenSegment(
+                        label = "Dark",
+                        selected = settings.appearance == AppAppearance.DARK,
+                        onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.DARK)) },
+                        modifier = Modifier.weight(1f),
+                        testTag = "appearance-dark",
+                    )
+                    LumenSegment(
+                        label = "OLED",
+                        selected = settings.appearance == AppAppearance.OLED_DARK,
+                        onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.OLED_DARK)) },
+                        modifier = Modifier.weight(1f),
+                        testTag = "appearance-oled_dark",
+                    )
+                    LumenSegment(
+                        label = "Light",
+                        selected = settings.appearance == AppAppearance.LIGHT,
+                        onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.LIGHT)) },
+                        modifier = Modifier.weight(1f),
+                        testTag = "appearance-light",
+                    )
+                }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AppearanceChoice("OLED", AppAppearance.OLED_DARK, settings, onSettingsChange, Modifier.weight(1f))
-                AppearanceChoice("Light", AppAppearance.LIGHT, settings, onSettingsChange, Modifier.weight(1f))
-            }
-            Text(
-                "Active appearance: ${appearanceLabel(settings.appearance)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = LumenColors.OnSurfaceMuted,
-            )
         }
 
-        SettingsCategory(
-            title = "Board & Pieces",
-            subtitle = "Board palettes, Lumen piece sets, backgrounds and presets",
-            tag = "settings-board-pieces",
-            onClick = onOpenBoardAppearance,
-        )
-        SettingsCategory(
-            title = "Sounds & Haptics",
-            subtitle = "Move feedback, event sounds, custom packs and tactile response",
-            tag = "settings-sounds-haptics",
-            onClick = onOpenSoundsHaptics,
-        )
-    }
-}
-
-@Composable
-private fun SettingsSection(label: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
-        Surface(color = LumenColors.Surface.copy(alpha = .96f), shape = RoundedCornerShape(18.dp)) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) { content() }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingsRow(
+                kind = SettingsGlyphKind.ENGINE,
+                title = "Engines",
+                subtitle = "Stockfish 18 and Reckless 0.9.0",
+                enabled = false,
+            )
+            SettingsRow(
+                kind = SettingsGlyphKind.PLAY,
+                title = "Play",
+                subtitle = "Board, pieces and match presentation",
+                tag = "settings-board-pieces",
+                onClick = onOpenBoardAppearance,
+            )
+            SettingsRow(
+                kind = SettingsGlyphKind.REVIEW,
+                title = "Game Review",
+                subtitle = "Analysis and move-classification preferences",
+                enabled = false,
+            )
+            SettingsRow(
+                kind = SettingsGlyphKind.SOUND,
+                title = "Sounds & Haptics",
+                subtitle = "Sound pack, event cues and tactile feedback",
+                tag = "settings-sounds-haptics",
+                onClick = onOpenSoundsHaptics,
+            )
+            SettingsRow(
+                kind = SettingsGlyphKind.RATING,
+                title = "Ratings",
+                subtitle = "Rating mode and match options",
+                enabled = false,
+            )
+            SettingsRow(
+                kind = SettingsGlyphKind.ACCOUNT,
+                title = "Accounts & Sync",
+                subtitle = "Chess.com and Lichess connections",
+                enabled = false,
+            )
+            SettingsRow(
+                kind = SettingsGlyphKind.ADVANCED,
+                title = "Advanced",
+                subtitle = "Developer and advanced options",
+                enabled = false,
+            )
         }
     }
 }
 
 @Composable
-private fun AppearanceChoice(
-    label: String,
-    appearance: AppAppearance,
-    settings: AppearanceSettings,
-    onSettingsChange: (AppearanceSettings) -> Unit,
-    modifier: Modifier,
-) {
-    val selected = settings.appearance == appearance
-    Surface(
-        modifier = modifier
-            .heightIn(min = 48.dp)
-            .selectable(
-                selected = selected,
-                onClick = { onSettingsChange(settings.copy(appearance = appearance)) },
-                role = Role.RadioButton,
-            )
-            .testTag("appearance-${appearance.name.lowercase()}"),
-        color = if (selected) LumenColors.AccentBlueSoft else LumenColors.SurfaceRaised,
-        shape = RoundedCornerShape(12.dp),
-    ) {
-        Text(
-            label,
-            Modifier.padding(horizontal = 12.dp, vertical = 14.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) LumenColors.AccentBlueBright else LumenColors.OnSurfaceMuted,
-        )
-    }
-}
-
-@Composable
-private fun SettingsCategory(
+private fun SettingsRow(
+    kind: SettingsGlyphKind,
     title: String,
     subtitle: String,
-    tag: String,
-    onClick: (() -> Unit)?,
-    trailing: String? = null,
+    tag: String? = null,
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null,
 ) {
-    var modifier = Modifier.fillMaxWidth().testTag(tag)
-    if (onClick != null) modifier = modifier.clickable(onClick = onClick)
-    Surface(modifier = modifier, color = LumenColors.Surface, shape = RoundedCornerShape(18.dp)) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = LumenColors.OnSurfaceMuted)
-            }
-            trailing?.let {
-                Surface(color = LumenColors.SurfaceRaised, shape = RoundedCornerShape(9.dp)) {
-                    Text(it, Modifier.padding(horizontal = 8.dp, vertical = 5.dp), style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
+    var modifier = Modifier
+    if (tag != null) modifier = modifier.testTag(tag)
+    LumenListRow(
+        title = title,
+        subtitle = subtitle,
+        modifier = modifier,
+        enabled = enabled,
+        onClick = if (enabled) onClick else null,
+        showChevron = enabled && onClick != null,
+        leading = { SettingsGlyph(kind, enabled) },
+    )
+}
+
+private enum class SettingsGlyphKind { ENGINE, PLAY, REVIEW, SOUND, RATING, ACCOUNT, ADVANCED }
+
+@Composable
+private fun SettingsGlyph(kind: SettingsGlyphKind, enabled: Boolean) {
+    val tint = if (enabled) LumenColors.OnSurfaceMuted else LumenColors.OnSurfaceFaint
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(LumenColors.SurfaceRaised, RoundedCornerShape(7.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize(.56f)) {
+            val s = 1.45.dp.toPx()
+            val w = size.width
+            val h = size.height
+            when (kind) {
+                SettingsGlyphKind.ENGINE -> {
+                    drawCircle(tint, w * .31f, Offset(w * .5f, h * .5f), style = Stroke(s))
+                    repeat(4) { i ->
+                        val angle = Math.PI * .5 * i
+                        val x1 = (w * .5f + kotlin.math.cos(angle).toFloat() * w * .31f)
+                        val y1 = (h * .5f + kotlin.math.sin(angle).toFloat() * h * .31f)
+                        val x2 = (w * .5f + kotlin.math.cos(angle).toFloat() * w * .46f)
+                        val y2 = (h * .5f + kotlin.math.sin(angle).toFloat() * h * .46f)
+                        drawLine(tint, Offset(x1, y1), Offset(x2, y2), s, StrokeCap.Round)
+                    }
+                }
+                SettingsGlyphKind.PLAY -> {
+                    drawLine(tint, Offset(w*.25f,h*.5f), Offset(w*.75f,h*.5f), s, StrokeCap.Round)
+                    drawLine(tint, Offset(w*.5f,h*.25f), Offset(w*.5f,h*.75f), s, StrokeCap.Round)
+                    drawCircle(tint, w*.35f, Offset(w*.5f,h*.5f), style = Stroke(s))
+                }
+                SettingsGlyphKind.REVIEW -> {
+                    drawLine(tint, Offset(w*.2f,h*.72f), Offset(w*.42f,h*.46f), s, StrokeCap.Round)
+                    drawLine(tint, Offset(w*.42f,h*.46f), Offset(w*.58f,h*.58f), s, StrokeCap.Round)
+                    drawLine(tint, Offset(w*.58f,h*.58f), Offset(w*.82f,h*.25f), s, StrokeCap.Round)
+                }
+                SettingsGlyphKind.SOUND -> {
+                    drawLine(tint, Offset(w*.25f,h*.42f), Offset(w*.44f,h*.42f), s*2f, StrokeCap.Round)
+                    drawLine(tint, Offset(w*.44f,h*.42f), Offset(w*.62f,h*.27f), s*2f, StrokeCap.Round)
+                    drawLine(tint, Offset(w*.62f,h*.27f), Offset(w*.62f,h*.73f), s*2f, StrokeCap.Round)
+                    drawLine(tint, Offset(w*.62f,h*.73f), Offset(w*.44f,h*.58f), s*2f, StrokeCap.Round)
+                }
+                SettingsGlyphKind.RATING -> {
+                    drawCircle(tint, w*.35f, Offset(w*.5f,h*.5f), style = Stroke(s))
+                    drawLine(tint, Offset(w*.5f,h*.5f), Offset(w*.68f,h*.31f), s, StrokeCap.Round)
+                }
+                SettingsGlyphKind.ACCOUNT -> {
+                    drawCircle(tint, w*.13f, Offset(w*.5f,h*.34f), style = Stroke(s))
+                    drawArc(tint, 200f, 140f, false, topLeft = Offset(w*.2f,h*.42f), size = androidx.compose.ui.geometry.Size(w*.6f,h*.45f), style = Stroke(s))
+                }
+                SettingsGlyphKind.ADVANCED -> {
+                    drawLine(tint, Offset(w*.3f,h*.2f), Offset(w*.7f,h*.8f), s, StrokeCap.Round)
+                    drawLine(tint, Offset(w*.7f,h*.2f), Offset(w*.3f,h*.8f), s, StrokeCap.Round)
                 }
             }
         }
     }
-}
-
-private fun appearanceLabel(appearance: AppAppearance): String = when (appearance) {
-    AppAppearance.SYSTEM -> "System"
-    AppAppearance.DARK -> "Dark"
-    AppAppearance.OLED_DARK -> "OLED"
-    AppAppearance.LIGHT -> "Light"
 }
