@@ -1,0 +1,27 @@
+name: P2 committed visual reference
+
+on:
+  push:
+    branches:
+      - physical-polish-customization
+
+permissions:
+  contents: read
+
+jobs:
+  export-reference:
+    if: startsWith(github.event.head_commit.message, 'tooling(P2):')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify committed LumenChess concept
+        run: |
+          test -f docs/references/LumenChess_UI_Concept_Blue.png
+          sha256sum docs/references/LumenChess_UI_Concept_Blue.png > LumenChess_UI_Concept_Blue.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumenchess-p2-visual-reference-${{ github.sha }}
+          path: |
+            docs/references/LumenChess_UI_Concept_Blue.png
+            LumenChess_UI_Concept_Blue.sha256
+          retention-days: 7
