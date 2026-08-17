@@ -1,5 +1,6 @@
 package dev.lumenchess.play
 
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -13,6 +14,7 @@ import dev.lumenchess.MainActivity
 import dev.lumenchess.board.CHESSBOARD_TEST_TAG
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Variant
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -63,6 +65,34 @@ class PlayUiIntegrationTest {
     }
 
     @Test
+    fun boardBoundsStayStableAcrossHumanMoveEngineThinkingAndEngineResult() {
+        composeRule.onNodeWithText("Standard").performScrollTo().performClick()
+        composeRule.onNodeWithText("White").performScrollTo().performClick()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
+        waitForLiveScreen()
+
+        val before = boardBounds()
+        val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
+        val beforeRevision = requireNotNull(viewModel.currentCoordinatorForTest()).state.positionRevision
+
+        composeRule.onNodeWithTag("square-e2").performClick()
+        composeRule.onNodeWithTag("square-e4").performClick()
+
+        composeRule.waitUntil(timeoutMillis = 5_000L) {
+            composeRule.onAllNodesWithTag(PLAY_PREMOVE_OVERLAY_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
+        val duringEngineThinking = boardBounds()
+        assertStableBounds(before, duringEngineThinking)
+
+        composeRule.waitUntil(timeoutMillis = 12_000L) {
+            val revision = viewModel.currentCoordinatorForTest()?.state?.positionRevision ?: beforeRevision
+            revision >= beforeRevision + 2
+        }
+        val afterEngineResult = boardBounds()
+        assertStableBounds(before, afterEngineResult)
+    }
+
+    @Test
     fun chess960BlackSetupStartsWithResolvedChess960Runtime() {
         composeRule.onNodeWithText("Chess960").performScrollTo().performClick()
         composeRule.onNodeWithText("Black").performScrollTo().performClick()
@@ -77,6 +107,18 @@ class PlayUiIntegrationTest {
         assertEquals(Variant.CHESS960, runtime.position.variant)
         assertTrue(requireNotNull(setup.chess960Index) in 0..959)
         composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).assertIsDisplayed()
+    }
+
+    private fun boardBounds(): Rect = composeRule
+        .onNodeWithTag(CHESSBOARD_TEST_TAG)
+        .fetchSemanticsNode()
+        .boundsInRoot
+
+    private fun assertStableBounds(expected: Rect, actual: Rect) {
+        assertTrue("board top changed: expected=${expected.top}, actual=${actual.top}", abs(expected.top - actual.top) <= 1f)
+        assertTrue("board bottom changed: expected=${expected.bottom}, actual=${actual.bottom}", abs(expected.bottom - actual.bottom) <= 1f)
+        assertTrue("board width changed: expected=${expected.width}, actual=${actual.width}", abs(expected.width - actual.width) <= 1f)
+        assertTrue("board height changed: expected=${expected.height}, actual=${actual.height}", abs(expected.height - actual.height) <= 1f)
     }
 
     private fun waitForLiveScreen() {
