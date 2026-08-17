@@ -12,6 +12,9 @@ import dev.lumenchess.engine.api.EngineSearchResult
 import dev.lumenchess.engine.api.EngineSession
 import dev.lumenchess.engine.api.EngineSessionCommand
 import dev.lumenchess.engine.api.EngineSessionId
+import dev.lumenchess.engine.api.EngineStrengthPlanner
+import dev.lumenchess.engine.api.EngineStrengthPlanning
+import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.engine.host.EngineSlotAService
 import dev.lumenchess.engine.host.EngineSlotBService
 import java.util.concurrent.ConcurrentHashMap
@@ -248,6 +251,18 @@ private class RemoteEngineSession(
                 }
                 is EngineSessionCommand.StartSearch -> {
                     val request = command.request
+                    val strengthPlanning = EngineStrengthPlanner.plan(request.strength, capabilities)
+                    if (strengthPlanning is EngineStrengthPlanning.Unsupported) {
+                        listener.onSessionFailure(
+                            sessionId,
+                            EngineHostFailure(EngineHostFailureCode.SESSION, strengthPlanning.reason),
+                        )
+                        return
+                    }
+                    val targetElo = when (val target = request.strength.target) {
+                        EngineStrengthTarget.FullStrength -> 0
+                        is EngineStrengthTarget.Elo -> target.value
+                    }
                     inFlight[request.searchId.value] = request.positionRevision.value
                     try {
                         remote.startSearch(
@@ -260,6 +275,9 @@ private class RemoteEngineSession(
                             request.limits.nodes ?: 0L,
                             request.limits.moveTimeMillis ?: 0L,
                             request.multiPv,
+                            request.strength.model.name,
+                            targetElo,
+                            request.strength.seed,
                         )
                     } catch (error: RemoteException) {
                         inFlight.remove(request.searchId.value)

@@ -16,7 +16,10 @@ interface IEngineHost {
         int depth,
         long nodes,
         long moveTimeMillis,
-        int multiPv
+        int multiPv,
+        String strengthModel,
+        int targetElo,
+        long strengthSeed
     );
     void stopSearch(String sessionId, long searchId);
     void closeSession(String sessionId);
