@@ -46,6 +46,14 @@ class LumenChessboardTest {
         composeRule.runOnIdle { assertEquals(Move.parseUci("e2e4"), emitted) }
     }
 
+    @Test fun defaultLumenPiecesOccupyMostOfTheirSquare() {
+        composeRule.setContent { LumenTheme { LumenChessboard(Position.initial(), {}) } }
+        val square = composeRule.onNodeWithTag("square-e2").fetchSemanticsNode().boundsInRoot
+        val piece = composeRule.onNodeWithTag("piece-e2-lumen-vector", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("default Lumen piece should occupy at least 86% of square height", piece.height / square.height >= 0.86f)
+        assertTrue("default Lumen piece should occupy at least 86% of square width", piece.width / square.width >= 0.86f)
+    }
+
     @Test fun blackOrientationActuallyFlipsBoardGeometry() {
         composeRule.setContent { LumenTheme { LumenChessboard(Position.initial(), {}, orientation = ChessboardOrientation.BLACK) } }
         val a1 = composeRule.onNodeWithTag("square-a1").fetchSemanticsNode().boundsInRoot.center
