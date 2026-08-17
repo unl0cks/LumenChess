@@ -175,9 +175,6 @@ fun LumenSettingRow(
         trailingText = null,
         showChevron = false,
     )
-    // Overlaying a separate row would duplicate semantics, so callers that need an
-    // inline toggle should use LumenToggle in their own compact Row. This overload
-    // remains intentionally small and is not used for screen-wide switches.
 }
 
 @Composable
@@ -188,6 +185,7 @@ fun LumenTopBar(
     backTestTag: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    val backIconColor = LumenColors.OnSurfaceMuted
     Row(
         modifier = modifier.fillMaxWidth().height(52.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -215,8 +213,8 @@ fun LumenTopBar(
             Box(backModifier, contentAlignment = Alignment.Center) {
                 Canvas(Modifier.size(20.dp)) {
                     val stroke = 1.8.dp.toPx()
-                    drawLine(LumenColors.OnSurfaceMuted, Offset(size.width * .72f, size.height * .18f), Offset(size.width * .35f, size.height * .5f), stroke, StrokeCap.Round)
-                    drawLine(LumenColors.OnSurfaceMuted, Offset(size.width * .35f, size.height * .5f), Offset(size.width * .72f, size.height * .82f), stroke, StrokeCap.Round)
+                    drawLine(backIconColor, Offset(size.width * .72f, size.height * .18f), Offset(size.width * .35f, size.height * .5f), stroke, StrokeCap.Round)
+                    drawLine(backIconColor, Offset(size.width * .35f, size.height * .5f), Offset(size.width * .72f, size.height * .82f), stroke, StrokeCap.Round)
                 }
             }
             Spacer(Modifier.width(2.dp))
@@ -413,10 +411,10 @@ fun LumenToggle(
 
 @Composable
 private fun LumenChevron(enabled: Boolean) {
+    val chevronColor = if (enabled) LumenColors.OnSurfaceFaint else LumenColors.Outline
     Canvas(Modifier.size(16.dp)) {
-        val color = if (enabled) LumenColors.OnSurfaceFaint else LumenColors.Outline
         val stroke = 1.5.dp.toPx()
-        drawLine(color, Offset(size.width * .36f, size.height * .25f), Offset(size.width * .64f, size.height * .5f), stroke, StrokeCap.Round)
-        drawLine(color, Offset(size.width * .64f, size.height * .5f), Offset(size.width * .36f, size.height * .75f), stroke, StrokeCap.Round)
+        drawLine(chevronColor, Offset(size.width * .36f, size.height * .25f), Offset(size.width * .64f, size.height * .5f), stroke, StrokeCap.Round)
+        drawLine(chevronColor, Offset(size.width * .64f, size.height * .5f), Offset(size.width * .36f, size.height * .75f), stroke, StrokeCap.Round)
     }
 }
