@@ -103,6 +103,14 @@ class EngineHostIsolationTest {
     }
 
     @Test
+    fun stockfish18StrengthModelsAreDeterministicLegalAndNativeAware() {
+        val details = runStockfishScenario(Stockfish18ReliabilityProbeActivity.SCENARIO_STRENGTH_MODELS)
+        assertTrue(details.contains("finite Hybrid deterministic"))
+        assertTrue(details.contains("Standard/Chess960 core-valid"))
+        assertTrue(details.contains("Engine Native finite accepted"))
+    }
+
+    @Test
     fun reckless09CapabilitiesMatchPinnedRelease() {
         val capabilities = Reckless09Engine.capabilities
         assertEquals(setOf(Variant.STANDARD, Variant.CHESS960), capabilities.variants)
@@ -143,6 +151,14 @@ class EngineHostIsolationTest {
     fun reckless09CanRunSimultaneouslyInBothIsolatedSlots() {
         val details = runRecklessScenario(Reckless09ReliabilityProbeActivity.SCENARIO_DUAL_SLOT)
         assertTrue(details.contains("simultaneous slots isolated"))
+    }
+
+    @Test
+    fun reckless09StrengthModelsAreDeterministicLegalAndRejectUnsupportedNativeMode() {
+        val details = runRecklessScenario(Reckless09ReliabilityProbeActivity.SCENARIO_STRENGTH_MODELS)
+        assertTrue(details.contains("finite Hybrid deterministic"))
+        assertTrue(details.contains("Standard/Chess960 core-valid"))
+        assertTrue(details.contains("Engine Native rejected as SESSION failure"))
     }
 
     private fun runEngineHostScenario(scenario: String): String = runTargetProcessScenario(

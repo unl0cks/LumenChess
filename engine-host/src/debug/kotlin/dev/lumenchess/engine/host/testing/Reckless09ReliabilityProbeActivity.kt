@@ -17,6 +17,9 @@ import dev.lumenchess.engine.api.EngineSearchRequest
 import dev.lumenchess.engine.api.EngineSearchResult
 import dev.lumenchess.engine.api.EngineSessionCommand
 import dev.lumenchess.engine.api.EngineSessionId
+import dev.lumenchess.engine.api.EngineStrengthModel
+import dev.lumenchess.engine.api.EngineStrengthSettings
+import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.engine.api.PositionRevision
 import dev.lumenchess.engine.host.Reckless09Engine
 import dev.lumenchess.engine.host.transport.EngineHostConnection
@@ -48,6 +51,7 @@ class Reckless09ReliabilityProbeActivity : Activity() {
                     SCENARIO_CANCEL_REPLACEMENT -> cancelReplacement()
                     SCENARIO_SESSION_REOPEN -> sessionReopen()
                     SCENARIO_DUAL_SLOT -> dualSlot()
+                    SCENARIO_STRENGTH_MODELS -> strengthModels()
                     else -> error("Unknown Reckless 0.9.0 reliability scenario '$scenario'")
                 }
             } catch (error: Throwable) {
@@ -235,6 +239,97 @@ class Reckless09ReliabilityProbeActivity : Activity() {
         }
     }
 
+    private fun strengthModels(): ProbeResult {
+        val listener = RecordingListener()
+        val connection = connect(EngineSlot.A, listener)
+        val hybrid = EngineStrengthSettings(
+            target = EngineStrengthTarget.Elo(1200),
+            model = EngineStrengthModel.HYBRID,
+            seed = 0x51A7L,
+        )
+        try {
+            val first = connection.openSession(
+                EngineSessionId("reckless-strength-first"),
+                Reckless09Engine.ID,
+                Reckless09Engine.capabilities,
+            )
+            val firstRequest = strengthRequest(151, 101, standardPosition, hybrid)
+            first.submit(EngineSessionCommand.StartSearch(firstRequest))
+            val firstResult = listener.takeResult(20).second
+            validate(standardPosition, firstRequest, firstResult, "First finite Hybrid Reckless result")
+            first.submit(EngineSessionCommand.Close)
+
+            val secondId = EngineSessionId("reckless-strength-second")
+            val second = connection.openSession(
+                secondId,
+                Reckless09Engine.ID,
+                Reckless09Engine.capabilities,
+            )
+            val repeatedRequest = strengthRequest(151, 101, standardPosition, hybrid)
+            second.submit(EngineSessionCommand.StartSearch(repeatedRequest))
+            val repeatedResult = listener.takeResult(20).second
+            validate(standardPosition, repeatedRequest, repeatedResult, "Repeated finite Hybrid Reckless result")
+            check(repeatedResult.bestMoveUci == firstResult.bestMoveUci) {
+                "Same Reckless seed/search/revision was not deterministic: ${firstResult.bestMoveUci} vs ${repeatedResult.bestMoveUci}"
+            }
+
+            val chess960Position = Chess960.startingPosition(0)
+            val chess960Request = strengthRequest(152, 102, chess960Position, hybrid)
+            second.submit(EngineSessionCommand.StartSearch(chess960Request))
+            val chess960Result = listener.takeResult(20).second
+            validate(chess960Position, chess960Request, chess960Result, "Finite Hybrid Chess960 Reckless result")
+
+            val nativeRequest = strengthRequest(
+                searchId = 153,
+                revision = 103,
+                searchPosition = standardPosition,
+                strength = EngineStrengthSettings(
+                    target = EngineStrengthTarget.Elo(1600),
+                    model = EngineStrengthModel.ENGINE_NATIVE,
+                    seed = 0xA11CEL,
+                ),
+            )
+            second.submit(EngineSessionCommand.StartSearch(nativeRequest))
+            val failure = listener.failures.poll(6, TimeUnit.SECONDS)
+            check(failure != null) {
+                val unexpected = listener.results.poll()
+                "Reckless Engine Native finite strength should be rejected, but no failure arrived; result=$unexpected"
+            }
+            check(failure.first == secondId) { "Reckless strength failure lost session identity" }
+            check(failure.second.code == EngineHostFailureCode.SESSION) {
+                "Reckless Engine Native used wrong typed failure: ${failure.second.code}"
+            }
+            check(failure.second.message.contains("native", ignoreCase = true)) {
+                "Reckless Engine Native failure did not explain missing native limiter: ${failure.second.message}"
+            }
+            check(listener.results.poll() == null) { "Unsupported Reckless Engine Native request produced a search result" }
+            second.submit(EngineSessionCommand.Close)
+
+            return ProbeResult(
+                true,
+                "Reckless finite Hybrid deterministic across fresh sessions; Standard/Chess960 core-valid; Engine Native rejected as SESSION failure",
+            )
+        } finally {
+            connection.close()
+        }
+    }
+
+    private fun validate(
+        searchPosition: Position,
+        request: EngineSearchRequest,
+        result: EngineSearchResult,
+        label: String,
+    ) {
+        check(
+            EngineMoveValidator.validate(
+                searchPosition,
+                request.searchId,
+                request.positionRevision,
+                result,
+            ) is EngineMoveValidation.Accepted,
+        ) { "$label failed core legality validation: ${result.bestMoveUci}" }
+    }
+
     private fun connect(slot: EngineSlot, listener: RecordingListener): EngineHostConnection {
         val connection = EngineHostConnection(this, slot, listener)
         check(connection.bind()) { "bindService failed for $slot" }
@@ -247,6 +342,19 @@ class Reckless09ReliabilityProbeActivity : Activity() {
         positionRevision = PositionRevision(revision),
         position = standardPosition,
         limits = limits,
+    )
+
+    private fun strengthRequest(
+        searchId: Long,
+        revision: Long,
+        searchPosition: Position,
+        strength: EngineStrengthSettings,
+    ) = EngineSearchRequest(
+        searchId = EngineSearchId(searchId),
+        positionRevision = PositionRevision(revision),
+        position = searchPosition,
+        limits = EngineSearchLimits(depth = 4),
+        strength = strength,
     )
 
     private data class ProbeResult(val passed: Boolean, val details: String)
@@ -288,6 +396,7 @@ class Reckless09ReliabilityProbeActivity : Activity() {
         const val SCENARIO_CANCEL_REPLACEMENT = "reckless09-cancel-replacement"
         const val SCENARIO_SESSION_REOPEN = "reckless09-session-reopen"
         const val SCENARIO_DUAL_SLOT = "reckless09-dual-slot"
+        const val SCENARIO_STRENGTH_MODELS = "reckless09-strength-models"
 
         private val standardPosition = Fen.parse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
