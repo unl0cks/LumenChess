@@ -43,6 +43,7 @@ dependencies {
     implementation(project(":core-chess"))
     implementation(project(":engine-api"))
 
+    testImplementation("junit:junit:4.13.2")
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
