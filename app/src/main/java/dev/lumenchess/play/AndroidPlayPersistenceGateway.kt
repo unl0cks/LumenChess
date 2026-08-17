@@ -117,7 +117,7 @@ class AndroidPlayPersistenceGateway(
         if (!closed.compareAndSet(false, true)) return
         // Queue close behind all accepted writes so a ViewModel/lifecycle teardown cannot close Room
         // underneath a snapshot transaction that was already emitted by the authoritative runtime.
-        executor.execute { database.close() }
+        executor.execute { LumenDatabaseFactory.close(database) }
         executor.shutdown()
     }
 
