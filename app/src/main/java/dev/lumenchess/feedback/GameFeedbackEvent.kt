@@ -12,4 +12,16 @@ sealed interface GameFeedbackEvent {
     data object Promotion : GameFeedbackEvent
     data object GameStart : GameFeedbackEvent
     data object GameEnd : GameFeedbackEvent
+
+    companion object {
+        val all: Set<GameFeedbackEvent> = linkedSetOf(
+            Move,
+            Capture,
+            Check,
+            Castle,
+            Promotion,
+            GameStart,
+            GameEnd,
+        )
+    }
 }
