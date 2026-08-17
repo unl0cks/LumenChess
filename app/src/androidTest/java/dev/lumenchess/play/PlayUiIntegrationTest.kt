@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
 import dev.lumenchess.MainActivity
 import dev.lumenchess.board.CHESSBOARD_TEST_TAG
@@ -25,20 +26,20 @@ class PlayUiIntegrationTest {
     @Test
     fun setupShowsTypedRecklessNativeConstraintInsteadOfSendingUnsupportedOptions() {
         composeRule.onNodeWithTag(PLAY_SETUP_TEST_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText("Reckless 0.9.0").performClick()
-        composeRule.onNodeWithText("Native").performClick()
+        composeRule.onNodeWithText("Reckless 0.9.0").performScrollTo().performClick()
+        composeRule.onNodeWithText("Native").performScrollTo().performClick()
 
         composeRule.onNodeWithText(
             "Engine native strength limiting is unavailable for this engine",
-        ).assertIsDisplayed()
-        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).assertIsNotEnabled()
+        ).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().assertIsNotEnabled()
     }
 
     @Test
     fun standardSetupStartsCleanLiveScreenAndConfigurationRecreationRetainsOwner() {
-        composeRule.onNodeWithText("Standard").performClick()
-        composeRule.onNodeWithText("White").performClick()
-        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performClick()
+        composeRule.onNodeWithText("Standard").performScrollTo().performClick()
+        composeRule.onNodeWithText("White").performScrollTo().performClick()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
         waitForLiveScreen()
 
         composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).assertIsDisplayed()
@@ -63,9 +64,9 @@ class PlayUiIntegrationTest {
 
     @Test
     fun chess960BlackSetupStartsWithResolvedChess960Runtime() {
-        composeRule.onNodeWithText("Chess960").performClick()
-        composeRule.onNodeWithText("Black").performClick()
-        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performClick()
+        composeRule.onNodeWithText("Chess960").performScrollTo().performClick()
+        composeRule.onNodeWithText("Black").performScrollTo().performClick()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
         waitForLiveScreen()
 
         val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
