@@ -137,7 +137,7 @@ jobs:
           "$emulator_bin" \
             -avd engine-checkpoint \
             -no-window -no-audio -no-boot-anim -no-snapshot \
-            -gpu software -memory 6144 \
+            -gpu software -memory 8192 \
             > "$diagnostics/emulator.log" 2>&1 &
           emulator_pid=$!
 
@@ -174,6 +174,8 @@ jobs:
           adb devices -l > "$diagnostics/adb-devices.txt" 2>&1 || true
           adb shell getprop > "$diagnostics/getprop.txt" 2>&1 || true
           adb shell getconf PAGESIZE > "$diagnostics/device-page-size.txt" 2>&1 || true
+          adb shell cat /proc/meminfo > "$diagnostics/proc-meminfo-before-tests.txt" 2>&1 || true
+          adb shell dumpsys meminfo > "$diagnostics/dumpsys-meminfo-before-tests.txt" 2>&1 || true
 
           adb logcat -c || true
           adb logcat -v threadtime > "$diagnostics/logcat.txt" 2>&1 &
@@ -193,6 +195,16 @@ jobs:
             kill "$logcat_pid" 2>/dev/null || true
             wait "$logcat_pid" 2>/dev/null || true
             logcat_pid=""
+          fi
+
+          adb shell cat /proc/meminfo > "$diagnostics/proc-meminfo-after-tests.txt" 2>&1 || true
+          adb shell dumpsys meminfo > "$diagnostics/dumpsys-meminfo-after-tests.txt" 2>&1 || true
+          grep -E "lowmemorykiller: Kill '.*engine_slot_[ab].*reason:.*watermark" \
+            "$diagnostics/logcat.txt" > "$diagnostics/engine-slot-lmk-kills.txt" || true
+          if [ -s "$diagnostics/engine-slot-lmk-kills.txt" ]; then
+            echo "Engine slot was killed by lowmemorykiller; API 37 gate is resource-invalid."
+            cat "$diagnostics/engine-slot-lmk-kills.txt"
+            gradle_status=1
           fi
 
           adb logcat -b crash -d -v threadtime > "$diagnostics/logcat-crash.txt" 2>&1 || true
@@ -371,7 +383,7 @@ jobs:
           "$emulator_bin" \
             -avd batch-gate \
             -no-window -no-audio -no-boot-anim -no-snapshot \
-            -gpu software -memory 6144 \
+            -gpu software -memory 8192 \
             > "$RUNNER_TEMP/batch-gate-emulator.log" 2>&1 &
           emulator_pid=$!
           trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
