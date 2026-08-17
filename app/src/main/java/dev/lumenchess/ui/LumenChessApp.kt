@@ -30,9 +30,9 @@ import dev.lumenchess.customization.BoardThemeCatalog
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTheme
+import dev.lumenchess.play.P5PlayRoute
 import dev.lumenchess.play.PlayScreenMode
 import dev.lumenchess.play.PlayViewModel
-import dev.lumenchess.play.PolishedPlayRoute
 import dev.lumenchess.settings.AppearanceSettings
 import dev.lumenchess.settings.BoardAppearanceScreen
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
@@ -111,7 +111,7 @@ fun LumenChessApp() {
                         label = "lumen-page-transition",
                     ) { (tab, destination) ->
                         when (tab) {
-                            MainTab.Play -> PolishedPlayRoute(viewModel = playViewModel, modifier = Modifier.fillMaxSize())
+                            MainTab.Play -> P5PlayRoute(viewModel = playViewModel, modifier = Modifier.fillMaxSize())
                             MainTab.Settings -> when (destination) {
                                 SettingsDestination.ROOT -> SettingsScreen(
                                     settings = appearanceSettings,
