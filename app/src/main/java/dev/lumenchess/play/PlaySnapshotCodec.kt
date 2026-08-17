@@ -61,7 +61,9 @@ object PlaySnapshotCodec {
         val seed = longValue(metadata, "strengthSeed")
         val initialMillis = longValue(metadata, "initialMillis")
         val incrementMillis = longValue(metadata, "incrementMillis")
-        val chess960Index = metadata[key("chess960Index")]?.toIntOrNull()
+        val chess960Index = metadata[key("chess960Index")]?.let { raw ->
+            raw.toIntOrNull() ?: throw PersistenceMappingException("Malformed stored Chess960 index '$raw'")
+        }
 
         val setupConfig = PlaySetupConfig(
             variant = game.tree.startPosition.variant,
@@ -73,7 +75,11 @@ object PlaySnapshotCodec {
             timeControl = PlayTimeControl(initialMillis, incrementMillis),
             strengthSeed = seed,
         )
-        val setup = PlaySetupResolver.resolve(setupConfig)
+        val setup = try {
+            PlaySetupResolver.resolve(setupConfig)
+        } catch (error: IllegalStateException) {
+            throw PersistenceMappingException("Stored Play setup is invalid for game ${game.id.value}", error)
+        }
         if (Fen.serialize(setup.initialPosition) != Fen.serialize(game.tree.startPosition)) {
             throw PersistenceMappingException("Stored Play setup does not reproduce game ${game.id.value} start position")
         }
@@ -88,15 +94,19 @@ object PlaySnapshotCodec {
         val currentNode = mainline.lastOrNull() ?: game.tree.root
         val terminal = metadata[key("terminal")]?.let(::decodeTerminal)
         val clockTimedOut = metadata[key("clockTimedOut")]?.let { parseEnum<ClockSide>(it, "clockTimedOut") }
-        val clock = ClockState(
-            whiteRemainingMillis = longValue(metadata, "clockWhite"),
-            blackRemainingMillis = longValue(metadata, "clockBlack"),
-            activeSide = enumValue(metadata, "clockActive"),
-            incrementMillis = longValue(metadata, "clockIncrement"),
-            running = false,
-            lastSampleMillis = null,
-            timedOutSide = clockTimedOut,
-        )
+        val clock = try {
+            ClockState(
+                whiteRemainingMillis = longValue(metadata, "clockWhite"),
+                blackRemainingMillis = longValue(metadata, "clockBlack"),
+                activeSide = enumValue(metadata, "clockActive"),
+                incrementMillis = longValue(metadata, "clockIncrement"),
+                running = false,
+                lastSampleMillis = null,
+                timedOutSide = clockTimedOut,
+            )
+        } catch (error: IllegalArgumentException) {
+            throw PersistenceMappingException("Stored Play clock state is invalid", error)
+        }
         val controllers = RuntimeControllers(
             white = if (humanSide == Color.WHITE) RuntimeController.HUMAN else RuntimeController.ENGINE,
             black = if (humanSide == Color.BLACK) RuntimeController.HUMAN else RuntimeController.ENGINE,
@@ -163,8 +173,15 @@ object PlaySnapshotCodec {
 
     private fun decodeStrengthTarget(value: String): EngineStrengthTarget = when {
         value == "FULL" -> EngineStrengthTarget.FullStrength
-        value.startsWith("ELO:") -> value.removePrefix("ELO:").toIntOrNull()?.let(EngineStrengthTarget::Elo)
-            ?: throw PersistenceMappingException("Malformed stored Play strength target '$value'")
+        value.startsWith("ELO:") -> {
+            val elo = value.removePrefix("ELO:").toIntOrNull()
+                ?: throw PersistenceMappingException("Malformed stored Play strength target '$value'")
+            try {
+                EngineStrengthTarget.Elo(elo)
+            } catch (error: IllegalArgumentException) {
+                throw PersistenceMappingException("Stored Play Elo is outside supported range", error)
+            }
+        }
         else -> throw PersistenceMappingException("Malformed stored Play strength target '$value'")
     }
 
@@ -179,9 +196,15 @@ object PlaySnapshotCodec {
     private fun decodeTerminal(value: String): RuntimeTerminal = when {
         value == "DRAW_AGREEMENT" -> RuntimeTerminal.DrawAgreement
         value == "STALEMATE" -> RuntimeTerminal.Stalemate
-        value.startsWith("TIMEOUT:") -> RuntimeTerminal.Timeout(parseEnum(value.substringAfter(':'), "terminal loser"))
-        value.startsWith("RESIGNATION:") -> RuntimeTerminal.Resignation(parseEnum(value.substringAfter(':'), "terminal loser"))
-        value.startsWith("CHECKMATE:") -> RuntimeTerminal.Checkmate(parseEnum(value.substringAfter(':'), "terminal winner"))
+        value.startsWith("TIMEOUT:") -> RuntimeTerminal.Timeout(
+            parseEnum<Color>(value.substringAfter(':'), "terminal loser"),
+        )
+        value.startsWith("RESIGNATION:") -> RuntimeTerminal.Resignation(
+            parseEnum<Color>(value.substringAfter(':'), "terminal loser"),
+        )
+        value.startsWith("CHECKMATE:") -> RuntimeTerminal.Checkmate(
+            parseEnum<Color>(value.substringAfter(':'), "terminal winner"),
+        )
         else -> throw PersistenceMappingException("Malformed stored Play terminal '$value'")
     }
 }
