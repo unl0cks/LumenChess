@@ -1,7 +1,7 @@
 package dev.lumenchess.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -22,17 +22,20 @@ fun BoardPreview(
     settings: AppearanceSettings,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .testTag("board-preview")
-            .padding(14.dp),
+            .padding(10.dp),
         contentAlignment = Alignment.Center,
     ) {
+        val widthTarget = maxWidth * 0.84f
+        val heightTarget = maxHeight - 12.dp
+        val boardSize = if (widthTarget <= heightTarget) widthTarget else heightTarget
         LumenChessboard(
             position = Position.initial(),
             onMove = {},
-            modifier = Modifier.size(204.dp),
+            modifier = Modifier.size(boardSize).testTag("board-preview-board"),
             input = ChessboardInput(tapEnabled = false, dragEnabled = false),
             palette = BoardThemeCatalog.palette(settings),
             pieceSet = PieceSetCatalog.definition(settings.pieceSetId),
