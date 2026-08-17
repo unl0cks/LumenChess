@@ -1,0 +1,65 @@
+name: Physical Polish app instrumentation
+
+on:
+  push:
+    branches:
+      - physical-polish-customization
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  app-device:
+    if: >-
+      startsWith(github.event.head_commit.message, 'checkpoint(P2):') ||
+      startsWith(github.event.head_commit.message, 'checkpoint(P3):') ||
+      startsWith(github.event.head_commit.message, 'checkpoint(P4):')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools emulator
+      - name: Install Android 17 emulator and pinned native toolchain
+        run: |
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            "system-images;android-37.0;google_apis_ps16k;x86_64" \
+            --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Boot Android 17 emulator
+        run: |
+          echo "no" | avdmanager create avd --force --name polish-app \
+            --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          "$ANDROID_HOME/emulator/emulator" -avd polish-app \
+            -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 \
+            > "$RUNNER_TEMP/polish-emulator.log" 2>&1 &
+          timeout 90 bash -c 'until adb devices | grep -Eq "^emulator-[0-9]+[[:space:]]+device$"; do sleep 2; done'
+          timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+      - name: Run cumulative app instrumentation
+        run: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+      - name: Upload emulator log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: polish-app-device-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/polish-emulator.log
+          if-no-files-found: warn
+          retention-days: 7
