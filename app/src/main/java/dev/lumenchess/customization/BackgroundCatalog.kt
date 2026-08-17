@@ -18,7 +18,7 @@ object BackgroundCatalog {
     const val WALNUT_STUDY = "walnut-study"
     const val PURE_GRAPHITE = "pure-graphite"
 
-    val all: List<BackgroundDefinition> = listOf(
+    val builtIns: List<BackgroundDefinition> = listOf(
         BackgroundDefinition(
             id = LUMEN_NIGHT,
             displayName = "Lumen Night",
@@ -56,7 +56,8 @@ object BackgroundCatalog {
             lightBottom = Color(0xFFF5F6F6),
         ),
     )
+    val all: List<BackgroundDefinition> get() = builtIns
 
     fun definition(id: String): BackgroundDefinition =
-        all.firstOrNull { it.id == id } ?: all.first()
+        builtIns.firstOrNull { it.id == id } ?: builtIns.first()
 }
