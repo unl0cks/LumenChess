@@ -11,6 +11,7 @@ import dev.lumenchess.engine.api.EngineSessionCommand
 import dev.lumenchess.engine.api.EngineSessionId
 import dev.lumenchess.engine.host.transport.EngineHostConnection
 import dev.lumenchess.engine.host.transport.EngineHostFailure
+import dev.lumenchess.engine.host.transport.EngineHostFailureCode
 import dev.lumenchess.engine.host.transport.EngineHostListener
 import dev.lumenchess.engine.host.transport.EngineSlot
 import java.util.UUID
@@ -66,7 +67,7 @@ class AndroidPlayEngineGateway(
         if (current == null) {
             listener?.onEngineFailure(
                 EngineHostFailure(
-                    code = dev.lumenchess.engine.host.transport.EngineHostFailureCode.TRANSPORT,
+                    code = EngineHostFailureCode.TRANSPORT,
                     message = "Engine search requested before isolated host session was available",
                 ),
             )
@@ -80,10 +81,10 @@ class AndroidPlayEngineGateway(
     }
 
     /**
-     * Test/diagnostic hook that tears down the current isolated host and exercises the same rebind
-     * path used after Binder death. Old callbacks are invalidated before teardown.
+     * Diagnostic hook used by M19 device tests and manual validation. It intentionally follows the
+     * same death/rebind path as Binder failure while preserving the logical game/session identity.
      */
-    internal fun restartHostForTest() {
+    fun restartHostForDiagnostics() {
         handler.post { replaceHost(notifyDeath = true) }
     }
 
@@ -116,7 +117,7 @@ class AndroidPlayEngineGateway(
             slot = slot,
             listener = object : EngineHostListener {
                 override fun onConnected(slot: EngineSlot, processId: Int, hostGeneration: Long) {
-                    handler.post { handleConnected(token, candidate = candidateReference(token), processId, hostGeneration) }
+                    handler.post { handleConnected(token, candidateReference(token), processId, hostGeneration) }
                 }
 
                 override fun onSearchResult(sessionId: EngineSessionId, result: EngineSearchResult) {
@@ -145,7 +146,7 @@ class AndroidPlayEngineGateway(
             connection = null
             listener?.onEngineFailure(
                 EngineHostFailure(
-                    code = dev.lumenchess.engine.host.transport.EngineHostFailureCode.TRANSPORT,
+                    code = EngineHostFailureCode.TRANSPORT,
                     message = "Could not bind isolated engine host",
                 ),
             )
@@ -171,14 +172,27 @@ class AndroidPlayEngineGateway(
                 capabilities = engine.capabilities,
             )
             opened.submit(EngineSessionCommand.NewGame)
-            synchronized(lock) {
-                if (!closed && token == connectionToken) session = opened else return
+            val accepted = synchronized(lock) {
+                if (!closed && token == connectionToken) {
+                    session = opened
+                    true
+                } else {
+                    false
+                }
+            }
+            if (!accepted) {
+                try {
+                    opened.submit(EngineSessionCommand.Close)
+                } catch (_: RuntimeException) {
+                    // Stale connection was already superseded.
+                }
+                return
             }
             listener?.onEngineHostRecovered()
         } catch (error: RuntimeException) {
             listener?.onEngineFailure(
                 EngineHostFailure(
-                    code = dev.lumenchess.engine.host.transport.EngineHostFailureCode.TRANSPORT,
+                    code = EngineHostFailureCode.TRANSPORT,
                     message = "Could not open ${engine.displayName} session in host $processId/$hostGeneration: ${error.message.orEmpty()}",
                 ),
             )
