@@ -74,7 +74,7 @@ class GameFeedbackProjectorTest {
         castleRuntime.dispatch(RuntimeEvent.HumanMove(RuntimeEventId(2), Move.parseUci("e1g1")))
         val afterCastle = castleRuntime.state
 
-        val promotionRuntime = runtime("4k3/P7/8/8/8/8/8/4K3 w - - 0 1")
+        val promotionRuntime = runtime("8/P7/7k/8/8/8/8/4K3 w - - 0 1")
         val beforePromotion = started(promotionRuntime)
         promotionRuntime.dispatch(RuntimeEvent.HumanMove(RuntimeEventId(2), Move.parseUci("a7a8q")))
         val afterPromotion = promotionRuntime.state
