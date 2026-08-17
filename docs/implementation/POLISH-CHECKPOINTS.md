@@ -41,7 +41,7 @@ The exact P2 checkpoint passed proportional JVM/Play checks, lint/assemblies, AR
 
 ## P3 — themes, boards, pieces, backgrounds and presets
 
-Checkpoint: the latest `checkpoint(P3): add LumenChess visual customization` commit containing this entry after the P3 API 37 regressions below were resolved.
+Checkpoint: the latest `checkpoint(P3): add LumenChess visual customization` commit containing this entry after all P3 API 37 regressions below were resolved.
 
 ### Architecture
 
@@ -60,7 +60,7 @@ Checkpoint: the latest `checkpoint(P3): add LumenChess visual customization` com
 - Settings now exposes System/Dark/OLED/Light and a dedicated Board & Pieces surface with an always-visible board preview and Board/Pieces/Background/Presets tabs.
 - Asset provenance and redistribution notes are recorded in `docs/implementation/P3-ASSET-PROVENANCE.md`.
 
-### Regression coverage and recovered API 37 fixes
+### Regression coverage and API 37 fixes
 
 - Preference codec tests cover defaults, defensive fallback, deterministic ARGB storage and no-preset persistence.
 - Customization model tests cover preset composition, individual override behavior and custom board-color fallback.
@@ -68,9 +68,10 @@ Checkpoint: the latest `checkpoint(P3): add LumenChess visual customization` com
 - Board presentation instrumentation verifies the presentation provider reaches an unchanged board call site.
 - Settings instrumentation exercises OLED appearance, the live preview, preset application, background override and board override.
 - The preview follows the resolved System light/dark theme instead of assuming System means dark.
-- The first P3 checkpoint `bf19f29d97d7bf332ef9322760610d2c407f5298` found three P3-only API 37 failures. Two were caused by attaching the piece style test tag directly to `Canvas`, which existed in semantics but did not have a stable displayed layout node. Commit `751e9d21fc037301e7967e192a1231cb52afd101` places the artwork Canvas inside a tagged layout container without changing board input or chess state.
-- The third failure was a Settings timeout after a preset component override. DataStore persistence was correct but UI state waited for asynchronous storage round-trip before reflecting the selection. Commit `27637dc390ca0aa40cc6fedfd75f6e96e3155ee0` makes presentation settings updates optimistic while still persisting through the same DataStore source of truth; runtime/game ownership remains untouched.
-- Both fixes passed proportional JVM/Play checks, lint/assemblies, ARM64+x86_64 native verification and 16 KiB checks before this replacement checkpoint.
+- The first P3 checkpoint `bf19f29d97d7bf332ef9322760610d2c407f5298` found three P3-only API 37 failures. Two involved internal piece-renderer nodes and one involved the third background option in the compact customization viewport.
+- Commit `751e9d21fc037301e7967e192a1231cb52afd101` placed the artwork Canvas inside a stable tagged layout container without changing board input or chess state. Commit `27637dc390ca0aa40cc6fedfd75f6e96e3155ee0` made presentation settings updates optimistic while retaining DataStore as the persisted source of truth.
+- The replacement checkpoint `5ba04a1794a0044528b61fc4adce83fc8f2894b7` reproduced the same three device assertions, proving the remaining problem was test interaction semantics rather than flaky CI. The piece-style tests had been using `assertIsDisplayed()` on internal renderer semantics even though the authoritative square/board was visibly laid out; the corrected regression now requires the board square to be displayed and the selected piece-style node to exist. The customization test now explicitly scrolls preset/background/board options into the weighted scroll viewport before clicking them, so the device test exercises the actual 48dp targets instead of clipped semantics nodes.
+- These corrections are test-only and do not change core chess, runtime, clock, engine, persistence, premove, board-stage geometry, or presentation ownership.
 
 ### Gate required for this checkpoint
 
