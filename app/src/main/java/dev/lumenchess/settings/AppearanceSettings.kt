@@ -39,7 +39,8 @@ data class AppearanceSettings(
     )
 
     companion object {
-        const val DEFAULT_ACCENT_ARGB: Long = 0xFF4C8DFFL
+        const val DEFAULT_ACCENT_ARGB: Long = 0xFF4F879BL
+        internal const val LEGACY_DEFAULT_ACCENT_ARGB: Long = 0xFF4C8DFFL
         const val DEFAULT_BOARD_THEME_ID = "lumen-blue"
         const val DEFAULT_PIECE_SET_ID = "lumen-vector"
         const val DEFAULT_BACKGROUND_ID = "lumen-night"
@@ -84,11 +85,17 @@ internal object AppearanceSettingsCodec {
 
     fun decode(raw: Map<String, String>): AppearanceSettings {
         val defaults = AppearanceSettings()
+        val storedAccent = raw[ACCENT]?.let(::decodeArgb)
+        val migratedAccent = when (storedAccent) {
+            AppearanceSettings.LEGACY_DEFAULT_ACCENT_ARGB -> AppearanceSettings.DEFAULT_ACCENT_ARGB
+            null -> defaults.accentArgb
+            else -> storedAccent
+        }
         return AppearanceSettings(
             appearance = raw[APPEARANCE]
                 ?.let { stored -> AppAppearance.entries.firstOrNull { it.name == stored } }
                 ?: defaults.appearance,
-            accentArgb = raw[ACCENT]?.let(::decodeArgb) ?: defaults.accentArgb,
+            accentArgb = migratedAccent,
             boardThemeId = raw[BOARD_THEME].validStableIdOr(defaults.boardThemeId),
             pieceSetId = raw[PIECE_SET].validStableIdOr(defaults.pieceSetId),
             backgroundId = raw[BACKGROUND].validStableIdOr(defaults.backgroundId),
