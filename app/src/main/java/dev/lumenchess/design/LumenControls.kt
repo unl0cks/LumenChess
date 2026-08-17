@@ -42,7 +42,6 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.progressBarRangeInfo
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontWeight
@@ -364,12 +363,16 @@ fun LumenSlider(
             ((fraction * intervals).roundToInt() / intervals.toFloat())
     }
 
+    val inactiveTrack = LumenColors.OutlineStrong
+    val activeTrack = if (enabled) LumenColors.AccentBlue else LumenColors.OnSurfaceFaint
+    val thumbColor = if (enabled) LumenColors.AccentBlueBright else LumenColors.OnSurfaceFaint
+    val thumbEdge = LumenColors.Background.copy(alpha = .7f)
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(LumenDimensions.MinimumTouchTarget)
             .semantics {
-                role = Role.Slider
                 progressBarRangeInfo = ProgressBarRangeInfo(value, valueRange, steps)
                 if (!enabled) disabled()
                 setProgress { target ->
@@ -408,24 +411,24 @@ fun LumenSlider(
             val y = size.height / 2f
             val thumbRadius = 6.dp.toPx()
             drawRoundRect(
-                color = LumenColors.OutlineStrong,
+                color = inactiveTrack,
                 topLeft = androidx.compose.ui.geometry.Offset(0f, y - trackHeight / 2f),
                 size = androidx.compose.ui.geometry.Size(size.width, trackHeight),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight),
             )
             drawRoundRect(
-                color = if (enabled) LumenColors.AccentBlue else LumenColors.OnSurfaceFaint,
+                color = activeTrack,
                 topLeft = androidx.compose.ui.geometry.Offset(0f, y - trackHeight / 2f),
                 size = androidx.compose.ui.geometry.Size(size.width * fraction, trackHeight),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight),
             )
             drawCircle(
-                color = if (enabled) LumenColors.AccentBlueBright else LumenColors.OnSurfaceFaint,
+                color = thumbColor,
                 radius = thumbRadius,
                 center = androidx.compose.ui.geometry.Offset(size.width * fraction, y),
             )
             drawCircle(
-                color = LumenColors.Background.copy(alpha = .7f),
+                color = thumbEdge,
                 radius = thumbRadius,
                 center = androidx.compose.ui.geometry.Offset(size.width * fraction, y),
                 style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
