@@ -1,0 +1,122 @@
+name: Gate P
+
+on:
+  push:
+    branches:
+      - physical-polish-customization
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-p-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate-p:
+    if: startsWith(github.event.head_commit.message, 'checkpoint(P4):')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools emulator
+      - name: Install Android 17 SDK, test image, and pinned native toolchain
+        run: |
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            "system-images;android-37.0;google_apis_ps16k;x86_64" \
+            --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+          rustup run 1.88.0 rustc --version
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify cumulative JVM, Android modules, lint, and assemblies
+        run: ./gradlew :core-chess:test :game-runtime:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Verify native engine ABIs and 16 KiB ELF alignment
+        run: |
+          readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$readelf"
+          for engine in lumen_stockfish18 lumen_reckless09; do
+            for abi in arm64-v8a x86_64; do
+              lib="$(find engine-host/build -type f -path "*/${abi}/lib${engine}.so" | head -n 1)"
+              test -n "$lib"
+              echo "Verifying $engine $abi: $lib"
+              python - "$readelf" "$lib" <<'PY'
+          import subprocess
+          import sys
+          readelf, library = sys.argv[1:]
+          output = subprocess.check_output([readelf, "-lW", library], text=True)
+          aligns = [
+              int(line.split()[-1], 0)
+              for line in output.splitlines()
+              if line.lstrip().startswith("LOAD")
+          ]
+          if not aligns:
+              raise SystemExit(f"No PT_LOAD segments found in {library}")
+          if any(align < 0x4000 for align in aligns):
+              raise SystemExit(f"{library} has LOAD alignment below 16 KiB: {aligns}")
+          print(f"LOAD alignments: {aligns}")
+          PY
+            done
+          done
+      - name: Verify committed Room schema history is up to date
+        run: |
+          schema_v1="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/1.json"
+          schema_v2="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/2.json"
+          test -f "$schema_v1"
+          test -f "$schema_v2"
+          git diff --exit-code -- data-persistence/schemas
+          test -z "$(git status --porcelain --untracked-files=all -- data-persistence/schemas)"
+      - name: Run cumulative instrumentation tests on Android 17
+        run: |
+          echo "no" | avdmanager create avd --force --name gate-p --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          emulator_bin="$ANDROID_HOME/emulator/emulator"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          "$emulator_bin" -accel-check || true
+          "$emulator_bin" -avd gate-p -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 > "$RUNNER_TEMP/gate-p-emulator.log" 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          device_ready=0
+          for _ in $(seq 1 45); do
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then cat "$RUNNER_TEMP/gate-p-emulator.log"; exit 1; fi
+            if adb devices | grep -Eq '^emulator-[0-9]+[[:space:]]+device$'; then device_ready=1; break; fi
+            sleep 2
+          done
+          if [ "$device_ready" -ne 1 ]; then cat "$RUNNER_TEMP/gate-p-emulator.log"; exit 1; fi
+          timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          echo "Device page size: $(adb shell getconf PAGESIZE | tr -d '\r')"
+          if ! ./gradlew :engine-host:connectedDebugAndroidTest :data-persistence:connectedDebugAndroidTest :app:connectedDebugAndroidTest; then
+            echo "==== Android instrumentation XML reports ===="
+            find engine-host/build data-persistence/build app/build -type f \( -name 'TEST-*.xml' -o -name '*.xml' \) -path '*androidTest-results*' -print -exec cat {} \; || true
+            echo "==== Emulator tail ===="
+            tail -n 300 "$RUNNER_TEMP/gate-p-emulator.log" || true
+            exit 1
+          fi
+      - name: Upload Gate P instrumentation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-p-instrumentation-results
+          path: |
+            engine-host/build/outputs/androidTest-results
+            engine-host/build/reports/androidTests
+            data-persistence/build/outputs/androidTest-results
+            data-persistence/build/reports/androidTests
+            app/build/outputs/androidTest-results
+            app/build/reports/androidTests
+          if-no-files-found: warn
+          retention-days: 14
