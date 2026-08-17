@@ -40,6 +40,7 @@ jobs:
       github.event_name == 'push' &&
       github.ref != 'refs/heads/main' &&
       (startsWith(github.event.head_commit.message, 'checkpoint(M12):') ||
+       startsWith(github.event.head_commit.message, 'ci(M12):') ||
        startsWith(github.event.head_commit.message, 'checkpoint(M13):') ||
        startsWith(github.event.head_commit.message, 'checkpoint(M14):'))
     runs-on: ubuntu-latest
@@ -61,8 +62,28 @@ jobs:
             "system-images;android-37.0;google_apis_ps16k;x86_64" \
             --channel=3
       - uses: gradle/actions/setup-gradle@v4
-      - name: Run focused engine-host lifecycle tests on Android 17
+      - name: Run focused engine-host lifecycle tests on Android 17 with diagnostics
         run: |
+          set -uo pipefail
+
+          diagnostics="$RUNNER_TEMP/m12-engine-device-diagnostics"
+          rm -rf "$diagnostics"
+          mkdir -p "$diagnostics"
+
+          emulator_pid=""
+          logcat_pid=""
+          cleanup() {
+            if [ -n "$logcat_pid" ]; then
+              kill "$logcat_pid" 2>/dev/null || true
+              wait "$logcat_pid" 2>/dev/null || true
+            fi
+            if [ -n "$emulator_pid" ]; then
+              kill "$emulator_pid" 2>/dev/null || true
+              wait "$emulator_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
           echo "no" | avdmanager create avd \
             --force \
             --name engine-checkpoint \
@@ -70,19 +91,20 @@ jobs:
 
           emulator_bin="$ANDROID_HOME/emulator/emulator"
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
-          "$emulator_bin" -accel-check || true
+          "$emulator_bin" -accel-check > "$diagnostics/emulator-accel-check.txt" 2>&1 || true
           "$emulator_bin" \
             -avd engine-checkpoint \
             -no-window -no-audio -no-boot-anim -no-snapshot \
             -gpu software -memory 4096 \
-            > "$RUNNER_TEMP/engine-checkpoint-emulator.log" 2>&1 &
+            > "$diagnostics/emulator.log" 2>&1 &
           emulator_pid=$!
-          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
 
           device_ready=0
           for _ in $(seq 1 45); do
+            adb devices -l > "$diagnostics/adb-devices.txt" 2>&1 || true
             if ! kill -0 "$emulator_pid" 2>/dev/null; then
-              cat "$RUNNER_TEMP/engine-checkpoint-emulator.log"
+              echo "Emulator exited before becoming ready"
+              cat "$diagnostics/emulator.log"
               exit 1
             fi
             if adb devices | grep -Eq '^emulator-[0-9]+[[:space:]]+device$'; then
@@ -92,19 +114,139 @@ jobs:
             sleep 2
           done
           if [ "$device_ready" -ne 1 ]; then
-            cat "$RUNNER_TEMP/engine-checkpoint-emulator.log"
+            echo "Emulator never reached adb device state"
+            cat "$diagnostics/emulator.log"
             exit 1
           fi
-          timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+
+          if ! timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'; then
+            echo "Emulator boot did not complete within 240 seconds"
+            adb devices -l > "$diagnostics/adb-devices.txt" 2>&1 || true
+            adb shell getprop > "$diagnostics/getprop.txt" 2>&1 || true
+            exit 1
+          fi
+
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
+          adb devices -l > "$diagnostics/adb-devices.txt" 2>&1 || true
+          adb shell getprop > "$diagnostics/getprop.txt" 2>&1 || true
+          adb shell getconf PAGESIZE > "$diagnostics/device-page-size.txt" 2>&1 || true
 
-          if ! ./gradlew :engine-host:connectedDebugAndroidTest; then
-            echo "==== engine-host instrumentation reports ===="
-            find engine-host/build -type f \( -name 'TEST-*.xml' -o -name '*.xml' \) -path '*androidTest-results*' -print -exec cat {} \; || true
-            exit 1
+          adb logcat -c || true
+          adb logcat -v threadtime > "$diagnostics/logcat.txt" 2>&1 &
+          logcat_pid=$!
+
+          set +e
+          ./gradlew \
+            :engine-host:connectedDebugAndroidTest \
+            -Pandroid.testInstrumentationRunnerArguments.class=dev.lumenchess.engine.host.EngineHostIsolationTest \
+            --stacktrace --info \
+            2>&1 | tee "$diagnostics/gradle-connectedDebugAndroidTest.log"
+          gradle_status=${PIPESTATUS[0]}
+          set -e
+
+          sleep 1
+          if [ -n "$logcat_pid" ]; then
+            kill "$logcat_pid" 2>/dev/null || true
+            wait "$logcat_pid" 2>/dev/null || true
+            logcat_pid=""
           fi
+
+          adb logcat -b crash -d -v threadtime > "$diagnostics/logcat-crash.txt" 2>&1 || true
+          adb shell ps -A > "$diagnostics/ps-A.txt" 2>&1 || true
+          adb shell dumpsys activity services > "$diagnostics/dumpsys-activity-services.txt" 2>&1 || true
+          adb shell dumpsys activity processes > "$diagnostics/dumpsys-activity-processes.txt" 2>&1 || true
+          adb shell dumpsys package dev.lumenchess.engine.host > "$diagnostics/dumpsys-package-engine-host.txt" 2>&1 || true
+          adb shell dumpsys package dev.lumenchess.engine.host.test > "$diagnostics/dumpsys-package-engine-host-test.txt" 2>&1 || true
+          {
+            echo "==== matching engine-host / instrumentation / slot processes ===="
+            adb shell ps -A 2>&1 | grep -E 'dev\.lumenchess\.engine\.host|engine_slot_[ab]|instrument' || true
+            echo
+            echo "==== package paths ===="
+            adb shell pm path dev.lumenchess.engine.host 2>&1 || true
+            adb shell pm path dev.lumenchess.engine.host.test 2>&1 || true
+          } > "$diagnostics/engine-host-process-package-summary.txt"
+
+          {
+            echo "==== /data/tombstones listing (non-privileged attempt) ===="
+            adb shell ls -al /data/tombstones 2>&1 || true
+            echo
+            echo "==== DropBox crash/tombstone tags available to shell ===="
+            adb shell dumpsys dropbox --print SYSTEM_TOMBSTONE 2>&1 || true
+            adb shell dumpsys dropbox --print data_app_crash 2>&1 || true
+            adb shell dumpsys dropbox --print system_app_crash 2>&1 || true
+          } > "$diagnostics/tombstone-dropbox.txt"
+
+          if [ -d engine-host/build/outputs/androidTest-results ]; then
+            cp -a engine-host/build/outputs/androidTest-results "$diagnostics/androidTest-results-raw"
+          fi
+          if [ -d engine-host/build/reports/androidTests ]; then
+            cp -a engine-host/build/reports/androidTests "$diagnostics/androidTests-html"
+          fi
+
+          echo "==== M12 focused instrumentation failure summary ===="
+          python - <<'PY' | tee "$diagnostics/failure-summary.txt"
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          roots = [
+              Path("engine-host/build/outputs/androidTest-results"),
+              Path("engine-host/build/reports/androidTests"),
+          ]
+          xml_files = sorted({p for root in roots if root.exists() for p in root.rglob("TEST-*.xml")})
+          if not xml_files:
+              print("No JUnit TEST-*.xml files were generated.")
+          else:
+              failures = 0
+              for path in xml_files:
+                  try:
+                      root = ET.parse(path).getroot()
+                  except Exception as exc:
+                      print(f"Could not parse {path}: {exc}")
+                      continue
+                  for testcase in root.iter("testcase"):
+                      problem = testcase.find("failure")
+                      kind = "failure"
+                      if problem is None:
+                          problem = testcase.find("error")
+                          kind = "error"
+                      if problem is None:
+                          continue
+                      failures += 1
+                      classname = testcase.attrib.get("classname", "<unknown-class>")
+                      name = testcase.attrib.get("name", "<unknown-method>")
+                      message = (problem.attrib.get("message") or "").strip()
+                      body = (problem.text or "").strip()
+                      print(f"FAILED TEST: {classname}.{name}")
+                      print(f"TYPE: {kind}")
+                      if message:
+                          print(f"EXCEPTION: {message}")
+                      if body:
+                          print("STACK TRACE:")
+                          print(body)
+                      print("---")
+              if failures == 0:
+                  print("JUnit XML contains no <failure> or <error> elements.")
+          PY
+
+          if [ "$gradle_status" -ne 0 ]; then
+            echo "==== Gradle failure-tail fallback ===="
+            grep -E 'FAILED|FAILURE:|Exception|Caused by:|AssertionError|SecurityException|DeadObjectException|RemoteException' \
+              "$diagnostics/gradle-connectedDebugAndroidTest.log" | tail -n 250 || true
+          fi
+
+          exit "$gradle_status"
+
+      - name: Upload M12 engine-device diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m12-engine-device-diagnostics
+          path: ${{ runner.temp }}/m12-engine-device-diagnostics
+          if-no-files-found: warn
+          overwrite: true
+          retention-days: 14
 
   full:
     if: >-
