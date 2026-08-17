@@ -134,7 +134,7 @@ class PremoveRuntimeTest {
 
     @Test
     fun promotionPremoveUsesCorePromotionLegality() {
-        val position = Fen.parse("7k/8/8/8/8/6N1/1p6/K7 w - - 0 1")
+        val position = Fen.parse("7k/8/8/8/8/K5N1/1p6/8 w - - 0 1")
         val (runtime, _) = fixture(position)
         runtime.dispatch(RuntimeEvent.QueuePremove(RuntimeEventId(2), Color.BLACK, move("b2b1q")))
 
@@ -147,7 +147,7 @@ class PremoveRuntimeTest {
 
     @Test
     fun standardCastlingPremoveExecutesUsingCoreRepresentation() {
-        val position = Fen.parse("r3k2r/8/8/8/8/8/6N1/K7 w kq - 0 1")
+        val position = Fen.parse("r3k2r/8/8/8/8/8/6N1/1K6 w kq - 0 1")
         val (runtime, _) = fixture(position)
         runtime.dispatch(RuntimeEvent.QueuePremove(RuntimeEventId(2), Color.BLACK, move("e8g8")))
 
@@ -160,7 +160,7 @@ class PremoveRuntimeTest {
 
     @Test
     fun chess960CastlingPremovePreservesRookSquareInputEncoding() {
-        val position = Fen.parse("rk2r3/8/8/8/8/8/6N1/K7 w ea - 0 1", Variant.CHESS960)
+        val position = Fen.parse("rk2r3/8/8/8/8/8/6N1/1K6 w ea - 0 1", Variant.CHESS960)
         val (runtime, _) = fixture(position)
         runtime.dispatch(RuntimeEvent.QueuePremove(RuntimeEventId(2), Color.BLACK, move("b8e8")))
 
