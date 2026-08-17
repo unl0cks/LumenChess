@@ -13,14 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -34,9 +29,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.lumenchess.design.LumenColors
+import dev.lumenchess.design.LumenListRow
+import dev.lumenchess.design.LumenPanel
+import dev.lumenchess.design.LumenSecondaryButton
+import dev.lumenchess.design.LumenToggle
+import dev.lumenchess.design.LumenTopBar
 import dev.lumenchess.feedback.AndroidGameFeedbackOutput
 import dev.lumenchess.feedback.GameFeedbackEvent
 import dev.lumenchess.feedback.SoundPackImporter
@@ -59,12 +58,8 @@ fun SoundsHapticsScreen(
     var pendingSingleEvent by remember { mutableStateOf<GameFeedbackEvent?>(null) }
     var importStatus by remember { mutableStateOf<String?>(null) }
 
-    DisposableEffect(previewOutput) {
-        onDispose { previewOutput.close() }
-    }
-    LaunchedEffect(settings.soundPackId) {
-        previewOutput.updateSoundPackId(settings.soundPackId)
-    }
+    DisposableEffect(previewOutput) { onDispose { previewOutput.close() } }
+    LaunchedEffect(settings.soundPackId) { previewOutput.updateSoundPackId(settings.soundPackId) }
 
     fun importPack(uri: Uri) {
         scope.launch {
@@ -82,9 +77,7 @@ fun SoundsHapticsScreen(
             result.onSuccess { packId ->
                 onSettingsChange(settings.copy(soundPackId = packId))
                 importStatus = "Imported sound pack"
-            }.onFailure { error ->
-                importStatus = error.message ?: "Sound pack import failed"
-            }
+            }.onFailure { error -> importStatus = error.message ?: "Sound pack import failed" }
         }
     }
 
@@ -107,9 +100,7 @@ fun SoundsHapticsScreen(
         }
     }
 
-    val packLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let(::importPack)
-    }
+    val packLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(::importPack) }
     val singleLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val event = pendingSingleEvent
         pendingSingleEvent = null
@@ -122,48 +113,46 @@ fun SoundsHapticsScreen(
             .testTag("sounds-haptics-screen")
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 18.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        TextButton(onClick = onBack) { Text("Back") }
-        Text("SOUNDS & HAPTICS", style = MaterialTheme.typography.labelSmall, color = LumenColors.AccentBlueBright)
-        Text("Feedback without touching the game", style = MaterialTheme.typography.headlineLarge)
-        Text(
-            "These controls observe committed moves only. They cannot change legality, clocks, engines or saved game state.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = LumenColors.OnSurfaceMuted,
-        )
+        LumenTopBar(title = "Sounds & Haptics", onBack = onBack, backTestTag = "sounds-haptics-back")
 
-        FeedbackSwitchRow(
-            title = "Sounds",
-            subtitle = "Master switch for move and game-event audio",
+        FeedbackMasterRow(
+            title = "Master sound",
+            subtitle = "Move and game-event audio",
             checked = settings.feedbackSoundsEnabled,
             tag = "feedback-sounds-master",
             onCheckedChange = { onSettingsChange(settings.copy(feedbackSoundsEnabled = it)) },
         )
-        FeedbackSwitchRow(
+        FeedbackMasterRow(
             title = "Haptics",
-            subtitle = "Master switch for tactile event feedback",
+            subtitle = "Tactile feedback for selected game events",
             checked = settings.feedbackHapticsEnabled,
             tag = "feedback-haptics-master",
             onCheckedChange = { onSettingsChange(settings.copy(feedbackHapticsEnabled = it)) },
         )
 
-        Surface(color = LumenColors.Surface.copy(alpha = .96f), shape = RoundedCornerShape(18.dp)) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("SOUND PACK", style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
+        LumenPanel(Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("Sound pack", style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurface)
                 Text(
-                    if (settings.soundPackId == AppearanceSettings.DEFAULT_SOUND_PACK_ID) "Lumen built-in" else settings.soundPackId,
-                    style = MaterialTheme.typography.titleMedium,
+                    if (settings.soundPackId == AppearanceSettings.DEFAULT_SOUND_PACK_ID) "Lumen Default" else settings.soundPackId,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LumenColors.OnSurfaceMuted,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    LumenSecondaryButton(
+                        label = "Import ZIP",
                         onClick = { packLauncher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
                         modifier = Modifier.testTag("feedback-import-pack"),
-                    ) { Text("Import ZIP") }
-                    TextButton(
-                        onClick = { onSettingsChange(settings.copy(soundPackId = AppearanceSettings.DEFAULT_SOUND_PACK_ID)) },
-                    ) { Text("Use Lumen") }
+                    )
+                    if (settings.soundPackId != AppearanceSettings.DEFAULT_SOUND_PACK_ID) {
+                        LumenSecondaryButton(
+                            label = "Use Lumen",
+                            onClick = { onSettingsChange(settings.copy(soundPackId = AppearanceSettings.DEFAULT_SOUND_PACK_ID)) },
+                        )
+                    }
                 }
                 importStatus?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = LumenColors.OnSurfaceMuted)
@@ -171,44 +160,31 @@ fun SoundsHapticsScreen(
             }
         }
 
+        Text("Event feedback", style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurface)
         GameFeedbackEvent.all.forEach { event ->
             val key = feedbackEventKey(event)
             val soundChecked = event in settings.feedbackSoundEvents
             val hapticChecked = event in settings.feedbackHapticEvents
-            Surface(color = LumenColors.Surface, shape = RoundedCornerShape(18.dp)) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(feedbackEventLabel(event), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("Sound", style = MaterialTheme.typography.bodyMedium)
-                        Switch(
-                            checked = soundChecked,
-                            onCheckedChange = { enabled ->
-                                onSettingsChange(settings.copy(feedbackSoundEvents = settings.feedbackSoundEvents.toggled(event, enabled)))
-                            },
-                            modifier = Modifier.testTag("feedback-sound-$key"),
-                        )
+            LumenPanel(Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(feedbackEventLabel(event), style = MaterialTheme.typography.titleMedium)
+                    CompactToggleLine(
+                        label = "Sound",
+                        checked = soundChecked,
+                        tag = "feedback-sound-$key",
+                    ) { enabled ->
+                        onSettingsChange(settings.copy(feedbackSoundEvents = settings.feedbackSoundEvents.toggled(event, enabled)))
                     }
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text("Haptic", style = MaterialTheme.typography.bodyMedium)
-                        Switch(
-                            checked = hapticChecked,
-                            onCheckedChange = { enabled ->
-                                onSettingsChange(settings.copy(feedbackHapticEvents = settings.feedbackHapticEvents.toggled(event, enabled)))
-                            },
-                            modifier = Modifier.testTag("feedback-haptic-$key"),
-                        )
+                    CompactToggleLine(
+                        label = "Haptic",
+                        checked = hapticChecked,
+                        tag = "feedback-haptic-$key",
+                    ) { enabled ->
+                        onSettingsChange(settings.copy(feedbackHapticEvents = settings.feedbackHapticEvents.toggled(event, enabled)))
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(
-                            modifier = Modifier.testTag("feedback-preview-$key"),
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        LumenSecondaryButton(
+                            label = "Preview",
                             onClick = {
                                 previewOutput.preview(
                                     event = event,
@@ -216,14 +192,16 @@ fun SoundsHapticsScreen(
                                     haptic = settings.feedbackHapticsEnabled && hapticChecked,
                                 )
                             },
-                        ) { Text("Preview") }
-                        TextButton(
-                            modifier = Modifier.testTag("feedback-import-$key"),
+                            modifier = Modifier.testTag("feedback-preview-$key"),
+                        )
+                        LumenSecondaryButton(
+                            label = "Custom",
                             onClick = {
                                 pendingSingleEvent = event
                                 singleLauncher.launch(arrayOf("audio/*"))
                             },
-                        ) { Text("Import sound") }
+                            modifier = Modifier.testTag("feedback-import-$key"),
+                        )
                     }
                 }
             }
@@ -232,25 +210,52 @@ fun SoundsHapticsScreen(
 }
 
 @Composable
-private fun FeedbackSwitchRow(
+private fun FeedbackMasterRow(
     title: String,
     subtitle: String,
     checked: Boolean,
     tag: String,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Surface(color = LumenColors.Surface, shape = RoundedCornerShape(18.dp)) {
+    LumenPanel(Modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = LumenColors.OnSurfaceMuted)
             }
-            Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = Modifier.testTag(tag))
+            LumenToggle(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                modifier = Modifier.testTag(tag),
+                contentDescription = title,
+            )
         }
+    }
+}
+
+@Composable
+private fun CompactToggleLine(
+    label: String,
+    checked: Boolean,
+    tag: String,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = LumenColors.OnSurfaceMuted)
+        LumenToggle(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.testTag(tag),
+            contentDescription = label,
+        )
     }
 }
 
