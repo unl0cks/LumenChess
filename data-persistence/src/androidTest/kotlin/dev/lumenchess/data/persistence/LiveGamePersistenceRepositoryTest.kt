@@ -7,7 +7,6 @@ import dev.lumenchess.core.chess.Pgn
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -60,7 +59,7 @@ class LiveGamePersistenceRepositoryTest {
         assertEquals(id, third)
         assertEquals(1, database.gameDao().countGames())
         assertEquals(3, database.gameDao().countNodes(id.value))
-        val loaded = assertNotNull(canonical.loadGame(id))
+        val loaded = requireNotNull(canonical.loadGame(id))
         assertEquals(listOf("e2e4", "e7e5", "g1f3"), loaded.tree.mainline().map { it.move!!.uci })
     }
 
@@ -101,11 +100,10 @@ class LiveGamePersistenceRepositoryTest {
             restoreMetadata = mapOf("runtime.revision" to "4"),
         )
 
-        val loaded = assertNotNull(canonical.loadGame(id))
+        val loaded = requireNotNull(canonical.loadGame(id))
         assertEquals(listOf("e2e4", "e7e5", "g1f3", "b8c6"), loaded.tree.mainline().map { it.move!!.uci })
         assertEquals("Annotated live game", loaded.tree.headers["Event"])
-        assertTrue(loaded.tree.childrenOf(loaded.tree.node(loaded.tree.rootId).id).isNotEmpty())
-        val pgn = Pgn.serializeGame(loaded.tree)
+        val pgn = Pgn.serialize(loaded.tree)
         assertTrue(pgn.contains("keep this comment"))
         assertTrue(pgn.contains("keep this variation"))
         assertTrue(loaded.sources.any { it.metadata["user-note"] == "keep-me" })
