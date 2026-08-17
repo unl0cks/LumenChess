@@ -74,7 +74,7 @@ class PlayUiIntegrationTest {
         assertEquals(Variant.CHESS960, setup.variant)
         assertEquals(Color.BLACK, setup.humanSide)
         assertEquals(Variant.CHESS960, runtime.position.variant)
-        assertTrue(setup.chess960Index in 0..959)
+        assertTrue(requireNotNull(setup.chess960Index) in 0..959)
         composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).assertIsDisplayed()
     }
 
