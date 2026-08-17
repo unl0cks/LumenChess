@@ -31,7 +31,7 @@ Checkpoint: `d3bbd27b8583a7b4b8b685a31dad4c4fff99aa81`
 
 ### Regressions discovered during P2
 
-- The recovered branch still contained one positional Compose `Modifier.selectable(...)` call in `LumenNavigation.kt` after the other compiler-directed fixes had landed. Commit `acf422769b17d4fff96e75626bb2256266d8256a` converted the call to explicit named arguments; its proportional JVM/Play checkpoint and ARM64/x86_64 + 16 KiB native verification passed.
+- The recovered branch still contained one positional Compose `Modifier.selectable(...)` call in `LumenNavigation.kt` after the other compiler-directed fixes had landed. Commit `acf422769b17d4fff96e75626bb2256266d8256a` converted the call to explicit named arguments; its proportional JVM/Play checkpoint and ARM64+x86_64 + 16 KiB native verification passed.
 - The first cumulative API 37 checkpoint then ran 23 instrumentation tests and found one failure in `LumenNavigationTest`: the test incorrectly required text `Arena` to resolve to a single node even though the approved P2 UI intentionally renders both the selected bottom-navigation label and the future-surface heading. Commit `7a2b98c90bea3b15084a44fdb928ffb6d91fed08` corrected only the assertion to require both intentional nodes. No product/runtime behavior changed.
 - The obsolete self-patching workflow used during compiler diagnosis was removed. The device workflow now retains and surfaces instrumentation reports on failure so future device-test regressions are directly identifiable.
 
@@ -41,7 +41,7 @@ The exact P2 checkpoint passed proportional JVM/Play checks, lint/assemblies, AR
 
 ## P3 — themes, boards, pieces, backgrounds and presets
 
-Checkpoint: the latest `checkpoint(P3): add LumenChess visual customization` commit containing this entry after all P3 API 37 regressions below were resolved.
+Checkpoint: the latest `checkpoint(P3): add LumenChess visual customization` commit containing this entry after all P3 regressions below were resolved.
 
 ### Architecture
 
@@ -70,7 +70,8 @@ Checkpoint: the latest `checkpoint(P3): add LumenChess visual customization` com
 - The preview follows the resolved System light/dark theme instead of assuming System means dark.
 - The first P3 checkpoint `bf19f29d97d7bf332ef9322760610d2c407f5298` found three P3-only API 37 failures. Two involved internal piece-renderer nodes and one involved the third background option in the compact customization viewport.
 - Commit `751e9d21fc037301e7967e192a1231cb52afd101` placed the artwork Canvas inside a stable tagged layout container without changing board input or chess state. Commit `27637dc390ca0aa40cc6fedfd75f6e96e3155ee0` made presentation settings updates optimistic while retaining DataStore as the persisted source of truth.
-- The replacement checkpoint `5ba04a1794a0044528b61fc4adce83fc8f2894b7` reproduced the same three device assertions, proving the remaining problem was test interaction semantics rather than flaky CI. The piece-style tests had been using `assertIsDisplayed()` on internal renderer semantics even though the authoritative square/board was visibly laid out; the corrected regression now requires the board square to be displayed and the selected piece-style node to exist. The customization test now explicitly scrolls preset/background/board options into the weighted scroll viewport before clicking them, so the device test exercises the actual 48dp targets instead of clipped semantics nodes.
+- The replacement checkpoint `5ba04a1794a0044528b61fc4adce83fc8f2894b7` reproduced the same three device assertions, proving the remaining problem was test interaction semantics rather than flaky CI. The piece-style tests had been using display assertions on internal renderer semantics even though the authoritative square/board was visibly laid out; the corrected regression requires the board square to be displayed and the selected piece-style node to exist. The customization test explicitly scrolls preset/background/board options into the weighted scroll viewport before clicking them, so the device test exercises the actual 48dp targets instead of clipped semantics nodes.
+- Checkpoint `85e12196320ea676a327f0bcd6bad6171551df64` then exposed a compile-only Android-test API mismatch: this Compose test stack does not provide `assertExists`. Commits `34fa6e63b1b2f819276997b1ca63723ea7d04733` and `f6b9655287f4353d7ea06af4c3e6f15c236ea288` replaced those unsupported helpers with `fetchSemanticsNode()`, preserving the intended existence-only assertions without changing product code.
 - These corrections are test-only and do not change core chess, runtime, clock, engine, persistence, premove, board-stage geometry, or presentation ownership.
 
 ### Gate required for this checkpoint
@@ -78,7 +79,7 @@ Checkpoint: the latest `checkpoint(P3): add LumenChess visual customization` com
 The exact replacement P3 checkpoint SHA must pass:
 
 - Android proportional JVM/Play checks, lint and assemblies;
-- ARM64/x86_64 native and 16 KiB verification;
+- ARM64+x86_64 native and 16 KiB verification;
 - cumulative API 37 app instrumentation, including prior board/Play/P2 regressions and new P3 customization tests;
 - universal APK-size reporting/budgets.
 
