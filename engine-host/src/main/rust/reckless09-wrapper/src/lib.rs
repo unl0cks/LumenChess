@@ -28,11 +28,22 @@ mod tb;
 #[allow(warnings)]
 mod bindings;
 
-/** Integration-only entry point. Engine initialization and UCI loop are exact v0.9.0 modules. */
+use std::sync::Once;
+
+static ENGINE_GLOBALS: Once = Once::new();
+
+/**
+ * Integration-only entry point. Upstream's standalone executable initializes its process-global
+ * lookup/NNUE tables exactly once before entering the UCI loop. An isolated LumenChess host may
+ * close and reopen sessions without restarting the process, so preserve that upstream lifecycle
+ * by initializing those globals once per host process and starting a fresh UCI loop per session.
+ */
 #[unsafe(no_mangle)]
 pub extern "C" fn lumen_reckless09_run() -> std::os::raw::c_int {
-    lookup::initialize();
-    nnue::initialize();
+    ENGINE_GLOBALS.call_once(|| {
+        lookup::initialize();
+        nnue::initialize();
+    });
     uci::message_loop(std::collections::VecDeque::<String>::new());
     0
 }
