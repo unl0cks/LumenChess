@@ -1,11 +1,14 @@
 package dev.lumenchess.visual
 
 import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
@@ -73,7 +76,7 @@ class P5ScreenshotQaTest {
         capture("07-background.png")
 
         composeRule.onNodeWithTag("customization-tab-3").performClick()
-        composeRule.onNodeWithTag("customization-preset-midnight").assertIsDisplayed()
+        composeRule.onNodeWithTag("customization-preset-midnight").performScrollTo().assertIsDisplayed()
         capture("08-presets.png")
 
         composeRule.onNodeWithTag("customization-back").performClick()
@@ -117,15 +120,11 @@ class P5ScreenshotQaTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val root = requireNotNull(instrumentation.targetContext.getExternalFilesDir(null))
         val directory = File(root, "p5-screenshots").apply { mkdirs() }
-        val screenshot = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
-        try {
-            FileOutputStream(File(directory, name)).use { output ->
-                check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                    "Failed to encode $name"
-                }
+        val screenshot = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        FileOutputStream(File(directory, name)).use { output ->
+            check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                "Failed to encode $name"
             }
-        } finally {
-            screenshot.recycle()
         }
     }
 }
