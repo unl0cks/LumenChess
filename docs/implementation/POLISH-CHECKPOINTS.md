@@ -12,7 +12,7 @@ Checkpoint: `279bff8b71e99e3c06711500d7ae8e36d7e48c56`
 
 ## P2 — full LumenChess UI redesign
 
-Checkpoint: the `checkpoint(P2): redesign LumenChess navigation and Play UI` commit containing this entry.
+Checkpoint: the latest `checkpoint(P2):` commit containing this entry after all P2 regressions below are resolved.
 
 ### Architecture
 
@@ -29,9 +29,11 @@ Checkpoint: the `checkpoint(P2): redesign LumenChess navigation and Play UI` com
 - Reworked live Play around compact participant rows, prominent clocks, a board-centered square stage, and a restrained action strip.
 - Kept the committed LumenChess blue concept/reference and settled design documents as visual direction rather than reverting to generic Material developer UI.
 
-### Regression discovered during P2
+### Regressions discovered during P2
 
-The recovered branch still contained one positional Compose `Modifier.selectable(...)` call in `LumenNavigation.kt` after the other compiler-directed fixes had landed. It kept the proportional P2 checkpoint red. Commit `acf422769b17d4fff96e75626bb2256266d8256a` converted the call to explicit named arguments. Its proportional JVM/Play checkpoint and ARM64/x86_64 + 16 KiB native verification passed. The obsolete self-patching workflow used during that diagnosis was then removed before this checkpoint.
+- The recovered branch still contained one positional Compose `Modifier.selectable(...)` call in `LumenNavigation.kt` after the other compiler-directed fixes had landed. Commit `acf422769b17d4fff96e75626bb2256266d8256a` converted the call to explicit named arguments; its proportional JVM/Play checkpoint and ARM64/x86_64 + 16 KiB native verification passed.
+- The first cumulative API 37 checkpoint then ran 23 instrumentation tests and found one failure in `LumenNavigationTest`: the test incorrectly required text `Arena` to resolve to a single node even though the approved P2 UI intentionally renders both the selected bottom-navigation label and the future-surface heading. Commit `7a2b98c90bea3b15084a44fdb928ffb6d91fed08` corrected only the assertion to require both intentional nodes. No product/runtime behavior changed.
+- The obsolete self-patching workflow used during compiler diagnosis was removed. The device workflow now retains and surfaces instrumentation reports on failure so future device-test regressions are directly identifiable.
 
 ### Gate required for this checkpoint
 
@@ -39,6 +41,7 @@ The exact checkpoint SHA must pass:
 
 - Android proportional JVM/Play checks, lint and assemblies;
 - ARM64/x86_64 native and 16 KiB verification;
-- cumulative API 37 app instrumentation from `polish-device.yml`, including navigation/preview and existing Play/board regressions.
+- cumulative API 37 app instrumentation from `polish-device.yml`, including navigation/preview and existing Play/board regressions;
+- universal APK-size reporting/budgets.
 
 P3 begins only after those exact-SHA checks are green.
