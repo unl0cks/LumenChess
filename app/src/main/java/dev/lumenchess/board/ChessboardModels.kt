@@ -58,20 +58,20 @@ data class ChessboardPalette(
 ) {
     companion object {
         fun default(): ChessboardPalette = ChessboardPalette(
-            lightSquare = Color(0xFFAFC0D2),
-            darkSquare = Color(0xFF526A82),
-            whitePiece = Color(0xFFF7F8FA),
-            blackPiece = Color(0xFF111820),
-            selected = Color(0x994D8DFF),
-            legalMove = Color(0x995DCC8A),
-            legalCapture = Color(0x99F0A35A),
-            lastMove = Color(0x80FFD166),
-            check = Color(0x99E45B5B),
-            premove = Color(0x996F7DFF),
-            extraHighlight = Color(0x8078C6FF),
-            primaryArrow = Color(0xCC4D8DFF),
-            secondaryArrow = Color(0xCC63C58B),
-            warningArrow = Color(0xCCE56A6A),
+            lightSquare = Color(0xFFE7E6C8),
+            darkSquare = Color(0xFF4E8191),
+            whitePiece = Color(0xFFF0EBDD),
+            blackPiece = Color(0xFF202224),
+            selected = Color(0x8AD7C867),
+            legalMove = Color(0x8A4A777D),
+            legalCapture = Color(0xA05A7F86),
+            lastMove = Color(0x72D7D16D),
+            check = Color(0x9AD65D62),
+            premove = Color(0x805F758F),
+            extraHighlight = Color(0x705E9AAF),
+            primaryArrow = Color(0xCC4F879B),
+            secondaryArrow = Color(0xCC649A83),
+            warningArrow = Color(0xCCD46C6C),
         )
     }
 }
