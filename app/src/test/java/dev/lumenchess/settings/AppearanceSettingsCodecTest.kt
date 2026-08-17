@@ -13,8 +13,17 @@ class AppearanceSettingsCodecTest {
         val decoded = AppearanceSettingsCodec.decode(AppearanceSettingsCodec.encode(defaults))
 
         assertEquals(defaults, decoded)
-        assertEquals(0xFF4C8DFFL, decoded.accentArgb)
+        assertEquals(0xFF4F879BL, decoded.accentArgb)
         assertEquals("lumen-blue", decoded.boardThemeId)
+    }
+
+    @Test
+    fun `legacy royal-blue default migrates to P5 steel-blue default`() {
+        val decoded = AppearanceSettingsCodec.decode(
+            mapOf(AppearanceSettingsCodec.ACCENT to "FF4C8DFF"),
+        )
+
+        assertEquals(AppearanceSettings.DEFAULT_ACCENT_ARGB, decoded.accentArgb)
     }
 
     @Test
