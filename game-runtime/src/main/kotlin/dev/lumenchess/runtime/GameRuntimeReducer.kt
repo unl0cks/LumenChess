@@ -34,6 +34,8 @@ internal object GameRuntimeReducer {
             is RuntimeEvent.Start -> error("handled above")
             is RuntimeEvent.HumanMove -> humanMove(settledState, event.move, clock)
             is RuntimeEvent.EngineCompleted -> engineCompleted(settledState, event, clock)
+            is RuntimeEvent.QueuePremove -> queuePremove(settledState, event)
+            is RuntimeEvent.CancelPremove -> cancelPremove(settledState, event)
             is RuntimeEvent.Pause -> pause(settledState)
             is RuntimeEvent.Resume -> resume(settledState, clock)
             is RuntimeEvent.ChangeController -> changeController(settledState, event)
@@ -140,6 +142,44 @@ internal object GameRuntimeReducer {
         }
     }
 
+    private fun queuePremove(
+        state: RuntimeState,
+        event: RuntimeEvent.QueuePremove,
+    ): RuntimeTransition {
+        if (state.paused) return RuntimeTransition(state, disposition = RuntimeDisposition.PAUSED)
+        if (state.controllers.forSide(event.side) != RuntimeController.HUMAN) {
+            return RuntimeTransition(state, disposition = RuntimeDisposition.WRONG_CONTROLLER)
+        }
+        if (event.side == state.position.sideToMove) {
+            return RuntimeTransition(state, disposition = RuntimeDisposition.IGNORED)
+        }
+
+        return RuntimeTransition(
+            state = state.copy(
+                queuedPremove = QueuedPremove(
+                    side = event.side,
+                    move = event.move,
+                    queuedAtRevision = state.positionRevision,
+                ),
+            ),
+            disposition = RuntimeDisposition.APPLIED,
+        )
+    }
+
+    private fun cancelPremove(
+        state: RuntimeState,
+        event: RuntimeEvent.CancelPremove,
+    ): RuntimeTransition {
+        val queued = state.queuedPremove
+        if (queued == null || queued.side != event.side) {
+            return RuntimeTransition(state, disposition = RuntimeDisposition.IGNORED)
+        }
+        return RuntimeTransition(
+            state = state.copy(queuedPremove = null),
+            disposition = RuntimeDisposition.APPLIED,
+        )
+    }
+
     private fun pause(state: RuntimeState): RuntimeTransition {
         if (state.paused) return RuntimeTransition(state, disposition = RuntimeDisposition.IGNORED)
         val effects = buildList {
@@ -149,6 +189,7 @@ internal object GameRuntimeReducer {
             state = state.copy(
                 clock = state.clock.copy(running = false, lastSampleMillis = null),
                 pendingEngineSearch = null,
+                queuedPremove = null,
                 paused = true,
             ),
             effects = effects,
@@ -182,7 +223,10 @@ internal object GameRuntimeReducer {
             return RuntimeTransition(state, disposition = RuntimeDisposition.IGNORED)
         }
 
-        var next = state.copy(controllers = state.controllers.withSide(event.side, event.controller))
+        var next = state.copy(
+            controllers = state.controllers.withSide(event.side, event.controller),
+            queuedPremove = null,
+        )
         val effects = mutableListOf<RuntimeEffect>()
         if (event.side == state.position.sideToMove) {
             next.pendingEngineSearch?.let {
@@ -220,6 +264,7 @@ internal object GameRuntimeReducer {
         state: RuntimeState,
         move: Move,
         clock: DeterministicGameClock,
+        allowPremove: Boolean = true,
     ): RuntimeTransition {
         val addition = state.gameTree.addMove(state.currentNodeId, move)
         val nextPosition = addition.tree.node(addition.nodeId).position
@@ -247,6 +292,35 @@ internal object GameRuntimeReducer {
             null -> null
         }
         if (terminal != null) return terminalTransition(next, terminal, persist = true)
+
+        if (allowPremove && state.queuedPremove != null) {
+            val queued = state.queuedPremove
+            // A queue is valid for exactly the very next authoritative position after it was created.
+            // It is never carried forward hoping it might become legal later.
+            if (queued.side == next.position.sideToMove && queued.queuedAtRevision == state.positionRevision) {
+                val legalPremove = MoveGenerator.legalMoves(next.position).firstOrNull { it == queued.move }
+                if (legalPremove != null) {
+                    val charged = clock.charge(
+                        next.clock,
+                        queued.side.toClockSide(),
+                        DEFAULT_PREMOVE_COST_MILLIS,
+                    )
+                    next = next.copy(
+                        clock = charged.state,
+                        queuedPremove = null,
+                    )
+                    if (charged.timeoutOccurred != null) {
+                        return terminalTransition(
+                            next,
+                            RuntimeTerminal.Timeout(charged.timeoutOccurred.toColor()),
+                            persist = true,
+                        )
+                    }
+                    return applyMove(next, legalPremove, clock, allowPremove = false)
+                }
+            }
+            next = next.copy(queuedPremove = null)
+        }
 
         val scheduled = maybeStartEngine(next)
         next = scheduled.state
@@ -295,6 +369,7 @@ internal object GameRuntimeReducer {
         gameTree = state.gameTree.withResult(terminal.toGameResult()),
         clock = state.clock.copy(running = false, lastSampleMillis = null),
         pendingEngineSearch = null,
+        queuedPremove = null,
         terminal = terminal,
     )
 
@@ -342,4 +417,7 @@ internal object GameRuntimeReducer {
 
     private fun ClockSide.toColor(): Color =
         if (this == ClockSide.WHITE) Color.WHITE else Color.BLACK
+
+    private fun Color.toClockSide(): ClockSide =
+        if (this == Color.WHITE) ClockSide.WHITE else ClockSide.BLACK
 }

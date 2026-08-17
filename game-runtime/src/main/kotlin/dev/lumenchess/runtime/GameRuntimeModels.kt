@@ -10,6 +10,8 @@ import dev.lumenchess.engine.api.EngineSearchResult
 import dev.lumenchess.engine.api.PositionRevision
 import dev.lumenchess.runtime.clock.ClockState
 
+const val DEFAULT_PREMOVE_COST_MILLIS: Long = 100L
+
 @JvmInline
 value class RuntimeEventId(val value: Long) {
     init {
@@ -50,6 +52,17 @@ data class PendingEngineSearch(
     val positionRevision: PositionRevision,
 )
 
+/**
+ * A single ephemeral premove intent. It is deliberately not present in [RuntimeSnapshot]: a queued
+ * input is not canonical game state and must never survive process restoration into an unrelated
+ * future position.
+ */
+data class QueuedPremove(
+    val side: Color,
+    val move: Move,
+    val queuedAtRevision: PositionRevision,
+)
+
 data class RuntimeState(
     val position: Position,
     val gameTree: GameTree,
@@ -58,6 +71,7 @@ data class RuntimeState(
     val controllers: RuntimeControllers,
     val positionRevision: PositionRevision,
     val pendingEngineSearch: PendingEngineSearch?,
+    val queuedPremove: QueuedPremove?,
     val paused: Boolean,
     val started: Boolean,
     val engineHostAvailable: Boolean,
@@ -86,6 +100,15 @@ sealed interface RuntimeEvent {
     data class Start(override val id: RuntimeEventId) : RuntimeEvent
     data class HumanMove(override val id: RuntimeEventId, val move: Move) : RuntimeEvent
     data class EngineCompleted(override val id: RuntimeEventId, val result: EngineSearchResult) : RuntimeEvent
+    data class QueuePremove(
+        override val id: RuntimeEventId,
+        val side: Color,
+        val move: Move,
+    ) : RuntimeEvent
+    data class CancelPremove(
+        override val id: RuntimeEventId,
+        val side: Color,
+    ) : RuntimeEvent
     data class Pause(override val id: RuntimeEventId) : RuntimeEvent
     data class Resume(override val id: RuntimeEventId) : RuntimeEvent
     data class ChangeController(

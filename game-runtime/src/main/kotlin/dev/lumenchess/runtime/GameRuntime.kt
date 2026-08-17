@@ -59,8 +59,8 @@ class GameRuntime private constructor(
 
     /**
      * Produces a crash/restore-safe snapshot without mutating the live owner. In-flight engine search
-     * state is intentionally absent from [RuntimeSnapshot]; restored games must establish a fresh
-     * host/search correlation before any engine result can become authoritative.
+     * state and queued premove input are intentionally absent from [RuntimeSnapshot]; restored games
+     * must establish fresh external correlation and user intent before either can affect the game.
      */
     fun snapshotForRestore(): RuntimeSnapshot = synchronized(ownerLock) {
         val sample = timeSource.nowMillis()
@@ -87,6 +87,7 @@ class GameRuntime private constructor(
                     controllers = controllers,
                     positionRevision = PositionRevision(0),
                     pendingEngineSearch = null,
+                    queuedPremove = null,
                     paused = true,
                     started = false,
                     engineHostAvailable = engineHostAvailable,
@@ -110,6 +111,7 @@ class GameRuntime private constructor(
                 controllers = snapshot.controllers,
                 positionRevision = snapshot.positionRevision,
                 pendingEngineSearch = null,
+                queuedPremove = null,
                 paused = true,
                 started = snapshot.started,
                 // A restored process must observe a real host-connected event before restarting work.
