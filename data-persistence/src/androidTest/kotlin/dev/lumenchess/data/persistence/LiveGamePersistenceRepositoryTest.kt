@@ -108,4 +108,41 @@ class LiveGamePersistenceRepositoryTest {
         assertTrue(pgn.contains("keep this variation"))
         assertTrue(loaded.sources.any { it.metadata["user-note"] == "keep-me" })
     }
+
+    @Test
+    fun divergentLiveSnapshotFailsWithoutChangingCanonicalGame() = runBlocking {
+        val canonicalTree = Pgn.parseGame("[Event \"Stable\"]\n[Result \"*\"]\n\n1. e4 e5 2. Nf3 *")
+        val id = canonical.saveGame(
+            PersistGameRequest(
+                tree = canonicalTree,
+                metadata = GamePersistenceMetadata(createdAtEpochMillis = 30L),
+                sources = listOf(
+                    GameSourceDraft(
+                        type = GameSourceType.LOCAL,
+                        metadata = mapOf("user-note" to "still-here"),
+                    ),
+                ),
+            ),
+        )
+        val divergent = Pgn.parseGame("[Result \"*\"]\n\n1. d4 d5 2. c4 *")
+
+        var conflict: Throwable? = null
+        try {
+            live.persist(
+                existingId = id,
+                tree = divergent,
+                metadata = GamePersistenceMetadata(createdAtEpochMillis = 30L),
+                restoreMetadata = mapOf("runtime.revision" to "3"),
+            )
+        } catch (error: PersistenceConflictException) {
+            conflict = error
+        }
+
+        assertTrue(conflict is PersistenceConflictException)
+        val loaded = requireNotNull(canonical.loadGame(id))
+        assertEquals("Stable", loaded.tree.headers["Event"])
+        assertEquals(listOf("e2e4", "e7e5", "g1f3"), loaded.tree.mainline().map { it.move!!.uci })
+        assertEquals(3, database.gameDao().countNodes(id.value))
+        assertTrue(loaded.sources.any { it.metadata["user-note"] == "still-here" })
+    }
 }
