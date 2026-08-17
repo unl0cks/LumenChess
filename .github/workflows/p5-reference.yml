@@ -30,7 +30,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification is running' \
+            -f description='API37 reference verification and screenshot QA are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -106,19 +106,58 @@ jobs:
           elif failures == 0:
               print(f"::error title=Instrumentation diagnostics::{len(reports)} report(s) found but no failing testcase element was parsed")
           PY
+      - name: Capture mandatory P5 Pixel screenshots
+        id: screenshots
+        if: steps.verify.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+          adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell pm clear dev.lumenchess
+          rm -rf p5-screenshots
+          mkdir -p p5-screenshots
+          adb shell am instrument -w -r \
+            -e p5ScreenshotQa true \
+            -e class dev.lumenchess.visual.P5ScreenshotQaTest \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p5-screenshot-instrumentation.txt"
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
+          COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
+          if [ "$COUNT" != "11" ]; then
+            echo "::error title=P5 screenshot set::Expected 11 screenshots, found $COUNT"
+            find p5-screenshots -maxdepth 2 -type f -print || true
+            exit 1
+          fi
+          printf 'Captured %s mandatory screenshots\n' "$COUNT"
+      - name: Upload P5 screenshot QA artifact
+        if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: p5-reference-screenshots-${{ github.sha }}
+          path: |
+            p5-screenshots/
+            docs/references/LumenChess_UI_Concept_Blue.png
+            docs/references/REFERENCE-MANIFEST.md
+            ${{ runner.temp }}/p5-screenshot-instrumentation.txt
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload P5 diagnostics on failure
-        if: steps.verify.outcome != 'success'
+        if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         uses: actions/upload-artifact@v4
         with:
           name: p5-reference-diagnostics-${{ github.sha }}
           path: |
             ${{ runner.temp }}/p5-emulator.log
+            ${{ runner.temp }}/p5-screenshot-instrumentation.txt
+            p5-screenshots/
             app/build/outputs/androidTest-results/
             app/build/reports/androidTests/
           if-no-files-found: warn
           retention-days: 7
       - name: Publish P5 reference verification success
-        if: steps.verify.outcome == 'success'
+        if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -126,10 +165,10 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification passed' \
+            -f description='API37 reference verification and 11-state screenshot capture passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
-        if: steps.verify.outcome != 'success'
+        if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -137,8 +176,8 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification failed' \
+            -f description='API37 reference verification or screenshot QA failed' \
             -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
-        if: steps.verify.outcome != 'success'
+        if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         run: exit 1
