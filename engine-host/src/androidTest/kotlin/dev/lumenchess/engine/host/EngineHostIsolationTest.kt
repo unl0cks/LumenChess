@@ -12,6 +12,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.engine.api.EngineStrengthCapability
 import dev.lumenchess.engine.host.testing.EngineHostProbeActivity
+import dev.lumenchess.engine.host.testing.Stockfish18ReliabilityProbeActivity
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -26,31 +27,31 @@ import org.junit.runner.RunWith
 class EngineHostIsolationTest {
     @Test
     fun twoSlotsAreIndependentIsolatedProcessesAndPreserveCorrelation() {
-        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_DUAL_SLOT)
+        val details = runEngineHostScenario(EngineHostProbeActivity.SCENARIO_DUAL_SLOT)
         assertTrue(details.contains("correlation/core validation passed"))
     }
 
     @Test
     fun cancelledLateOutputCannotBeRelabelledAsTheNextSearch() {
-        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_CANCEL_LATE)
+        val details = runEngineHostScenario(EngineHostProbeActivity.SCENARIO_CANCEL_LATE)
         assertTrue(details.contains("discarded"))
     }
 
     @Test
     fun malformedKnownUciOutputBecomesTypedFailureInsteadOfSearchResult() {
-        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_MALFORMED)
+        val details = runEngineHostScenario(EngineHostProbeActivity.SCENARIO_MALFORMED)
         assertTrue(details.contains("PROTOCOL"))
     }
 
     @Test
     fun crashedSlotDoesNotKillCallerOrOtherSlotAndCanBeRecovered() {
-        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_CRASH_RECOVERY)
+        val details = runEngineHostScenario(EngineHostProbeActivity.SCENARIO_CRASH_RECOVERY)
         assertTrue(details.contains("crash isolated"))
     }
 
     @Test
     fun closeReleasesSessionAndFullUnbindCanRebindFreshHost() {
-        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_TEARDOWN_REBIND)
+        val details = runEngineHostScenario(EngineHostProbeActivity.SCENARIO_TEARDOWN_REBIND)
         assertTrue(details.contains("unbind/rebind succeeded"))
     }
 
@@ -69,19 +70,62 @@ class EngineHostIsolationTest {
 
     @Test
     fun stockfish18StandardSearchRunsInIsolatedHostAndPassesCoreValidation() {
-        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_STOCKFISH18_STANDARD)
+        val details = runEngineHostScenario(EngineHostProbeActivity.SCENARIO_STOCKFISH18_STANDARD)
         assertTrue(details.contains("Stockfish 18 STANDARD"))
         assertTrue(details.contains("correlation/core validation"))
     }
 
     @Test
     fun stockfish18Chess960SearchRunsInIsolatedHostAndPassesCoreValidation() {
-        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_STOCKFISH18_CHESS960)
+        val details = runEngineHostScenario(EngineHostProbeActivity.SCENARIO_STOCKFISH18_CHESS960)
         assertTrue(details.contains("Stockfish 18 CHESS960"))
         assertTrue(details.contains("correlation/core validation"))
     }
 
-    private fun runTargetProcessScenario(scenario: String): String {
+    @Test
+    fun stockfish18CancellationDiscardsRealTerminalOutputBeforeReplacement() {
+        val details = runStockfishScenario(Stockfish18ReliabilityProbeActivity.SCENARIO_CANCEL_REPLACEMENT)
+        assertTrue(details.contains("cancel terminal output discarded"))
+    }
+
+    @Test
+    fun stockfish18NativeSessionCanCloseAndReopenInSameIsolatedHost() {
+        val details = runStockfishScenario(Stockfish18ReliabilityProbeActivity.SCENARIO_SESSION_REOPEN)
+        assertTrue(details.contains("closed and reopened"))
+    }
+
+    @Test
+    fun stockfish18CanRunSimultaneouslyInBothIsolatedSlots() {
+        val details = runStockfishScenario(Stockfish18ReliabilityProbeActivity.SCENARIO_DUAL_SLOT)
+        assertTrue(details.contains("simultaneous slots isolated"))
+    }
+
+    private fun runEngineHostScenario(scenario: String): String = runTargetProcessScenario(
+        activityClassName = EngineHostProbeActivity::class.java.name,
+        scenarioKey = EngineHostProbeActivity.EXTRA_SCENARIO,
+        receiverKey = EngineHostProbeActivity.EXTRA_RECEIVER,
+        passedKey = EngineHostProbeActivity.KEY_PASSED,
+        detailsKey = EngineHostProbeActivity.KEY_DETAILS,
+        scenario = scenario,
+    )
+
+    private fun runStockfishScenario(scenario: String): String = runTargetProcessScenario(
+        activityClassName = Stockfish18ReliabilityProbeActivity::class.java.name,
+        scenarioKey = Stockfish18ReliabilityProbeActivity.EXTRA_SCENARIO,
+        receiverKey = Stockfish18ReliabilityProbeActivity.EXTRA_RECEIVER,
+        passedKey = Stockfish18ReliabilityProbeActivity.KEY_PASSED,
+        detailsKey = Stockfish18ReliabilityProbeActivity.KEY_DETAILS,
+        scenario = scenario,
+    )
+
+    private fun runTargetProcessScenario(
+        activityClassName: String,
+        scenarioKey: String,
+        receiverKey: String,
+        passedKey: String,
+        detailsKey: String,
+        scenario: String,
+    ): String {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val latch = CountDownLatch(1)
         val resultCode = AtomicInteger(Int.MIN_VALUE)
@@ -95,22 +139,19 @@ class EngineHostIsolationTest {
         }
 
         val intent = Intent().apply {
-            component = ComponentName(
-                instrumentation.targetContext.packageName,
-                EngineHostProbeActivity::class.java.name,
-            )
+            component = ComponentName(instrumentation.targetContext.packageName, activityClassName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(EngineHostProbeActivity.EXTRA_SCENARIO, scenario)
-            putExtra(EngineHostProbeActivity.EXTRA_RECEIVER, receiver)
+            putExtra(scenarioKey, scenario)
+            putExtra(receiverKey, receiver)
         }
         instrumentation.context.startActivity(intent)
 
-        assertTrue("Timed out waiting for target-process engine-host probe '$scenario'", latch.await(25, TimeUnit.SECONDS))
+        assertTrue("Timed out waiting for target-process probe '$scenario'", latch.await(35, TimeUnit.SECONDS))
         val bundle = resultData.get()
-        assertNotNull("Engine-host probe '$scenario' returned no result bundle", bundle)
-        val details = bundle?.getString(EngineHostProbeActivity.KEY_DETAILS).orEmpty()
-        assertEquals("Engine-host probe '$scenario' failed: $details", Activity.RESULT_OK, resultCode.get())
-        assertTrue("Engine-host probe '$scenario' reported failure: $details", bundle?.getBoolean(EngineHostProbeActivity.KEY_PASSED) == true)
+        assertNotNull("Target-process probe '$scenario' returned no result bundle", bundle)
+        val details = bundle?.getString(detailsKey).orEmpty()
+        assertEquals("Target-process probe '$scenario' failed: $details", Activity.RESULT_OK, resultCode.get())
+        assertTrue("Target-process probe '$scenario' reported failure: $details", bundle?.getBoolean(passedKey) == true)
         return details
     }
 }
