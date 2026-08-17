@@ -165,7 +165,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     internal fun restartEngineHostForTest() {
-        engineGateway?.restartHostForTest()
+        engineGateway?.restartHostForDiagnostics()
     }
 
     internal fun currentCoordinatorForTest(): PlayRuntimeCoordinator? = coordinator
