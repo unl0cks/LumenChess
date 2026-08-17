@@ -26,6 +26,9 @@ class SoundPackImporterTest {
         return output.toByteArray()
     }
 
+    private fun wavHeader(): ByteArray = "RIFF".toByteArray() + ByteArray(4) + "WAVE".toByteArray()
+    private fun oggHeader(): ByteArray = "OggS".toByteArray()
+    private fun mp3Header(): ByteArray = "ID3".toByteArray()
     private fun tempRoot(): File = Files.createTempDirectory("lumen-sound-pack-test").toFile()
 
     @Test
@@ -34,9 +37,9 @@ class SoundPackImporterTest {
         val pack = SoundPackImporter().importZip(
             input = ByteArrayInputStream(
                 zip(
-                    "move.wav" to byteArrayOf(1, 2, 3),
-                    "capture.ogg" to byteArrayOf(4, 5),
-                    "check.mp3" to byteArrayOf(6),
+                    "move.wav" to wavHeader(),
+                    "capture.ogg" to oggHeader(),
+                    "check.mp3" to mp3Header(),
                 ),
             ),
             destinationRoot = root,
@@ -59,7 +62,7 @@ class SoundPackImporterTest {
 
         assertFailsWith<IllegalArgumentException> {
             SoundPackImporter().importZip(
-                ByteArrayInputStream(zip("../escape.wav" to byteArrayOf(1))),
+                ByteArrayInputStream(zip("../escape.wav" to wavHeader())),
                 root,
                 "bad-pack",
             )
@@ -74,10 +77,10 @@ class SoundPackImporterTest {
         val root = tempRoot()
 
         assertFailsWith<IllegalArgumentException> {
-            importer.importZip(ByteArrayInputStream(zip("/move.wav" to byteArrayOf(1))), root, "absolute")
+            importer.importZip(ByteArrayInputStream(zip("/move.wav" to wavHeader())), root, "absolute")
         }
         assertFailsWith<IllegalArgumentException> {
-            importer.importZip(ByteArrayInputStream(zip("folder/move.wav" to byteArrayOf(1))), root, "nested")
+            importer.importZip(ByteArrayInputStream(zip("folder/move.wav" to wavHeader())), root, "nested")
         }
     }
 
@@ -104,13 +107,30 @@ class SoundPackImporterTest {
     }
 
     @Test
+    fun malformedZipIsRejectedAndCleanedUp() {
+        val root = tempRoot()
+        val finalRoot = File(root, "malformed")
+
+        assertFailsWith<IllegalArgumentException> {
+            SoundPackImporter().importZip(
+                ByteArrayInputStream("definitely-not-a-zip".toByteArray()),
+                root,
+                "malformed",
+            )
+        }
+
+        assertFalse(finalRoot.exists())
+        assertTrue(root.listFiles().orEmpty().none { it.name.startsWith(".malformed.import-") })
+    }
+
+    @Test
     fun duplicateEventAssignmentsAreRejectedEvenAcrossExtensionsAndCase() {
         assertFailsWith<IllegalArgumentException> {
             SoundPackImporter().importZip(
                 ByteArrayInputStream(
                     zip(
-                        "move.wav" to byteArrayOf(1),
-                        "MOVE.ogg" to byteArrayOf(2),
+                        "move.wav" to wavHeader(),
+                        "MOVE.ogg" to oggHeader(),
                     ),
                 ),
                 tempRoot(),
@@ -122,11 +142,11 @@ class SoundPackImporterTest {
     @Test
     fun actualReadBytesEnforcePerEntryAndAggregateCaps() {
         val root = tempRoot()
-        val importer = SoundPackImporter(maxEntryBytes = 4, maxTotalBytes = 6)
+        val importer = SoundPackImporter(maxEntryBytes = 12, maxTotalBytes = 20)
 
         assertFailsWith<IllegalArgumentException> {
             importer.importZip(
-                ByteArrayInputStream(zip("move.wav" to ByteArray(5) { 1 })),
+                ByteArrayInputStream(zip("move.wav" to ByteArray(13) { 1 })),
                 root,
                 "entry-too-large",
             )
@@ -135,8 +155,8 @@ class SoundPackImporterTest {
             importer.importZip(
                 ByteArrayInputStream(
                     zip(
-                        "move.wav" to ByteArray(4) { 1 },
-                        "capture.wav" to ByteArray(3) { 2 },
+                        "move.wav" to wavHeader(),
+                        "capture.wav" to wavHeader(),
                     ),
                 ),
                 root,
@@ -151,11 +171,11 @@ class SoundPackImporterTest {
         val destination = File(root, "partial")
 
         assertFailsWith<IllegalArgumentException> {
-            SoundPackImporter(maxEntryBytes = 2).importZip(
+            SoundPackImporter(maxEntryBytes = 12).importZip(
                 ByteArrayInputStream(
                     zip(
-                        "move.wav" to byteArrayOf(1),
-                        "capture.wav" to byteArrayOf(1, 2, 3),
+                        "move.wav" to wavHeader(),
+                        "capture.wav" to ByteArray(13) { 1 },
                     ),
                 ),
                 root,
@@ -169,8 +189,8 @@ class SoundPackImporterTest {
     @Test
     fun singleEventImportCopiesSupportedAudioIntoPrivateRoot() {
         val root = tempRoot()
-        val bytes = byteArrayOf(9, 8, 7, 6)
-        val file = SoundPackImporter(maxEntryBytes = 8).importSingle(
+        val bytes = wavHeader()
+        val file = SoundPackImporter(maxEntryBytes = 12).importSingle(
             input = ByteArrayInputStream(bytes),
             originalFileName = "whatever.WAV",
             destinationRoot = root,
@@ -184,15 +204,23 @@ class SoundPackImporterTest {
     }
 
     @Test
-    fun singleEventImportRejectsUnsupportedTypeAndOversizePayload() {
-        val importer = SoundPackImporter(maxEntryBytes = 3)
+    fun singleEventImportRejectsUnsupportedInvalidAndOversizePayloads() {
+        val importer = SoundPackImporter(maxEntryBytes = 12)
         val root = tempRoot()
 
         assertFailsWith<IllegalArgumentException> {
             importer.importSingle(ByteArrayInputStream(byteArrayOf(1)), "sound.txt", root, SoundEvent.MOVE)
         }
         assertFailsWith<IllegalArgumentException> {
-            importer.importSingle(ByteArrayInputStream(ByteArray(4)), "sound.ogg", root, SoundEvent.MOVE)
+            importer.importSingle(
+                ByteArrayInputStream("not-a-wave".toByteArray()),
+                "sound.wav",
+                root,
+                SoundEvent.MOVE,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            importer.importSingle(ByteArrayInputStream(ByteArray(13)), "sound.ogg", root, SoundEvent.MOVE)
         }
     }
 }

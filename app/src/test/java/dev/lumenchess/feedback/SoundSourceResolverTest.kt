@@ -7,6 +7,8 @@ import kotlin.test.assertEquals
 
 class SoundSourceResolverTest {
     private fun tempRoot(): File = Files.createTempDirectory("lumen-sound-source-test").toFile()
+    private fun wavHeader(): ByteArray = "RIFF".toByteArray() + ByteArray(4) + "WAVE".toByteArray()
+    private fun oggHeader(): ByteArray = "OggS".toByteArray()
 
     @Test
     fun builtInPackFallsBackToBundledSound() {
@@ -20,7 +22,7 @@ class SoundSourceResolverTest {
     fun selectedCustomPackOverridesBuiltInWhenEventExists() {
         val root = tempRoot()
         val packRoot = File(root, "sound-packs/night-pack").apply { mkdirs() }
-        val custom = File(packRoot, "capture.ogg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val custom = File(packRoot, "capture.ogg").apply { writeBytes(oggHeader()) }
 
         val resolved = SoundSourceResolver(root).resolve(SoundEvent.CAPTURE, "night-pack")
 
@@ -38,15 +40,29 @@ class SoundSourceResolverTest {
     }
 
     @Test
-    fun invalidOverrideFallsThroughToSelectedPack() {
+    fun deletedCustomEventFallsBackToBuiltIn() {
+        val root = tempRoot()
+        val custom = File(root, "sound-packs/night-pack/check.ogg").apply {
+            parentFile?.mkdirs()
+            writeBytes(oggHeader())
+        }
+        check(custom.delete())
+
+        val resolved = SoundSourceResolver(root).resolve(SoundEvent.CHECK, "night-pack")
+
+        assertEquals(ResolvedSoundSource.BuiltIn(SoundEvent.CHECK), resolved)
+    }
+
+    @Test
+    fun invalidOverrideFallsThroughToValidSelectedPack() {
         val root = tempRoot()
         File(root, "overrides/move.wav").apply {
             parentFile?.mkdirs()
-            writeText("not-a-wav")
+            writeBytes("not-a-wav".toByteArray())
         }
         val pack = File(root, "sound-packs/night-pack/move.ogg").apply {
             parentFile?.mkdirs()
-            writeBytes(byteArrayOf(1, 2, 3))
+            writeBytes(oggHeader())
         }
 
         val resolved = SoundSourceResolver(root).resolve(SoundEvent.MOVE, "night-pack")
@@ -55,13 +71,26 @@ class SoundSourceResolverTest {
     }
 
     @Test
+    fun invalidSelectedPackEventFallsBackToBuiltIn() {
+        val root = tempRoot()
+        File(root, "sound-packs/night-pack/capture.ogg").apply {
+            parentFile?.mkdirs()
+            writeBytes("corrupt".toByteArray())
+        }
+
+        val resolved = SoundSourceResolver(root).resolve(SoundEvent.CAPTURE, "night-pack")
+
+        assertEquals(ResolvedSoundSource.BuiltIn(SoundEvent.CAPTURE), resolved)
+    }
+
+    @Test
     fun individualOverrideWinsOverSelectedPack() {
         val root = tempRoot()
         val packRoot = File(root, "sound-packs/night-pack").apply { mkdirs() }
-        File(packRoot, "move.ogg").writeBytes(byteArrayOf(1))
+        File(packRoot, "move.ogg").writeBytes(oggHeader())
         val override = File(root, "overrides/move.wav").apply {
             parentFile?.mkdirs()
-            writeBytes(byteArrayOf(2))
+            writeBytes(wavHeader())
         }
 
         val resolved = SoundSourceResolver(root).resolve(SoundEvent.MOVE, "night-pack")

@@ -74,6 +74,7 @@ class SoundPackImporter(
                         require(totalBytes <= maxTotalBytes) { "Sound pack exceeds total size limit" }
                     }
                     require(bytesWritten <= maxEntryBytes) { "Sound exceeds per-entry size limit" }
+                    SoundMediaValidator.requireSupported(output)
                     imported[parsed.event] = output
                     zip.closeEntry()
                 }
@@ -111,11 +112,12 @@ class SoundPackImporter(
 
         val target = File(destinationRoot, "${event.fileStem}.$parsedExtension")
         require(isDirectChild(destinationRoot, target)) { "Unsafe sound destination" }
-        val staging = File(destinationRoot, ".${target.name}.import-${UUID.randomUUID()}")
+        val staging = File(destinationRoot, ".${event.fileStem}.import-${UUID.randomUUID()}.$parsedExtension")
         require(isDirectChild(destinationRoot, staging)) { "Unsafe sound staging path" }
 
         try {
             copyBounded(input, staging, maxEntryBytes)
+            SoundMediaValidator.requireSupported(staging)
             if (target.exists()) {
                 require(target.delete()) { "Could not replace existing sound" }
             }

@@ -37,7 +37,7 @@ object BuiltInSoundAssets {
         require(root.isDirectory) { "Built-in sound destination is not a directory" }
         val output = File(root, "${event.fileStem}.wav").canonicalFile
         require(output.parentFile == root.canonicalFile) { "Unsafe built-in sound path" }
-        if (output.isFile && output.length() > 44L) return output
+        if (output.isFile && output.length() > 44L && SoundMediaValidator.isSupported(output)) return output
 
         val cue = requireNotNull(cues[event]) { "Missing built-in sound cue" }
         val temporary = File(root, ".${event.fileStem}.wav.tmp").canonicalFile

@@ -18,11 +18,19 @@ class GameFeedbackDispatcher(
     fun dispatch(events: List<GameFeedbackEvent>, settings: FeedbackSettings) {
         events.forEach { event ->
             if (settings.soundsEnabled && event in settings.soundEvents) {
-                output.playSound(event)
+                isolateOutputFailure { output.playSound(event) }
             }
             if (settings.hapticsEnabled && event in settings.hapticEvents) {
-                output.playHaptic(event)
+                isolateOutputFailure { output.playHaptic(event) }
             }
+        }
+    }
+
+    private inline fun isolateOutputFailure(block: () -> Unit) {
+        try {
+            block()
+        } catch (_: Exception) {
+            // Presentation-only feedback failures must never escape into runtime authority.
         }
     }
 }

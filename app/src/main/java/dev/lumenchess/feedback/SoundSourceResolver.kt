@@ -28,7 +28,13 @@ class SoundSourceResolver(private val feedbackRoot: File) {
         for (extension in EXTENSION_PRIORITY) {
             val candidate = File(canonicalRoot, "${event.fileStem}.$extension")
             val canonical = runCatching { candidate.canonicalFile }.getOrNull() ?: continue
-            if (canonical.parentFile == canonicalRoot && canonical.isFile) return canonical
+            if (
+                canonical.parentFile == canonicalRoot &&
+                canonical.isFile &&
+                SoundMediaValidator.isSupported(canonical)
+            ) {
+                return canonical
+            }
         }
         return null
     }
