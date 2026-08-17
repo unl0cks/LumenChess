@@ -98,6 +98,8 @@ sealed interface RuntimeEvent {
     val id: RuntimeEventId
 
     data class Start(override val id: RuntimeEventId) : RuntimeEvent
+    /** Neutral boundary event used by lifecycle/presentation scheduling to make a flag fall authoritative. */
+    data class ClockCheck(override val id: RuntimeEventId) : RuntimeEvent
     data class HumanMove(override val id: RuntimeEventId, val move: Move) : RuntimeEvent
     data class EngineCompleted(override val id: RuntimeEventId, val result: EngineSearchResult) : RuntimeEvent
     data class QueuePremove(
