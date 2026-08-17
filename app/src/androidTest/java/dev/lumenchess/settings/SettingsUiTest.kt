@@ -3,7 +3,6 @@ package dev.lumenchess.settings
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.lumenchess.MainActivity
@@ -17,10 +16,9 @@ class SettingsUiTest {
     @Test
     fun compactAppearancePresetAndIndividualOverridesRemainComposable() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
-        composeRule.onNodeWithText("Settings").assertIsDisplayed()
-        composeRule.onNodeWithTag("appearance-oled_dark").performClick()
+        composeRule.onNodeWithTag("appearance-oled_dark").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("settings-board-pieces").assertIsDisplayed().performClick()
 
-        composeRule.onNodeWithTag("settings-board-pieces").performClick()
         composeRule.onNodeWithTag("board-preview").assertIsDisplayed()
         composeRule.onNodeWithTag("board-preview-board", useUnmergedTree = true).assertIsDisplayed()
 
