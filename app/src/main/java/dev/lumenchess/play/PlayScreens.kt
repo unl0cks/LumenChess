@@ -5,11 +5,14 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
@@ -60,7 +63,6 @@ import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.runtime.RuntimeController
 import dev.lumenchess.runtime.RuntimeState
 import dev.lumenchess.runtime.clock.ClockReading
-import dev.lumenchess.runtime.clock.ClockSide
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
@@ -79,7 +81,9 @@ fun PlayRoute(
     val ui by viewModel.uiState
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(lifecycleOwner, ui.mode) {
+    // This observer follows the route itself, not setup/live recomposition. Switching setup -> game
+    // cannot synthesize a pause/resume pair or a duplicate search.
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> viewModel.onScreenStarted()
@@ -263,7 +267,7 @@ private fun PlayLiveScreen(
     modifier: Modifier,
 ) {
     val runtime = ui.runtime ?: return
-    val setup = viewModel.currentCoordinatorForTest()?.setup ?: return
+    val setup = ui.resolvedSetup ?: return
     val humanSide = setup.humanSide
     val engineSide = humanSide.opposite
     val orientation = if (humanSide == Color.WHITE) ChessboardOrientation.WHITE else ChessboardOrientation.BLACK
@@ -314,11 +318,11 @@ private fun PlayLiveScreen(
                 )
                 if (premoveEnabled) {
                     PremoveInputOverlay(
-                        position = runtime,
+                        runtime = runtime,
                         humanSide = humanSide,
                         orientation = orientation,
                         onPremove = viewModel::queuePremove,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.matchParentSize(),
                     )
                 }
             }
@@ -461,38 +465,36 @@ private fun RowScope.ChoiceChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label) },
-        modifier = Modifier
-            .weight(1f, fill = false)
-            .sizeIn(minHeight = 48.dp),
+        modifier = Modifier.sizeIn(minHeight = 48.dp),
     )
 }
 
 @Composable
 private fun PremoveInputOverlay(
-    position: RuntimeState,
+    runtime: RuntimeState,
     humanSide: Color,
     orientation: ChessboardOrientation,
     onPremove: (Move) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var from by remember(position.positionRevision) { mutableStateOf<Square?>(null) }
-    LaunchedEffect(position.queuedPremove) {
-        if (position.queuedPremove == null) from = null
+    var from by remember(runtime.positionRevision) { mutableStateOf<Square?>(null) }
+    LaunchedEffect(runtime.queuedPremove) {
+        if (runtime.queuedPremove == null) from = null
     }
     Box(
         modifier = modifier
             .semantics { contentDescription = "Premove input board" }
             .testTag(PLAY_PREMOVE_OVERLAY_TEST_TAG)
-            .pointerInput(position.positionRevision, orientation, humanSide) {
+            .pointerInput(runtime.positionRevision, orientation, humanSide) {
                 detectTapGestures { offset ->
                     val square = premoveSquareFromOffset(offset, size, orientation) ?: return@detectTapGestures
                     val selected = from
                     if (selected == null) {
-                        if (position.position[square]?.color == humanSide) from = square
-                    } else if (position.position[square]?.color == humanSide) {
+                        if (runtime.position[square]?.color == humanSide) from = square
+                    } else if (runtime.position[square]?.color == humanSide) {
                         from = square
                     } else {
-                        val piece = position.position[selected]
+                        val piece = runtime.position[selected]
                         val promotion = if (
                             piece?.type == PieceType.PAWN &&
                             square.rank == if (humanSide == Color.WHITE) 7 else 0
