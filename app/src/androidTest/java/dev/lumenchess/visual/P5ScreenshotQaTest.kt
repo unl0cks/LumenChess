@@ -65,7 +65,7 @@ class P5ScreenshotQaTest {
         capture("05-board.png")
 
         composeRule.onNodeWithTag("customization-tab-1").performClick()
-        composeRule.onNodeWithTag("customization-piece-lumen").assertIsDisplayed()
+        composeRule.onNodeWithTag("customization-piece-lumen-vector").assertIsDisplayed()
         capture("06-pieces.png")
 
         composeRule.onNodeWithTag("customization-tab-2").performClick()
