@@ -1,0 +1,84 @@
+name: Pixel 8 Pro ARM64 debug APK
+
+on:
+  push:
+    branches:
+      - physical-polish-customization
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pixel-arm64-apk:
+    if: >-
+      startsWith(github.event.head_commit.message, 'checkpoint(P1):') ||
+      startsWith(github.event.head_commit.message, 'checkpoint(P4):')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact source SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify exact source SHA
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools
+      - name: Install Android 17 SDK and pinned native toolchain
+        run: |
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build ARM64-only debug APK
+        run: ./gradlew :app:assembleDebug -PlumenPhysicalArm64Only=true
+      - name: Inspect and package exact-SHA APK
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' | head -n 1)"
+          test -n "$apk"
+          out="$RUNNER_TEMP/pixel-arm64"
+          mkdir -p "$out"
+          name="LumenChess-Pixel8Pro-${GITHUB_SHA:0:8}-debug.apk"
+          cp "$apk" "$out/$name"
+
+          unzip -t "$out/$name"
+          unzip -l "$out/$name" > "$out/apk-entries.txt"
+          grep -q 'lib/arm64-v8a/liblumen_stockfish18.so' "$out/apk-entries.txt"
+          grep -q 'lib/arm64-v8a/liblumen_reckless09.so' "$out/apk-entries.txt"
+          if grep -Eq 'lib/(x86_64|x86|armeabi-v7a)/' "$out/apk-entries.txt"; then
+            echo "Non-ARM64 native payload found in physical APK"
+            grep -E 'lib/(x86_64|x86|armeabi-v7a)/' "$out/apk-entries.txt"
+            exit 1
+          fi
+
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$out/$name" > "$out/aapt-badging.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$out/$name" > "$out/apksigner.txt"
+          sha256sum "$out/$name" > "$out/SHA256SUMS.txt"
+          printf 'source_sha=%s\nfilename=%s\n' "$GITHUB_SHA" "$name" > "$out/build-metadata.txt"
+          python scripts/report-apk-size.py "$out/$name" \
+            --budget-mib 230 \
+            --json-output "$out/arm64-debug-size.json" \
+            --markdown-output "$out/arm64-debug-size.md"
+      - name: Upload Pixel 8 Pro APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumenchess-pixel8pro-arm64-${{ github.sha }}
+          path: ${{ runner.temp }}/pixel-arm64
+          if-no-files-found: error
+          retention-days: 30

@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val physicalArm64Only = providers.gradleProperty("lumenPhysicalArm64Only")
+    .map(String::toBoolean)
+    .orElse(false)
+
 android {
     namespace = "dev.lumenchess"
     compileSdk = 37
@@ -15,6 +19,12 @@ android {
         versionCode = 1
         versionName = "0.1.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        if (physicalArm64Only.get()) {
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
+        }
     }
 
     compileOptions {
