@@ -28,8 +28,9 @@ class PlayUiIntegrationTest {
     @Test
     fun setupShowsTypedRecklessNativeConstraintInsteadOfSendingUnsupportedOptions() {
         composeRule.onNodeWithTag(PLAY_SETUP_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Stockfish 18").performScrollTo().performClick()
         composeRule.onNodeWithText("Reckless 0.9.0").performScrollTo().performClick()
-        composeRule.onNodeWithText("Native").performScrollTo().performClick()
+        composeRule.onNodeWithText("Engine Native").performScrollTo().performClick()
 
         composeRule.onNodeWithText(
             "Engine native strength limiting is unavailable for this engine",
