@@ -1,0 +1,87 @@
+package dev.lumenchess.play
+
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.lifecycle.ViewModelProvider
+import dev.lumenchess.MainActivity
+import dev.lumenchess.board.CHESSBOARD_TEST_TAG
+import dev.lumenchess.core.chess.Color
+import dev.lumenchess.core.chess.Variant
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+
+class PlayUiIntegrationTest {
+    @get:Rule
+    val composeRule = createAndroidComposeRule<MainActivity>()
+
+    @Test
+    fun setupShowsTypedRecklessNativeConstraintInsteadOfSendingUnsupportedOptions() {
+        composeRule.onNodeWithTag(PLAY_SETUP_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Reckless 0.9.0").performClick()
+        composeRule.onNodeWithText("Native").performClick()
+
+        composeRule.onNodeWithText(
+            "Engine native strength limiting is unavailable for this engine",
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).assertIsNotEnabled()
+    }
+
+    @Test
+    fun standardSetupStartsCleanLiveScreenAndConfigurationRecreationRetainsOwner() {
+        composeRule.onNodeWithText("Standard").performClick()
+        composeRule.onNodeWithText("White").performClick()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performClick()
+        waitForLiveScreen()
+
+        composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("You").assertIsDisplayed()
+        composeRule.onNodeWithText("Stockfish 18").assertIsDisplayed()
+        composeRule.onNodeWithText("Resign").assertIsDisplayed()
+
+        val beforeViewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
+        val beforeCoordinator = requireNotNull(beforeViewModel.currentCoordinatorForTest())
+        val beforeRevision = beforeCoordinator.state.positionRevision
+
+        composeRule.activityRule.scenario.recreate()
+        waitForLiveScreen()
+
+        val afterViewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
+        val afterCoordinator = requireNotNull(afterViewModel.currentCoordinatorForTest())
+        assertSame(beforeViewModel, afterViewModel)
+        assertSame(beforeCoordinator, afterCoordinator)
+        assertEquals(beforeRevision, afterCoordinator.state.positionRevision)
+        assertEquals(1, composeRule.onAllNodesWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun chess960BlackSetupStartsWithResolvedChess960Runtime() {
+        composeRule.onNodeWithText("Chess960").performClick()
+        composeRule.onNodeWithText("Black").performClick()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performClick()
+        waitForLiveScreen()
+
+        val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
+        val setup = requireNotNull(viewModel.uiState.value.resolvedSetup)
+        val runtime = requireNotNull(viewModel.uiState.value.runtime)
+        assertEquals(Variant.CHESS960, setup.variant)
+        assertEquals(Color.BLACK, setup.humanSide)
+        assertEquals(Variant.CHESS960, runtime.position.variant)
+        assertTrue(setup.chess960Index in 0..959)
+        composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).assertIsDisplayed()
+    }
+
+    private fun waitForLiveScreen() {
+        composeRule.waitUntil(timeoutMillis = 12_000L) {
+            composeRule.onAllNodesWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(PLAY_LIVE_TEST_TAG).assertIsDisplayed()
+    }
+}
