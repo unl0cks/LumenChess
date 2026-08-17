@@ -26,12 +26,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 abstract class EngineHostService : Service() {
     private val sessions = ConcurrentHashMap<String, HostSession>()
-    private val hostGeneration: Long by lazy {
+    private val hostGenerationToken: Long by lazy {
         SystemClock.elapsedRealtimeNanos() xor (Process.myPid().toLong() shl 32)
     }
 
     private val binder = object : IEngineHost.Stub() {
-        override fun getHostGeneration(): Long = hostGeneration
+        override fun getHostGeneration(): Long = hostGenerationToken
 
         override fun getProcessId(): Int = Process.myPid()
 
@@ -44,7 +44,7 @@ abstract class EngineHostService : Service() {
             require(sessions.isEmpty()) { "An isolated engine slot may own only one session" }
             val session = HostSession(
                 sessionId = requestedSessionId,
-                hostGeneration = hostGeneration,
+                hostGeneration = hostGenerationToken,
                 callback = callback,
                 backend = createBackend(engineId),
             )
