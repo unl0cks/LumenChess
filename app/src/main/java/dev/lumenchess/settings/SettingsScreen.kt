@@ -142,7 +142,7 @@ private fun SettingsRow(
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
 ) {
-    var modifier = Modifier
+    var modifier: Modifier = Modifier
     if (tag != null) modifier = modifier.testTag(tag)
     LumenListRow(
         title = title,
