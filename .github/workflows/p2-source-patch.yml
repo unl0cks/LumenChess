@@ -1,0 +1,63 @@
+name: P2 exact source patch
+
+on:
+  push:
+    branches:
+      - physical-polish-customization
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: startsWith(github.event.head_commit.message, 'tooling(P2): apply exact Compose source fixes')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: physical-polish-customization
+          fetch-depth: 0
+      - name: Apply compiler-directed fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          play = Path('app/src/main/java/dev/lumenchess/play/PolishedPlayRoute.kt')
+          text = play.read_text()
+          old = '.selectable(selected, onClick, role = Role.RadioButton)'
+          new = '.selectable(selected = selected, onClick = onClick, role = Role.RadioButton)'
+          if old not in text:
+              raise SystemExit('Expected Play selectable call not found')
+          text = text.replace(old, new, 1)
+          old = '''    val status = when {
+              ui.message != null -> ui.message
+              runtime.terminal != null -> runtime.terminal.presentationLabel()
+          '''
+          new = '''    val terminal = runtime.terminal
+              val status = when {
+              ui.message != null -> ui.message
+              terminal != null -> terminal.presentationLabel()
+          '''
+          if old not in text:
+              raise SystemExit('Expected terminal smart-cast block not found')
+          text = text.replace(old, new, 1)
+          play.write_text(text)
+
+          nav = Path('app/src/main/java/dev/lumenchess/ui/LumenNavigation.kt')
+          text = nav.read_text()
+          old = '.selectable(selected, { onSelect(tab) }, role = Role.Tab)'
+          new = '.selectable(selected = selected, onClick = { onSelect(tab) }, role = Role.Tab)'
+          if old not in text:
+              raise SystemExit('Expected navigation selectable call not found')
+          nav.write_text(text.replace(old, new, 1))
+          PY
+          rm .github/workflows/p2-source-patch.yml
+      - name: Commit exact source fixes
+        run: |
+          git config user.name 'LumenChess CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/dev/lumenchess/play/PolishedPlayRoute.kt \
+                  app/src/main/java/dev/lumenchess/ui/LumenNavigation.kt \
+                  .github/workflows/p2-source-patch.yml
+          git commit -m 'fix(P2): correct Compose selection and terminal projection'
+          git push origin HEAD:physical-polish-customization
