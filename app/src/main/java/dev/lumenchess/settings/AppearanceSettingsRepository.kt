@@ -60,5 +60,10 @@ private val ALL_KEY_NAMES = listOf(
     AppearanceSettingsCodec.PRESET,
     AppearanceSettingsCodec.CUSTOM_LIGHT,
     AppearanceSettingsCodec.CUSTOM_DARK,
+    AppearanceSettingsCodec.FEEDBACK_SOUNDS_ENABLED,
+    AppearanceSettingsCodec.FEEDBACK_HAPTICS_ENABLED,
+    AppearanceSettingsCodec.FEEDBACK_SOUND_EVENTS,
+    AppearanceSettingsCodec.FEEDBACK_HAPTIC_EVENTS,
+    AppearanceSettingsCodec.SOUND_PACK,
 )
 private val ALL_KEYS = ALL_KEY_NAMES.map(::key)
