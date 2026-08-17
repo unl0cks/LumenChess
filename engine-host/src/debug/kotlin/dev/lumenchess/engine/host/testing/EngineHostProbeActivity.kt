@@ -6,7 +6,9 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import android.os.ResultReceiver
+import dev.lumenchess.core.chess.Chess960
 import dev.lumenchess.core.chess.Fen
+import dev.lumenchess.core.chess.Position
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.engine.api.EngineCapabilities
 import dev.lumenchess.engine.api.EngineMoveValidation
@@ -70,7 +72,9 @@ class EngineHostProbeActivity : Activity() {
         SCENARIO_MALFORMED -> malformedScenario()
         SCENARIO_CRASH_RECOVERY -> crashRecoveryScenario()
         SCENARIO_TEARDOWN_REBIND -> teardownRebindScenario()
-        else -> error("Unknown M12 probe scenario '$scenario'")
+        SCENARIO_STOCKFISH18_STANDARD -> stockfish18Scenario(position, 61, 15)
+        SCENARIO_STOCKFISH18_CHESS960 -> stockfish18Scenario(Chess960.startingPosition(0), 62, 16)
+        else -> error("Unknown engine-host probe scenario '$scenario'")
     }
 
     private fun dualSlotScenario(): ProbeResult {
@@ -222,7 +226,6 @@ class EngineHostProbeActivity : Activity() {
             first.close()
         }
 
-        // Give stopSelf/unbind a deterministic opportunity to destroy the old service instance.
         Thread.sleep(250)
         val reboundListener = RecordingListener()
         val rebound = connect(EngineSlot.A, reboundListener)
@@ -238,6 +241,42 @@ class EngineHostProbeActivity : Activity() {
             )
         } finally {
             rebound.close()
+        }
+    }
+
+    private fun stockfish18Scenario(searchPosition: Position, searchId: Long, revision: Long): ProbeResult {
+        val listener = RecordingListener()
+        val connection = connect(EngineSlot.A, listener)
+        try {
+            check(listener.processId != Process.myPid()) { "Stockfish was not isolated from caller PID" }
+            val sessionId = EngineSessionId("stockfish-18-${searchPosition.variant.name.lowercase()}")
+            val session = connection.openSession(sessionId, "stockfish-18", capabilities)
+            val request = EngineSearchRequest(
+                searchId = EngineSearchId(searchId),
+                positionRevision = PositionRevision(revision),
+                position = searchPosition,
+                limits = EngineSearchLimits(depth = 1),
+            )
+            session.submit(EngineSessionCommand.StartSearch(request))
+            val delivered = listener.takeResult()
+            check(delivered.first == sessionId) { "Stockfish session identity changed in transport" }
+            check(delivered.second.searchId == request.searchId) { "Stockfish search identity changed in transport" }
+            check(delivered.second.positionRevision == request.positionRevision) { "Stockfish revision changed in transport" }
+            check(
+                EngineMoveValidator.validate(
+                    searchPosition,
+                    request.searchId,
+                    request.positionRevision,
+                    delivered.second,
+                ) is EngineMoveValidation.Accepted,
+            ) { "Stockfish result did not pass the existing core legality boundary: ${delivered.second.bestMoveUci}" }
+            session.submit(EngineSessionCommand.Close)
+            return ProbeResult(
+                true,
+                "Stockfish 18 ${searchPosition.variant.name} result ${delivered.second.bestMoveUci} passed correlation/core validation in isolated PID ${listener.processId}",
+            )
+        } finally {
+            connection.close()
         }
     }
 
@@ -301,6 +340,8 @@ class EngineHostProbeActivity : Activity() {
         const val SCENARIO_MALFORMED = "malformed"
         const val SCENARIO_CRASH_RECOVERY = "crash-recovery"
         const val SCENARIO_TEARDOWN_REBIND = "teardown-rebind"
+        const val SCENARIO_STOCKFISH18_STANDARD = "stockfish18-standard"
+        const val SCENARIO_STOCKFISH18_CHESS960 = "stockfish18-chess960"
 
         private val position = Fen.parse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
         private val capabilities = EngineCapabilities(

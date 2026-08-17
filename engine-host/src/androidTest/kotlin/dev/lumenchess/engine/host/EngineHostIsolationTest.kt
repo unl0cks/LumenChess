@@ -52,6 +52,20 @@ class EngineHostIsolationTest {
         assertTrue(details.contains("unbind/rebind succeeded"))
     }
 
+    @Test
+    fun stockfish18StandardSearchRunsInIsolatedHostAndPassesCoreValidation() {
+        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_STOCKFISH18_STANDARD)
+        assertTrue(details.contains("Stockfish 18 STANDARD"))
+        assertTrue(details.contains("correlation/core validation"))
+    }
+
+    @Test
+    fun stockfish18Chess960SearchRunsInIsolatedHostAndPassesCoreValidation() {
+        val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_STOCKFISH18_CHESS960)
+        assertTrue(details.contains("Stockfish 18 CHESS960"))
+        assertTrue(details.contains("correlation/core validation"))
+    }
+
     private fun runTargetProcessScenario(scenario: String): String {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val latch = CountDownLatch(1)
@@ -76,12 +90,12 @@ class EngineHostIsolationTest {
         }
         instrumentation.context.startActivity(intent)
 
-        assertTrue("Timed out waiting for target-process M12 probe '$scenario'", latch.await(25, TimeUnit.SECONDS))
+        assertTrue("Timed out waiting for target-process engine-host probe '$scenario'", latch.await(25, TimeUnit.SECONDS))
         val bundle = resultData.get()
-        assertNotNull("M12 probe '$scenario' returned no result bundle", bundle)
+        assertNotNull("Engine-host probe '$scenario' returned no result bundle", bundle)
         val details = bundle?.getString(EngineHostProbeActivity.KEY_DETAILS).orEmpty()
-        assertEquals("M12 probe '$scenario' failed: $details", Activity.RESULT_OK, resultCode.get())
-        assertTrue("M12 probe '$scenario' reported failure: $details", bundle?.getBoolean(EngineHostProbeActivity.KEY_PASSED) == true)
+        assertEquals("Engine-host probe '$scenario' failed: $details", Activity.RESULT_OK, resultCode.get())
+        assertTrue("Engine-host probe '$scenario' reported failure: $details", bundle?.getBoolean(EngineHostProbeActivity.KEY_PASSED) == true)
         return details
     }
 }
