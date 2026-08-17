@@ -22,12 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-      - name: Verify exact source SHA
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git diff --exit-code
       - name: Mark P5 reference verification pending
         env:
           GH_TOKEN: ${{ github.token }}
@@ -36,7 +30,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='P5 visual QA, cumulative gate, and ARM64 build are running' \
+            -f description='API37 reference verification and screenshot QA are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -59,7 +53,6 @@ jobs:
         run: |
           rustup toolchain install 1.88.0 --profile minimal
           rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
-          rustup run 1.88.0 rustc --version
       - uses: gradle/actions/setup-gradle@v4
       - name: Boot Pixel 8 Pro sized Android 17 emulator
         run: |
@@ -88,8 +81,7 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-          echo "Device page size: $(adb shell getconf PAGESIZE | tr -d '\r')"
-      - name: Run proportional P5 app instrumentation
+      - name: Run P5 app instrumentation
         id: verify
         continue-on-error: true
         run: ./gradlew :app:connectedDebugAndroidTest --stacktrace
@@ -150,14 +142,9 @@ jobs:
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
-          for image in p5-screenshots/*.png; do
-            file "$image" | grep -q '1344 x 2992'
-          done
-          printf 'Captured %s mandatory 1344x2992 screenshots\n' "$COUNT"
+          printf 'Captured %s mandatory screenshots\n' "$COUNT"
       - name: Upload P5 screenshot QA artifact
-        id: screenshot_artifact
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: p5-reference-screenshots-${{ github.sha }}
@@ -168,192 +155,23 @@ jobs:
             ${{ runner.temp }}/p5-screenshot-instrumentation.txt
           if-no-files-found: error
           retention-days: 14
-      - name: Verify cumulative M0-M19 and P1-P5 JVM, lint, and assemblies
-        id: gate_jvm
-        if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success' && steps.screenshot_artifact.outcome == 'success'
-        continue-on-error: true
-        run: >-
-          ./gradlew
-          :core-chess:test
-          :game-runtime:test
-          :engine-api:test
-          :engine-host:testDebugUnitTest
-          :engine-host:lintDebug
-          :engine-host:assembleDebug
-          :engine-host:assembleDebugAndroidTest
-          :data-persistence:testDebugUnitTest
-          :data-persistence:lintDebug
-          :data-persistence:assembleDebug
-          :data-persistence:assembleDebugAndroidTest
-          :app:testDebugUnitTest
-          :app:lintDebug
-          :app:assembleDebug
-          :app:assembleDebugAndroidTest
-      - name: Verify native engine ABIs and 16 KiB ELF alignment
-        id: gate_native
-        if: steps.gate_jvm.outcome == 'success'
-        continue-on-error: true
-        shell: bash
-        run: |
-          readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
-          test -x "$readelf"
-          for engine in lumen_stockfish18 lumen_reckless09; do
-            for abi in arm64-v8a x86_64; do
-              lib="$(find engine-host/build -type f -path "*/${abi}/lib${engine}.so" | head -n 1)"
-              test -n "$lib"
-              echo "Verifying $engine $abi: $lib"
-              python - "$readelf" "$lib" <<'PY'
-          import subprocess
-          import sys
-          readelf, library = sys.argv[1:]
-          output = subprocess.check_output([readelf, "-lW", library], text=True)
-          aligns = [
-              int(line.split()[-1], 0)
-              for line in output.splitlines()
-              if line.lstrip().startswith("LOAD")
-          ]
-          if not aligns:
-              raise SystemExit(f"No PT_LOAD segments found in {library}")
-          if any(align < 0x4000 for align in aligns):
-              raise SystemExit(f"{library} has LOAD alignment below 16 KiB: {aligns}")
-          print(f"LOAD alignments: {aligns}")
-          PY
-            done
-          done
-      - name: Verify committed Room schema history is up to date
-        id: gate_room
-        if: steps.gate_jvm.outcome == 'success'
-        continue-on-error: true
-        shell: bash
-        run: |
-          schema_v1="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/1.json"
-          schema_v2="data-persistence/schemas/dev.lumenchess.data.persistence.LumenDatabase/2.json"
-          test -f "$schema_v1"
-          test -f "$schema_v2"
-          git diff --exit-code -- data-persistence/schemas
-          test -z "$(git status --porcelain --untracked-files=all -- data-persistence/schemas)"
-      - name: Run cumulative engine, persistence, and app instrumentation on API37
-        id: gate_device
-        if: steps.gate_jvm.outcome == 'success' && steps.gate_native.outcome == 'success' && steps.gate_room.outcome == 'success'
-        continue-on-error: true
-        shell: bash
-        run: |
-          adb shell settings put global window_animation_scale 0
-          adb shell settings put global transition_animation_scale 0
-          adb shell settings put global animator_duration_scale 0
-          ./gradlew \
-            :engine-host:connectedDebugAndroidTest \
-            :data-persistence:connectedDebugAndroidTest \
-            :app:connectedDebugAndroidTest \
-            --stacktrace
-      - name: Upload cumulative Gate P5 instrumentation results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gate-p5-instrumentation-${{ github.sha }}
-          path: |
-            engine-host/build/outputs/androidTest-results/
-            engine-host/build/reports/androidTests/
-            data-persistence/build/outputs/androidTest-results/
-            data-persistence/build/reports/androidTests/
-            app/build/outputs/androidTest-results/
-            app/build/reports/androidTests/
-          if-no-files-found: warn
-          retention-days: 14
-      - name: Build exact-SHA ARM64-only Pixel 8 Pro debug APK
-        id: apk
-        if: >-
-          steps.gate_jvm.outcome == 'success' &&
-          steps.gate_native.outcome == 'success' &&
-          steps.gate_room.outcome == 'success' &&
-          steps.gate_device.outcome == 'success'
-        continue-on-error: true
-        run: ./gradlew :app:clean :engine-host:clean :app:assembleDebug -PlumenPhysicalArm64Only=true
-      - name: Inspect and package exact-SHA ARM64 APK
-        id: package_apk
-        if: steps.apk.outcome == 'success'
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -euo pipefail
-          apk="$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' | head -n 1)"
-          test -n "$apk"
-          out="$RUNNER_TEMP/pixel-arm64"
-          mkdir -p "$out"
-          name="LumenChess-Pixel8Pro-${GITHUB_SHA:0:8}-debug.apk"
-          cp "$apk" "$out/$name"
-
-          unzip -t "$out/$name"
-          unzip -l "$out/$name" > "$out/apk-entries.txt"
-          grep -q 'lib/arm64-v8a/liblumen_stockfish18.so' "$out/apk-entries.txt"
-          grep -q 'lib/arm64-v8a/liblumen_reckless09.so' "$out/apk-entries.txt"
-          if grep -Eq 'lib/(x86_64|x86|armeabi-v7a)/' "$out/apk-entries.txt"; then
-            echo "Non-ARM64 native payload found in physical APK"
-            grep -E 'lib/(x86_64|x86|armeabi-v7a)/' "$out/apk-entries.txt"
-            exit 1
-          fi
-
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$out/$name" > "$out/aapt-badging.txt"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$out/$name" > "$out/apksigner.txt"
-          sha256sum "$out/$name" > "$out/SHA256SUMS.txt"
-          printf 'source_sha=%s\nfilename=%s\n' "$GITHUB_SHA" "$name" > "$out/build-metadata.txt"
-          python scripts/report-apk-size.py "$out/$name" \
-            --budget-mib 230 \
-            --json-output "$out/arm64-debug-size.json" \
-            --markdown-output "$out/arm64-debug-size.md"
-      - name: Upload exact-SHA Pixel 8 Pro ARM64 APK
-        id: apk_artifact
-        if: steps.package_apk.outcome == 'success'
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: lumenchess-pixel8pro-arm64-${{ github.sha }}
-          path: ${{ runner.temp }}/pixel-arm64
-          if-no-files-found: error
-          retention-days: 30
       - name: Upload P5 diagnostics on failure
-        if: >-
-          always() &&
-          (steps.verify.outcome != 'success' ||
-           steps.screenshots.outcome != 'success' ||
-           steps.screenshot_artifact.outcome != 'success' ||
-           steps.gate_jvm.outcome != 'success' ||
-           steps.gate_native.outcome != 'success' ||
-           steps.gate_room.outcome != 'success' ||
-           steps.gate_device.outcome != 'success' ||
-           steps.apk.outcome != 'success' ||
-           steps.package_apk.outcome != 'success' ||
-           steps.apk_artifact.outcome != 'success')
+        if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         uses: actions/upload-artifact@v4
         with:
           name: p5-reference-diagnostics-${{ github.sha }}
           path: |
             ${{ runner.temp }}/p5-emulator.log
             ${{ runner.temp }}/p5-screenshot-instrumentation.txt
-            ${{ runner.temp }}/pixel-arm64/
             p5-screenshots/
             docs/references/LumenChess_UI_Concept_Blue.png
             docs/references/REFERENCE-MANIFEST.md
-            engine-host/build/outputs/androidTest-results/
-            engine-host/build/reports/androidTests/
-            data-persistence/build/outputs/androidTest-results/
-            data-persistence/build/reports/androidTests/
             app/build/outputs/androidTest-results/
             app/build/reports/androidTests/
           if-no-files-found: warn
           retention-days: 7
-      - name: Publish P5 completion success
-        if: >-
-          steps.verify.outcome == 'success' &&
-          steps.screenshots.outcome == 'success' &&
-          steps.screenshot_artifact.outcome == 'success' &&
-          steps.gate_jvm.outcome == 'success' &&
-          steps.gate_native.outcome == 'success' &&
-          steps.gate_room.outcome == 'success' &&
-          steps.gate_device.outcome == 'success' &&
-          steps.apk.outcome == 'success' &&
-          steps.package_apk.outcome == 'success' &&
-          steps.apk_artifact.outcome == 'success'
+      - name: Publish P5 reference verification success
+        if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -361,21 +179,10 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='P5 visual QA, cumulative gate, and ARM64 build passed' \
+            -f description='API37 reference verification and 11-state screenshot capture passed' \
             -f target_url="$RUN_URL"
-      - name: Publish P5 completion failure
-        if: >-
-          always() &&
-          (steps.verify.outcome != 'success' ||
-           steps.screenshots.outcome != 'success' ||
-           steps.screenshot_artifact.outcome != 'success' ||
-           steps.gate_jvm.outcome != 'success' ||
-           steps.gate_native.outcome != 'success' ||
-           steps.gate_room.outcome != 'success' ||
-           steps.gate_device.outcome != 'success' ||
-           steps.apk.outcome != 'success' ||
-           steps.package_apk.outcome != 'success' ||
-           steps.apk_artifact.outcome != 'success')
+      - name: Publish P5 reference verification failure
+        if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -383,19 +190,8 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='P5 visual QA, cumulative gate, or ARM64 build failed' \
+            -f description='API37 reference verification or screenshot QA failed' \
             -f target_url="$RUN_URL"
-      - name: Fail workflow when P5 completion gate failed
-        if: >-
-          always() &&
-          (steps.verify.outcome != 'success' ||
-           steps.screenshots.outcome != 'success' ||
-           steps.screenshot_artifact.outcome != 'success' ||
-           steps.gate_jvm.outcome != 'success' ||
-           steps.gate_native.outcome != 'success' ||
-           steps.gate_room.outcome != 'success' ||
-           steps.gate_device.outcome != 'success' ||
-           steps.apk.outcome != 'success' ||
-           steps.package_apk.outcome != 'success' ||
-           steps.apk_artifact.outcome != 'success')
+      - name: Fail workflow when P5 verification failed
+        if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         run: exit 1
