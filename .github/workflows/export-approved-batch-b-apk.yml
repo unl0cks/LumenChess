@@ -1,0 +1,119 @@
+name: Export approved Batch B testing APK
+
+on:
+  push:
+    branches:
+      - tooling/batch-b-physical-apk
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact approved Batch B source
+        uses: actions/checkout@v4
+        with:
+          ref: 06baccdfb3696371750e6d6a5288e50c1add3d24
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=06baccdfb3696371750e6d6a5288e50c1add3d24
+          actual="$(git rev-parse HEAD)"
+          echo "expected=$expected"
+          echo "actual=$actual"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools
+
+      - name: Install Android 17 SDK and pinned native toolchain
+        run: |
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            --channel=3
+
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+          rustup run 1.88.0 rustc --version
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build normal debug APK
+        run: ./gradlew :app:assembleDebug
+
+      - name: Inspect and package APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=06baccdfb3696371750e6d6a5288e50c1add3d24
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+
+          src="app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$src"
+          mkdir -p dist
+          apk="dist/LumenChess-BatchB-M19-06baccdf-debug.apk"
+          cp "$src" "$apk"
+
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          test -x "$aapt"
+          test -x "$apksigner"
+
+          unzip -t "$apk"
+          "$apksigner" verify --verbose --print-certs "$apk" > dist/apksigner.txt
+          "$aapt" dump badging "$apk" > dist/aapt-badging.txt
+          unzip -l "$apk" > dist/apk-contents.txt
+
+          grep -q "package: name='dev.lumenchess'" dist/aapt-badging.txt
+          grep -q "sdkVersion:'37'" dist/aapt-badging.txt
+          grep -q "targetSdkVersion:'37'" dist/aapt-badging.txt
+          grep -q 'lib/arm64-v8a/liblumen_stockfish18.so' dist/apk-contents.txt
+          grep -q 'lib/arm64-v8a/liblumen_reckless09.so' dist/apk-contents.txt
+          grep -q 'lib/x86_64/liblumen_stockfish18.so' dist/apk-contents.txt
+          grep -q 'lib/x86_64/liblumen_reckless09.so' dist/apk-contents.txt
+
+          {
+            echo "source_git_sha=$actual"
+            echo "apk_filename=$(basename "$apk")"
+            echo "apk_sha256=$(sha256sum "$apk" | awk '{print $1}')"
+            echo "application_id=dev.lumenchess"
+            echo "build_type=debug"
+            echo "min_sdk=37"
+            echo "target_sdk=37"
+            echo "abis=arm64-v8a,x86_64"
+            echo "arm64_included=yes"
+            echo "stockfish18_arm64_present=yes"
+            echo "reckless090_arm64_present=yes"
+            echo "testing_debug_build=yes"
+          } > dist/BUILD-VERIFICATION.txt
+
+          cat dist/BUILD-VERIFICATION.txt
+          grep '^native-code:' dist/aapt-badging.txt || true
+
+      - name: Upload approved Batch B testing APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumenchess-batch-b-m19-physical-apk-06baccdf
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
