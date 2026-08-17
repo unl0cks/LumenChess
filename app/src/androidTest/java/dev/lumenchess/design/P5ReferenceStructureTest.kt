@@ -1,13 +1,12 @@
 package dev.lumenchess.design
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.fetchSemanticsNode
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.lumenchess.MainActivity
 import org.junit.Assert.assertEquals
@@ -32,8 +31,8 @@ class P5ReferenceStructureTest {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
 
         composeRule.onAllNodesWithText("Make LumenChess yours").assertCountEquals(0)
-        composeRule.onAllNodes(hasText("presentation-only", substring = true)).assertCountEquals(0)
-        composeRule.onAllNodes(hasText("Chess rules", substring = true)).assertCountEquals(0)
+        composeRule.onNodeWithText("presentation-only", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Chess rules", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -49,8 +48,8 @@ class P5ReferenceStructureTest {
     fun futureTabPreviewUsesProductCopyRatherThanBuildInternalCopy() {
         composeRule.onNodeWithTag("main-tab-arena").performClick()
 
-        composeRule.onAllNodes(hasText("not available in this build", substring = true)).assertCountEquals(0)
-        composeRule.onAllNodes(hasText("later milestone", substring = true)).assertCountEquals(0)
+        composeRule.onNodeWithText("not available in this build", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("later milestone", substring = true).assertDoesNotExist()
     }
 
     @Test
