@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -330,7 +331,7 @@ private fun P5SetupScreen(ui: PlayUiState, viewModel: PlayViewModel, modifier: M
 }
 
 @Composable
-private fun P5Section(label: String, content: @Composable Column.() -> Unit) {
+private fun P5Section(label: String, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurface)
         content()
