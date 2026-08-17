@@ -193,7 +193,9 @@ class PlayM19IntegrationTest {
         assertEquals(listOf("e2e4", "e7e5", "g1f3"), coordinator.state.gameTree.mainline().map { it.move!!.uci })
         assertEquals(3L, coordinator.state.positionRevision.value)
         assertNull(coordinator.state.queuedPremove)
-        assertEquals(59_900L, coordinator.state.clock.whiteRemainingMillis)
+        // White receives the normal +1s increment for e4 and Nf3, while the premove itself costs
+        // exactly 100ms once: 60_000 + 1_000 - 100 + 1_000 = 61_900.
+        assertEquals(61_900L, coordinator.state.clock.whiteRemainingMillis)
     }
 
     @Test
@@ -217,7 +219,7 @@ class PlayM19IntegrationTest {
         val flushed = CountDownLatch(1)
         persistence.flushForTest { flushed.countDown() }
         assertTrue("Live persistence did not flush", flushed.await(10, TimeUnit.SECONDS))
-        val stableId = assertNotNull(persistence.gameId)
+        val stableId = requireNotNull(persistence.gameId)
 
         val restoredLatch = CountDownLatch(1)
         val restored = AtomicReference<RestoredPlayGame?>()
