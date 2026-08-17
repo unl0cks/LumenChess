@@ -19,7 +19,7 @@ class LumenNavigationTest {
     fun navigationUsesIconLabelTabsAndIntentionalFuturePreview() {
         composeRule.onNodeWithTag("main-tab-play").assertIsDisplayed()
         composeRule.onNodeWithTag("main-tab-arena").performClick()
-        composeRule.onNodeWithText("Arena").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Arena").assertCountEquals(2)
         composeRule.onNodeWithText("Preview · not available in this build").assertIsDisplayed()
         composeRule.onAllNodesWithText("Coming in a later milestone").assertCountEquals(0)
         composeRule.onNodeWithTag("main-tab-play").performClick()
