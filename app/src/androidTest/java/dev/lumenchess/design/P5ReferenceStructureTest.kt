@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import dev.lumenchess.MainActivity
 import org.junit.Assert.assertEquals
