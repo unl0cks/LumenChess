@@ -56,8 +56,8 @@ class GameFeedbackDispatcherTest {
         val output = RecordingOutput()
         val dispatcher = GameFeedbackDispatcher(output)
         val settings = FeedbackSettings(
-            soundEvents = GameFeedbackEvent.all - GameFeedbackEvent.Check,
-            hapticEvents = GameFeedbackEvent.all - GameFeedbackEvent.Capture,
+            soundEvents = GameFeedbackEvent.all.filterNot { it == GameFeedbackEvent.Check }.toSet(),
+            hapticEvents = GameFeedbackEvent.all.filterNot { it == GameFeedbackEvent.Capture }.toSet(),
         )
 
         dispatcher.dispatch(
