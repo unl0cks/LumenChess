@@ -41,6 +41,7 @@ jobs:
       github.ref != 'refs/heads/main' &&
       (startsWith(github.event.head_commit.message, 'checkpoint(M12):') ||
        startsWith(github.event.head_commit.message, 'ci(M12):') ||
+       startsWith(github.event.head_commit.message, 'fix(M12):') ||
        startsWith(github.event.head_commit.message, 'checkpoint(M13):') ||
        startsWith(github.event.head_commit.message, 'checkpoint(M14):'))
     runs-on: ubuntu-latest
