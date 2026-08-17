@@ -32,6 +32,7 @@ internal object GameRuntimeReducer {
 
         return when (event) {
             is RuntimeEvent.Start -> error("handled above")
+            is RuntimeEvent.ClockCheck -> RuntimeTransition(settledState, disposition = RuntimeDisposition.IGNORED)
             is RuntimeEvent.HumanMove -> humanMove(settledState, event.move, clock)
             is RuntimeEvent.EngineCompleted -> engineCompleted(settledState, event, clock)
             is RuntimeEvent.QueuePremove -> queuePremove(settledState, event)
