@@ -38,6 +38,23 @@ class SoundSourceResolverTest {
     }
 
     @Test
+    fun invalidOverrideFallsThroughToSelectedPack() {
+        val root = tempRoot()
+        File(root, "overrides/move.wav").apply {
+            parentFile?.mkdirs()
+            writeText("not-a-wav")
+        }
+        val pack = File(root, "sound-packs/night-pack/move.ogg").apply {
+            parentFile?.mkdirs()
+            writeBytes(byteArrayOf(1, 2, 3))
+        }
+
+        val resolved = SoundSourceResolver(root).resolve(SoundEvent.MOVE, "night-pack")
+
+        assertEquals(ResolvedSoundSource.LocalFile(pack.canonicalFile), resolved)
+    }
+
+    @Test
     fun individualOverrideWinsOverSelectedPack() {
         val root = tempRoot()
         val packRoot = File(root, "sound-packs/night-pack").apply { mkdirs() }

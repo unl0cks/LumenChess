@@ -37,4 +37,17 @@ class BuiltInSoundAssetsTest {
         assertEquals(first.canonicalFile, second.canonicalFile)
         assertEquals(modified, second.lastModified())
     }
+
+    @Test
+    fun ensureRegeneratesCorruptedBuiltInFile() {
+        val root = Files.createTempDirectory("lumen-sound-corrupt").toFile()
+        val first = BuiltInSoundAssets.ensure(root, SoundEvent.CHECK)
+        first.writeBytes(ByteArray(100) { 0 })
+
+        val repaired = BuiltInSoundAssets.ensure(root, SoundEvent.CHECK)
+        val bytes = repaired.readBytes()
+
+        assertEquals("RIFF", bytes.copyOfRange(0, 4).toString(Charsets.US_ASCII))
+        assertEquals("WAVE", bytes.copyOfRange(8, 12).toString(Charsets.US_ASCII))
+    }
 }

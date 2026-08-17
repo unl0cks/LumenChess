@@ -76,6 +76,29 @@ class GameFeedbackDispatcherTest {
     }
 
     @Test
+    fun outputFailuresCannotEscapeOrBlockOtherFeedback() {
+        val sounds = mutableListOf<GameFeedbackEvent>()
+        val haptics = mutableListOf<GameFeedbackEvent>()
+        val output = object : GameFeedbackOutput {
+            override fun playSound(event: GameFeedbackEvent) {
+                sounds += event
+                if (event == GameFeedbackEvent.Move) error("audio device failed")
+            }
+
+            override fun playHaptic(event: GameFeedbackEvent) {
+                haptics += event
+                if (event == GameFeedbackEvent.Capture) error("vibrator failed")
+            }
+        }
+        val events = listOf(GameFeedbackEvent.Move, GameFeedbackEvent.Capture, GameFeedbackEvent.Check)
+
+        GameFeedbackDispatcher(output).dispatch(events, FeedbackSettings())
+
+        assertEquals(events, sounds)
+        assertEquals(events, haptics)
+    }
+
+    @Test
     fun emptyEventBatchProducesNoSideEffects() {
         val output = RecordingOutput()
         GameFeedbackDispatcher(output).dispatch(emptyList(), FeedbackSettings())

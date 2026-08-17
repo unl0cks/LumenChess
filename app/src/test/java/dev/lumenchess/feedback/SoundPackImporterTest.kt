@@ -93,6 +93,17 @@ class SoundPackImporterTest {
     }
 
     @Test
+    fun supportedExtensionWithInvalidContainerDataIsRejected() {
+        assertFailsWith<IllegalArgumentException> {
+            SoundPackImporter().importZip(
+                ByteArrayInputStream(zip("move.wav" to "not-a-wave".toByteArray())),
+                tempRoot(),
+                "invalid-media",
+            )
+        }
+    }
+
+    @Test
     fun duplicateEventAssignmentsAreRejectedEvenAcrossExtensionsAndCase() {
         assertFailsWith<IllegalArgumentException> {
             SoundPackImporter().importZip(
