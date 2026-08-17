@@ -51,16 +51,21 @@ fun LumenChessApp() {
     val appearanceRepository = remember(context.applicationContext) {
         DataStoreAppearanceSettingsRepository.from(context.applicationContext)
     }
-    val appearanceSettings by appearanceRepository.settings.collectAsStateWithLifecycle(
+    val persistedAppearanceSettings by appearanceRepository.settings.collectAsStateWithLifecycle(
         initialValue = AppearanceSettings(),
     )
+    var appearanceSettings by remember { mutableStateOf(persistedAppearanceSettings) }
     val livePlay = currentTab == MainTab.Play && playUi.mode == PlayScreenMode.LIVE
 
+    LaunchedEffect(persistedAppearanceSettings) {
+        appearanceSettings = persistedAppearanceSettings
+    }
     LaunchedEffect(currentTab) {
         if (currentTab != MainTab.Settings) settingsDestination = SettingsDestination.ROOT
     }
 
     fun persist(settings: AppearanceSettings) {
+        appearanceSettings = settings
         scope.launch { appearanceRepository.update { settings } }
     }
 
