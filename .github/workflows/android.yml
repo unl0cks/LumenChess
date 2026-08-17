@@ -39,8 +39,8 @@ jobs:
           rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
           rustup run 1.88.0 rustc --version
       - uses: gradle/actions/setup-gradle@v4
-      - name: Run proportional JVM and engine-host checkpoint checks
-        run: ./gradlew :core-chess:test :game-runtime:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest
+      - name: Run proportional JVM and Play checkpoint checks
+        run: ./gradlew :core-chess:test :game-runtime:test :engine-api:test :engine-host:testDebugUnitTest :data-persistence:testDebugUnitTest :app:testDebugUnitTest :engine-host:lintDebug :app:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Verify native engine ABIs and 16 KiB ELF alignment
         run: |
           readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
@@ -79,7 +79,8 @@ jobs:
        startsWith(github.event.head_commit.message, 'checkpoint(M13):') ||
        startsWith(github.event.head_commit.message, 'checkpoint(M14):') ||
        startsWith(github.event.head_commit.message, 'test(M15):') ||
-       startsWith(github.event.head_commit.message, 'checkpoint(M15):'))
+       startsWith(github.event.head_commit.message, 'checkpoint(M15):') ||
+       startsWith(github.event.head_commit.message, 'checkpoint(M19):'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -304,11 +305,76 @@ jobs:
           overwrite: true
           retention-days: 14
 
+  play-device:
+    if: >-
+      github.event_name == 'push' &&
+      github.ref != 'refs/heads/main' &&
+      (startsWith(github.event.head_commit.message, 'test(M19):') ||
+       startsWith(github.event.head_commit.message, 'checkpoint(M19):'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools emulator
+      - name: Install Android 17 test image and pinned native toolchain
+        run: |
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            "system-images;android-37.0;google_apis_ps16k;x86_64" \
+            --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run focused M19 Play and persistence instrumentation on Android 17
+        run: |
+          echo "no" | avdmanager create avd --force --name play-checkpoint --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          emulator_bin="$ANDROID_HOME/emulator/emulator"
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          "$emulator_bin" -avd play-checkpoint -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 > "$RUNNER_TEMP/play-checkpoint-emulator.log" 2>&1 &
+          emulator_pid=$!
+          trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 45); do
+            if adb devices | grep -Eq '^emulator-[0-9]+[[:space:]]+device$'; then break; fi
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then cat "$RUNNER_TEMP/play-checkpoint-emulator.log"; exit 1; fi
+            sleep 2
+          done
+          timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb shell getconf PAGESIZE
+          ./gradlew :data-persistence:connectedDebugAndroidTest :app:connectedDebugAndroidTest
+      - name: Upload Play instrumentation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m19-play-device-results
+          path: |
+            app/build/outputs/androidTest-results
+            app/build/reports/androidTests
+            data-persistence/build/outputs/androidTest-results
+            data-persistence/build/reports/androidTests
+          if-no-files-found: warn
+          retention-days: 14
+
   full:
     if: >-
       github.ref == 'refs/heads/main' ||
       github.event_name == 'pull_request' ||
-      (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'checkpoint(M15):'))
+      (github.event_name == 'push' &&
+       (startsWith(github.event.head_commit.message, 'checkpoint(M15):') ||
+        startsWith(github.event.head_commit.message, 'checkpoint(M19):')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -374,43 +440,24 @@ jobs:
           test -z "$(git status --porcelain --untracked-files=all -- data-persistence/schemas)"
       - name: Run cumulative instrumentation tests on Android 17
         run: |
-          echo "no" | avdmanager create avd \
-            --force \
-            --name batch-gate \
-            --package "system-images;android-37.0;google_apis_ps16k;x86_64"
-
+          echo "no" | avdmanager create avd --force --name batch-gate --package "system-images;android-37.0;google_apis_ps16k;x86_64"
           emulator_bin="$ANDROID_HOME/emulator/emulator"
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
           "$emulator_bin" -accel-check || true
-          "$emulator_bin" \
-            -avd batch-gate \
-            -no-window -no-audio -no-boot-anim -no-snapshot \
-            -gpu software -memory 8192 \
-            > "$RUNNER_TEMP/batch-gate-emulator.log" 2>&1 &
+          "$emulator_bin" -avd batch-gate -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 > "$RUNNER_TEMP/batch-gate-emulator.log" 2>&1 &
           emulator_pid=$!
           trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
-
           device_ready=0
           for _ in $(seq 1 45); do
-            if ! kill -0 "$emulator_pid" 2>/dev/null; then
-              cat "$RUNNER_TEMP/batch-gate-emulator.log"
-              exit 1
-            fi
-            if adb devices | grep -Eq '^emulator-[0-9]+[[:space:]]+device$'; then
-              device_ready=1
-              break
-            fi
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then cat "$RUNNER_TEMP/batch-gate-emulator.log"; exit 1; fi
+            if adb devices | grep -Eq '^emulator-[0-9]+[[:space:]]+device$'; then device_ready=1; break; fi
             sleep 2
           done
-          if [ "$device_ready" -ne 1 ]; then
-            cat "$RUNNER_TEMP/batch-gate-emulator.log"
-            exit 1
-          fi
+          if [ "$device_ready" -ne 1 ]; then cat "$RUNNER_TEMP/batch-gate-emulator.log"; exit 1; fi
           timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-
           if ! ./gradlew :engine-host:connectedDebugAndroidTest :data-persistence:connectedDebugAndroidTest :app:connectedDebugAndroidTest; then
             echo "==== Android instrumentation XML reports ===="
             find engine-host/build data-persistence/build app/build -type f \( -name 'TEST-*.xml' -o -name '*.xml' \) -path '*androidTest-results*' -print -exec cat {} \; || true
