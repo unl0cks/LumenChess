@@ -40,7 +40,7 @@ jobs:
           rustup run 1.88.0 rustc --version
       - uses: gradle/actions/setup-gradle@v4
       - name: Run proportional JVM and engine-host checkpoint checks
-        run: ./gradlew :core-chess:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest
+        run: ./gradlew :core-chess:test :game-runtime:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest
       - name: Verify native engine ABIs and 16 KiB ELF alignment
         run: |
           readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
@@ -336,7 +336,7 @@ jobs:
           rustup run 1.88.0 rustc --version
       - uses: gradle/actions/setup-gradle@v4
       - name: Verify cumulative JVM, Android modules, lint, and assemblies
-        run: ./gradlew :core-chess:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+        run: ./gradlew :core-chess:test :game-runtime:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Verify native engine ABIs and 16 KiB ELF alignment
         run: |
           readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
