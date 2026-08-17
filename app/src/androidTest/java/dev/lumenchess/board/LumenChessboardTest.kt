@@ -130,11 +130,11 @@ class LumenChessboardTest {
             }
         }
         composeRule.onNodeWithTag("square-e2").assertIsDisplayed()
-        composeRule.onNodeWithTag("piece-e2-lumen-vector").fetchSemanticsNode()
+        composeRule.onNodeWithTag("piece-e2-lumen-vector", useUnmergedTree = true).fetchSemanticsNode()
         composeRule.onNodeWithTag("square-e2").performClick(); composeRule.onNodeWithTag("square-e4").performClick()
         composeRule.runOnIdle { selectedSet.value = LumenOutlinePieceSet }
         composeRule.onNodeWithTag("square-e2").assertIsDisplayed()
-        composeRule.onNodeWithTag("piece-e2-lumen-outline").fetchSemanticsNode()
+        composeRule.onNodeWithTag("piece-e2-lumen-outline", useUnmergedTree = true).fetchSemanticsNode()
         composeRule.onNodeWithTag("square-e2").performClick(); composeRule.onNodeWithTag("square-e4").performClick()
         composeRule.runOnIdle { assertEquals(listOf(Move.parseUci("e2e4"), Move.parseUci("e2e4")), emitted) }
     }
