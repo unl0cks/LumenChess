@@ -55,11 +55,48 @@ jobs:
           adb shell settings put global animator_duration_scale 0
       - name: Run cumulative app instrumentation
         run: ./gradlew :app:connectedDebugAndroidTest --stacktrace
-      - name: Upload emulator log on failure
+      - name: Surface instrumentation failure details
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import glob
+          import os
+          import xml.etree.ElementTree as ET
+
+          reports = glob.glob('app/build/outputs/androidTest-results/**/*.xml', recursive=True)
+          failures = 0
+          for report in reports:
+              try:
+                  root = ET.parse(report).getroot()
+              except (ET.ParseError, OSError) as error:
+                  print(f"::warning title=Unreadable instrumentation report::{report}: {error}")
+                  continue
+              for case in root.iter('testcase'):
+                  failure = case.find('failure')
+                  if failure is None:
+                      failure = case.find('error')
+                  if failure is None:
+                      continue
+                  failures += 1
+                  class_name = case.get('classname', 'unknown class')
+                  name = case.get('name', 'unknown test')
+                  detail = failure.get('message') or failure.text or 'Instrumentation test failed'
+                  detail = ' '.join(detail.split())[:3000]
+                  print(f"::error title=Instrumentation failure::{class_name}.{name}: {detail}")
+          if not reports:
+              print('::error title=Instrumentation diagnostics::No Android test XML reports were produced')
+          elif failures == 0:
+              print(f"::error title=Instrumentation diagnostics::{len(reports)} report(s) found but no failing testcase element was parsed")
+          PY
+      - name: Upload device diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: polish-app-device-diagnostics-${{ github.sha }}
-          path: ${{ runner.temp }}/polish-emulator.log
+          path: |
+            ${{ runner.temp }}/polish-emulator.log
+            app/build/outputs/androidTest-results/
+            app/build/reports/androidTests/
           if-no-files-found: warn
           retention-days: 7
