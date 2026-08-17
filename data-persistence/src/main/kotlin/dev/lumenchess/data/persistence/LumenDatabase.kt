@@ -49,4 +49,9 @@ object LumenDatabaseFactory {
         Room.inMemoryDatabaseBuilder(context.applicationContext, LumenDatabase::class.java)
             .setDriver(AndroidSQLiteDriver())
             .build()
+
+    /** Keeps the Room superclass implementation detail inside the persistence module boundary. */
+    fun close(database: LumenDatabase) {
+        database.close()
+    }
 }
