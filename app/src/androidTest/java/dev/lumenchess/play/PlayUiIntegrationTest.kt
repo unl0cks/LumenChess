@@ -73,7 +73,7 @@ class PlayUiIntegrationTest {
 
         val before = boardBounds()
         val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
-        val beforeRevision = requireNotNull(viewModel.currentCoordinatorForTest()).state.positionRevision
+        val beforeMoveCount = requireNotNull(viewModel.currentCoordinatorForTest()).state.gameTree.mainline().size
 
         composeRule.onNodeWithTag("square-e2").performClick()
         composeRule.onNodeWithTag("square-e4").performClick()
@@ -85,8 +85,8 @@ class PlayUiIntegrationTest {
         assertStableBounds(before, duringEngineThinking)
 
         composeRule.waitUntil(timeoutMillis = 12_000L) {
-            val revision = viewModel.currentCoordinatorForTest()?.state?.positionRevision ?: beforeRevision
-            revision >= beforeRevision + 2
+            val moveCount = viewModel.currentCoordinatorForTest()?.state?.gameTree?.mainline()?.size ?: beforeMoveCount
+            moveCount >= beforeMoveCount + 2
         }
         val afterEngineResult = boardBounds()
         assertStableBounds(before, afterEngineResult)
