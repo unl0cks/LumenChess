@@ -1,5 +1,6 @@
 package dev.lumenchess.settings
 
+import dev.lumenchess.feedback.GameFeedbackEvent
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
@@ -28,6 +29,11 @@ class AppearanceSettingsCodecTest {
                 AppearanceSettingsCodec.PRESET to "???",
                 AppearanceSettingsCodec.CUSTOM_LIGHT to "GGGGGGGG",
                 AppearanceSettingsCodec.CUSTOM_DARK to "FFFFFFFFF",
+                AppearanceSettingsCodec.FEEDBACK_SOUNDS_ENABLED to "perhaps",
+                AppearanceSettingsCodec.FEEDBACK_HAPTICS_ENABLED to "absolutely",
+                AppearanceSettingsCodec.FEEDBACK_SOUND_EVENTS to "MOVE,BOGUS",
+                AppearanceSettingsCodec.FEEDBACK_HAPTIC_EVENTS to "CAPTURE,NOPE",
+                AppearanceSettingsCodec.SOUND_PACK to "../../escape",
             ),
         )
 
@@ -51,5 +57,31 @@ class AppearanceSettingsCodecTest {
         assertEquals("FF010203", encoded[AppearanceSettingsCodec.CUSTOM_DARK])
         assertNull(decoded.presetId)
         assertEquals(customized, decoded)
+    }
+
+    @Test
+    fun `feedback controls and selected sound pack round trip deterministically`() {
+        val customized = AppearanceSettings(
+            feedbackSoundsEnabled = false,
+            feedbackHapticsEnabled = true,
+            feedbackSoundEvents = linkedSetOf(
+                GameFeedbackEvent.Move,
+                GameFeedbackEvent.Castle,
+                GameFeedbackEvent.GameEnd,
+            ),
+            feedbackHapticEvents = linkedSetOf(
+                GameFeedbackEvent.Capture,
+                GameFeedbackEvent.Check,
+            ),
+            soundPackId = "night-pack",
+        )
+
+        val encoded = AppearanceSettingsCodec.encode(customized)
+        val decoded = AppearanceSettingsCodec.decode(encoded)
+
+        assertEquals(customized, decoded)
+        assertEquals("MOVE,CASTLE,GAME_END", encoded[AppearanceSettingsCodec.FEEDBACK_SOUND_EVENTS])
+        assertEquals("CAPTURE,CHECK", encoded[AppearanceSettingsCodec.FEEDBACK_HAPTIC_EVENTS])
+        assertEquals("night-pack", encoded[AppearanceSettingsCodec.SOUND_PACK])
     }
 }
