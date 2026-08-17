@@ -15,6 +15,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.lumenchess.customization.BackgroundCatalog
 import dev.lumenchess.settings.AppAppearance
 import dev.lumenchess.settings.AppearanceSettings
 
@@ -120,12 +121,17 @@ fun LumenTheme(
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
-    val base = when (settings.appearance) {
+    val appearanceBase = when (settings.appearance) {
         AppAppearance.SYSTEM -> if (systemDark) DarkPalette else LightPalette
         AppAppearance.DARK -> DarkPalette
         AppAppearance.OLED_DARK -> OledPalette
         AppAppearance.LIGHT -> LightPalette
     }
+    val background = BackgroundCatalog.definition(settings.backgroundId)
+    val base = appearanceBase.copy(
+        backgroundLift = if (appearanceBase.isLight) background.lightTop else background.darkTop,
+        background = if (appearanceBase.isLight) background.lightBottom else background.darkBottom,
+    )
     val accent = Color(settings.accentArgb.toInt())
     val palette = base.copy(
         accentBlue = accent,

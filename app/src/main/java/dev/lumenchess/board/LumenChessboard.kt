@@ -51,9 +51,12 @@ fun LumenChessboard(
     input: ChessboardInput = ChessboardInput(),
     highlights: ChessboardHighlights = ChessboardHighlights(),
     arrows: List<ChessboardArrow> = emptyList(),
-    palette: ChessboardPalette = ChessboardPalette.default(),
-    pieceSet: PieceSet = LumenVectorPieceSet,
+    palette: ChessboardPalette? = null,
+    pieceSet: PieceSet? = null,
 ) {
+    val presentation = LocalChessboardPresentationStyle.current
+    val resolvedPalette = palette ?: presentation.palette
+    val resolvedPieceSet = pieceSet ?: presentation.pieceSet
     val legalMoves = remember(position) { MoveGenerator.legalMoves(position) }
     var selectedSquare by remember(position) { mutableStateOf<Square?>(null) }
     var pendingPromotion by remember(position) { mutableStateOf<List<Move>>(emptyList()) }
@@ -110,19 +113,31 @@ fun LumenChessboard(
                     dragPosition = offset
                     if (dragFrom != null) selectedSquare = dragFrom
                 },
-                onDrag = { change, _ -> dragPosition = change.position; change.consume() },
+                onDrag = { change, _ ->
+                    dragPosition = change.position
+                    change.consume()
+                },
                 onDragEnd = {
                     val from = dragFrom
                     val target = dragPosition?.let { squareFromOffset(it, size, orientation) }
                     if (from != null && target != null) {
                         if (!submitInput(from, target)) selectedSquare = null
-                    } else selectedSquare = null
-                    dragFrom = null; dragPosition = null
+                    } else {
+                        selectedSquare = null
+                    }
+                    dragFrom = null
+                    dragPosition = null
                 },
-                onDragCancel = { selectedSquare = null; dragFrom = null; dragPosition = null },
+                onDragCancel = {
+                    selectedSquare = null
+                    dragFrom = null
+                    dragPosition = null
+                },
             )
         }
-    } else Modifier
+    } else {
+        Modifier
+    }
 
     Box(modifier = modifier.aspectRatio(1f).testTag(CHESSBOARD_TEST_TAG).then(dragModifier)) {
         Column(Modifier.fillMaxSize()) {
@@ -134,31 +149,52 @@ fun LumenChessboard(
                         val selected = selectedSquare
                         val candidates = if (selected != null && highlights.showLegalMoves) {
                             ChessboardMoveResolver.candidates(position, legalMoves, selected, square)
-                        } else emptyList()
+                        } else {
+                            emptyList()
+                        }
                         val legalTarget = candidates.isNotEmpty()
                         val captureTarget = candidates.any { ChessboardMoveResolver.isCapture(position, it) }
                         val lastMove = highlights.lastMove
                         ChessboardSquare(
-                            modifier = Modifier.weight(1f).fillMaxHeight(), square = square, piece = piece,
-                            dark = (square.file + square.rank) % 2 == 0, selected = square == selectedSquare,
-                            legalTarget = legalTarget, captureTarget = captureTarget,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            square = square,
+                            piece = piece,
+                            dark = (square.file + square.rank) % 2 == 0,
+                            selected = square == selectedSquare,
+                            legalTarget = legalTarget,
+                            captureTarget = captureTarget,
                             lastMove = lastMove != null && (square == lastMove.from || square == lastMove.to),
-                            check = square == checkSquare, premove = square in highlights.premoveSquares,
+                            check = square == checkSquare,
+                            premove = square in highlights.premoveSquares,
                             extraHighlight = square in highlights.extraSquares,
-                            tapEnabled = input.tapEnabled && pendingPromotion.isEmpty(), palette = palette,
-                            pieceSet = pieceSet, onClick = { handleTap(square) },
+                            tapEnabled = input.tapEnabled && pendingPromotion.isEmpty(),
+                            palette = resolvedPalette,
+                            pieceSet = resolvedPieceSet,
+                            onClick = { handleTap(square) },
                         )
                     }
                 }
             }
         }
         if (arrows.isNotEmpty()) {
-            ChessboardArrows(arrows, orientation, palette, Modifier.fillMaxSize().testTag(CHESSBOARD_ARROWS_TEST_TAG))
+            ChessboardArrows(
+                arrows = arrows,
+                orientation = orientation,
+                palette = resolvedPalette,
+                modifier = Modifier.fillMaxSize().testTag(CHESSBOARD_ARROWS_TEST_TAG),
+            )
         }
         if (pendingPromotion.isNotEmpty()) {
             PromotionPicker(
-                moves = pendingPromotion, color = position.sideToMove, palette = palette, pieceSet = pieceSet,
-                onChoose = { move -> pendingPromotion = emptyList(); selectedSquare = null; onMove(move) },
+                moves = pendingPromotion,
+                color = position.sideToMove,
+                palette = resolvedPalette,
+                pieceSet = resolvedPieceSet,
+                onChoose = { move ->
+                    pendingPromotion = emptyList()
+                    selectedSquare = null
+                    onMove(move)
+                },
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -167,18 +203,32 @@ fun LumenChessboard(
 
 @Composable
 private fun ChessboardSquare(
-    square: Square, piece: Piece?, dark: Boolean, selected: Boolean, legalTarget: Boolean,
-    captureTarget: Boolean, lastMove: Boolean, check: Boolean, premove: Boolean,
-    extraHighlight: Boolean, tapEnabled: Boolean, palette: ChessboardPalette, pieceSet: PieceSet,
-    onClick: () -> Unit, modifier: Modifier = Modifier,
+    square: Square,
+    piece: Piece?,
+    dark: Boolean,
+    selected: Boolean,
+    legalTarget: Boolean,
+    captureTarget: Boolean,
+    lastMove: Boolean,
+    check: Boolean,
+    premove: Boolean,
+    extraHighlight: Boolean,
+    tapEnabled: Boolean,
+    palette: ChessboardPalette,
+    pieceSet: PieceSet,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val states = buildList {
         if (selected) add("selected")
         if (captureTarget) add("capture") else if (legalTarget) add("legal move")
-        if (lastMove) add("last move"); if (check) add("check"); if (premove) add("premove")
+        if (lastMove) add("last move")
+        if (check) add("check")
+        if (premove) add("premove")
         if (extraHighlight) add("highlighted")
     }
-    var squareModifier = modifier.testTag("square-${square.algebraic}")
+    var squareModifier = modifier
+        .testTag("square-${square.algebraic}")
         .background(if (dark) palette.darkSquare else palette.lightSquare)
         .semantics {
             contentDescription = squareDescription(square, piece)
@@ -213,7 +263,9 @@ private fun HighlightOverlay(color: androidx.compose.ui.graphics.Color) {
 
 @Composable
 private fun ChessboardArrows(
-    arrows: List<ChessboardArrow>, orientation: ChessboardOrientation, palette: ChessboardPalette,
+    arrows: List<ChessboardArrow>,
+    orientation: ChessboardOrientation,
+    palette: ChessboardPalette,
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier) {
@@ -222,11 +274,14 @@ private fun ChessboardArrows(
         arrows.forEach { arrow ->
             val start = squareCenter(arrow.from, size.width, orientation)
             val end = squareCenter(arrow.to, size.width, orientation)
-            val dx = end.x - start.x; val dy = end.y - start.y
+            val dx = end.x - start.x
+            val dy = end.y - start.y
             val length = sqrt(dx * dx + dy * dy)
             if (length <= 0f) return@forEach
-            val ux = dx / length; val uy = dy / length
-            val headLength = cell * 0.38f; val headWidth = cell * 0.22f
+            val ux = dx / length
+            val uy = dy / length
+            val headLength = cell * 0.38f
+            val headWidth = cell * 0.22f
             val lineEnd = Offset(end.x - ux * headLength * 0.55f, end.y - uy * headLength * 0.55f)
             val color = when (arrow.style) {
                 ChessboardArrowStyle.PRIMARY -> palette.primaryArrow
@@ -235,7 +290,8 @@ private fun ChessboardArrows(
             }
             drawLine(color, start, lineEnd, stroke, StrokeCap.Round)
             val base = Offset(end.x - ux * headLength, end.y - uy * headLength)
-            val perpendicularX = -uy; val perpendicularY = ux
+            val perpendicularX = -uy
+            val perpendicularY = ux
             val path = Path().apply {
                 moveTo(end.x, end.y)
                 lineTo(base.x + perpendicularX * headWidth, base.y + perpendicularY * headWidth)
@@ -249,8 +305,12 @@ private fun ChessboardArrows(
 
 @Composable
 private fun PromotionPicker(
-    moves: List<Move>, color: Color, palette: ChessboardPalette, pieceSet: PieceSet,
-    onChoose: (Move) -> Unit, modifier: Modifier = Modifier,
+    moves: List<Move>,
+    color: Color,
+    palette: ChessboardPalette,
+    pieceSet: PieceSet,
+    onChoose: (Move) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val orderedTypes = listOf(PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT)
     Surface(modifier = modifier, shape = RoundedCornerShape(12.dp), tonalElevation = 8.dp, shadowElevation = 8.dp) {
@@ -259,7 +319,9 @@ private fun PromotionPicker(
                 val move = moves.firstOrNull { it.promotion == type } ?: return@forEach
                 val label = type.name.lowercase()
                 Box(
-                    modifier = Modifier.size(56.dp).testTag("promotion-choice-$label")
+                    modifier = Modifier
+                        .size(56.dp)
+                        .testTag("promotion-choice-$label")
                         .semantics { contentDescription = "Promote to ${type.displayName()}" }
                         .clickable { onChoose(move) },
                     contentAlignment = Alignment.Center,
@@ -292,8 +354,14 @@ private fun squareCenter(square: Square, boardWidth: Float, orientation: Chessbo
     val visualColumn: Int
     val visualRow: Int
     when (orientation) {
-        ChessboardOrientation.WHITE -> { visualColumn = square.file; visualRow = 7 - square.rank }
-        ChessboardOrientation.BLACK -> { visualColumn = 7 - square.file; visualRow = square.rank }
+        ChessboardOrientation.WHITE -> {
+            visualColumn = square.file
+            visualRow = 7 - square.rank
+        }
+        ChessboardOrientation.BLACK -> {
+            visualColumn = 7 - square.file
+            visualRow = square.rank
+        }
     }
     return Offset((visualColumn + 0.5f) * cell, (visualRow + 0.5f) * cell)
 }
