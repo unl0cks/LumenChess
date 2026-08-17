@@ -9,6 +9,8 @@ import android.os.Looper
 import android.os.ResultReceiver
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.lumenchess.core.chess.Variant
+import dev.lumenchess.engine.api.EngineStrengthCapability
 import dev.lumenchess.engine.host.testing.EngineHostProbeActivity
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -50,6 +52,19 @@ class EngineHostIsolationTest {
     fun closeReleasesSessionAndFullUnbindCanRebindFreshHost() {
         val details = runTargetProcessScenario(EngineHostProbeActivity.SCENARIO_TEARDOWN_REBIND)
         assertTrue(details.contains("unbind/rebind succeeded"))
+    }
+
+    @Test
+    fun stockfish18CapabilitiesMatchPinnedRelease() {
+        val capabilities = Stockfish18Engine.capabilities
+        assertEquals(setOf(Variant.STANDARD, Variant.CHESS960), capabilities.variants)
+        assertEquals(256, capabilities.multiPv?.maxLines)
+        assertTrue(capabilities.supportsPonder)
+        val strength = capabilities.strength as EngineStrengthCapability.EloRange
+        assertEquals(1320, strength.minElo)
+        assertEquals(3190, strength.maxElo)
+        assertEquals("sf_18", Stockfish18Engine.SOURCE_TAG)
+        assertEquals("cb3d4ee9b47d0c5aae855b12379378ea1439675c", Stockfish18Engine.SOURCE_COMMIT)
     }
 
     @Test

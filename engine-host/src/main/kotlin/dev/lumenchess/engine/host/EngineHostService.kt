@@ -113,14 +113,17 @@ abstract class EngineHostService : Service() {
     private fun requireSession(sessionId: String): HostSession =
         sessions[sessionId] ?: throw IllegalStateException("Unknown engine session '$sessionId'")
 
-    private fun createBackend(engineId: String): UciBackend {
+    private fun createBackend(engineId: String): UciBackend = when (engineId) {
+        Stockfish18Engine.ID -> Stockfish18UciBackend()
+        "mock" -> debugMock(MockMode.NORMAL)
+        "mock-malformed" -> debugMock(MockMode.MALFORMED)
+        "mock-crash" -> debugMock(MockMode.CRASH)
+        else -> throw IllegalArgumentException("Unknown engine backend '$engineId'")
+    }
+
+    private fun debugMock(mode: MockMode): UciBackend {
         check(BuildConfig.DEBUG) { "M12 mock backends are available only in debug builds" }
-        return when (engineId) {
-            "mock" -> MockUciBackend(MockMode.NORMAL)
-            "mock-malformed" -> MockUciBackend(MockMode.MALFORMED)
-            "mock-crash" -> MockUciBackend(MockMode.CRASH)
-            else -> throw IllegalArgumentException("Unknown M12 engine backend '$engineId'")
-        }
+        return MockUciBackend(mode)
     }
 }
 
@@ -288,7 +291,7 @@ private class HostSession(
     }
 }
 
-private interface UciBackend : AutoCloseable {
+internal interface UciBackend : AutoCloseable {
     interface Listener {
         fun onLine(line: String)
         fun onFailure(error: Throwable)
