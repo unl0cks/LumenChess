@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.rememberScrollState
@@ -42,6 +44,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -71,6 +74,7 @@ const val PLAY_START_TEST_TAG = "play-start"
 const val PLAY_RESUME_TEST_TAG = "play-resume"
 const val PLAY_ENGINE_STATUS_TEST_TAG = "play-engine-status"
 const val PLAY_PREMOVE_OVERLAY_TEST_TAG = "play-premove-overlay"
+const val PLAY_BOARD_STAGE_TEST_TAG = "play-board-stage"
 
 @Composable
 fun PlayRoute(
@@ -300,7 +304,12 @@ private fun PlayLiveScreen(
                 .weight(1f),
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .testTag(PLAY_BOARD_STAGE_TEST_TAG),
+            ) {
                 LumenChessboard(
                     position = runtime.position,
                     onMove = viewModel::onBoardMove,
@@ -313,7 +322,7 @@ private fun PlayLiveScreen(
                         lastMove = lastMove,
                         premoveSquares = queuedPremove?.let { setOf(it.from, it.to) }.orEmpty(),
                     ),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.matchParentSize(),
                 )
                 if (premoveEnabled) {
                     PremoveInputOverlay(
@@ -321,7 +330,7 @@ private fun PlayLiveScreen(
                         humanSide = humanSide,
                         orientation = orientation,
                         onPremove = viewModel::queuePremove,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.matchParentSize(),
                     )
                 }
             }
@@ -411,6 +420,8 @@ private fun PlayerCard(
                     detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Text(
