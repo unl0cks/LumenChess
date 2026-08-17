@@ -7,6 +7,7 @@ import android.os.SystemClock
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.Variant
@@ -14,11 +15,19 @@ import dev.lumenchess.engine.api.EngineSearchResult
 import dev.lumenchess.engine.api.EngineStrengthModel
 import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.engine.host.transport.EngineHostFailure
+import dev.lumenchess.feedback.AndroidGameFeedbackOutput
+import dev.lumenchess.feedback.CommittedFeedbackObserver
+import dev.lumenchess.feedback.GameFeedbackDispatcher
 import dev.lumenchess.runtime.RuntimeState
 import dev.lumenchess.runtime.RuntimeTerminal
 import dev.lumenchess.runtime.clock.ClockReading
 import dev.lumenchess.runtime.clock.DeterministicGameClock
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
+import dev.lumenchess.settings.AppearanceSettings
+import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
+import dev.lumenchess.settings.toFeedbackSettings
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 private const val CLOCK_REFRESH_MILLIS = 100L
 
@@ -43,12 +52,17 @@ data class PlayUiState(
  */
 class PlayViewModel(application: Application) : AndroidViewModel(application) {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val feedbackHandler = Handler(Looper.getMainLooper())
     private val timeSource = MonotonicTimeSource { SystemClock.elapsedRealtime() }
     private val clockReader = DeterministicGameClock(timeSource)
     private val mutableUiState = mutableStateOf(PlayUiState())
+    private val feedbackOutput = AndroidGameFeedbackOutput(application)
+    private val feedbackObserver = CommittedFeedbackObserver(GameFeedbackDispatcher(feedbackOutput))
+    private val feedbackSettingsRepository = DataStoreAppearanceSettingsRepository.from(application)
 
     val uiState: State<PlayUiState> = mutableUiState
 
+    private var feedbackPreferences = AppearanceSettings()
     private var coordinator: PlayRuntimeCoordinator? = null
     private var engineGateway: AndroidPlayEngineGateway? = null
     private var persistenceGateway: AndroidPlayPersistenceGateway? = null
@@ -65,6 +79,12 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        viewModelScope.launch {
+            feedbackSettingsRepository.settings.collectLatest { settings ->
+                feedbackPreferences = settings
+                feedbackOutput.updateSoundPackId(settings.soundPackId)
+            }
+        }
         loadRestorableGame()
     }
 
@@ -173,10 +193,12 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         mainHandler.removeCallbacks(clockTicker)
+        feedbackHandler.removeCallbacksAndMessages(null)
         stopLiveAdapters()
         restoreProbe?.setListener(null)
         restoreProbe?.close()
         restoreProbe = null
+        feedbackOutput.close()
         super.onCleared()
     }
 
@@ -209,6 +231,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
+        feedbackObserver.resetBaseline(runtimeCoordinator.state)
         coordinator = runtimeCoordinator
         engineGateway = engine
         persistenceGateway = persistence
@@ -287,7 +310,14 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             state = current.state
             reading = clockReader.read(state.clock)
         }
+
+        // Commit presentation state first. Feedback observes this committed projection afterwards.
         mutableUiState.value = mutableUiState.value.copy(runtime = state, clock = reading)
+        val feedbackState = state
+        val settings = feedbackPreferences.toFeedbackSettings()
+        feedbackHandler.post {
+            feedbackObserver.onCommitted(feedbackState, settings)
+        }
     }
 
     private fun updateSetup(transform: PlaySetupConfig.() -> PlaySetupConfig) {
@@ -325,6 +355,8 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun stopLiveAdapters() {
         mainHandler.removeCallbacks(clockTicker)
+        feedbackHandler.removeCallbacksAndMessages(null)
+        feedbackObserver.resetBaseline(null)
         engineGateway?.setListener(null)
         persistenceGateway?.setListener(null)
         engineGateway?.close()
