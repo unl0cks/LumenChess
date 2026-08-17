@@ -53,108 +53,159 @@ private fun DrawScope.drawLumenPiece(
     fun y(value: Float) = oy + scale * value
     fun point(px: Float, py: Float) = Offset(x(px), y(py))
 
-    val edge = if (side == ChessColor.WHITE) Color(0xFF607184) else Color(0xFF607892)
-    val shine = if (side == ChessColor.WHITE) Color.White.copy(alpha = 0.72f) else Color(0xFF9AB0C8).copy(alpha = 0.52f)
-    val strokeWidth = scale * if (outlined) 0.052f else 0.034f
-    val fill = if (outlined) tint.copy(alpha = 0.13f) else tint
+    val white = side == ChessColor.WHITE
+    val body = if (white) Color(0xFFF0EBDD) else Color(0xFF202224)
+    val edge = if (white) Color(0xFF41484B) else Color(0xFF0A0B0C)
+    val highlight = if (white) Color(0xFFFFFFFF).copy(alpha = .68f) else Color(0xFF8FA4AA).copy(alpha = .42f)
+    val resolvedBody = if (outlined) tint.copy(alpha = .08f) else body
+    val resolvedEdge = if (outlined) tint.copy(alpha = .92f) else edge
+    val stroke = scale * if (outlined) .044f else .024f
 
-    fun styledPath(path: Path) {
-        drawPath(path = path, color = fill)
-        drawPath(path = path, color = if (outlined) edge else edge.copy(alpha = 0.72f), style = Stroke(strokeWidth))
+    fun styled(path: Path) {
+        drawPath(path, resolvedBody)
+        drawPath(path, resolvedEdge, style = Stroke(stroke))
     }
-    fun styledCircle(cx: Float, cy: Float, radius: Float) {
-        drawCircle(color = fill, radius = scale * radius, center = point(cx, cy))
-        drawCircle(color = if (outlined) edge else edge.copy(alpha = 0.72f), radius = scale * radius, center = point(cx, cy), style = Stroke(strokeWidth))
+    fun circle(cx: Float, cy: Float, radius: Float) {
+        drawCircle(resolvedBody, scale * radius, point(cx, cy))
+        drawCircle(resolvedEdge, scale * radius, point(cx, cy), style = Stroke(stroke))
     }
-    fun base(top: Float = 0.72f) {
-        val basePath = Path().apply {
-            moveTo(x(0.22f), y(top))
-            quadraticBezierTo(x(0.18f), y(top + 0.03f), x(0.20f), y(top + 0.08f))
-            lineTo(x(0.80f), y(top + 0.08f))
-            quadraticBezierTo(x(0.82f), y(top + 0.03f), x(0.78f), y(top))
+    fun ellipseLike(cx: Float, top: Float, halfWidth: Float, height: Float) {
+        val path = Path().apply {
+            moveTo(x(cx - halfWidth), y(top + height * .52f))
+            quadraticBezierTo(x(cx - halfWidth), y(top), x(cx), y(top))
+            quadraticBezierTo(x(cx + halfWidth), y(top), x(cx + halfWidth), y(top + height * .52f))
+            quadraticBezierTo(x(cx + halfWidth * .9f), y(top + height), x(cx), y(top + height))
+            quadraticBezierTo(x(cx - halfWidth * .9f), y(top + height), x(cx - halfWidth), y(top + height * .52f))
             close()
         }
-        styledPath(basePath)
-        drawLine(shine, point(0.29f, top + 0.025f), point(0.59f, top + 0.025f), scale * 0.018f)
+        styled(path)
     }
-    fun torso(shoulderY: Float = 0.48f, waistY: Float = 0.69f) {
-        val body = Path().apply {
-            moveTo(x(0.38f), y(shoulderY))
-            quadraticBezierTo(x(0.50f), y(shoulderY - 0.045f), x(0.62f), y(shoulderY))
-            lineTo(x(0.69f), y(waistY))
-            lineTo(x(0.31f), y(waistY))
+    fun base(top: Float = .75f, left: Float = .16f, right: Float = .84f) {
+        val upper = Path().apply {
+            moveTo(x(left + .08f), y(top))
+            quadraticBezierTo(x(.50f), y(top - .035f), x(right - .08f), y(top))
+            lineTo(x(right - .02f), y(top + .075f))
+            lineTo(x(left + .02f), y(top + .075f))
             close()
         }
-        styledPath(body)
-        drawLine(shine, point(0.41f, shoulderY + 0.04f), point(0.37f, waistY - 0.035f), scale * 0.018f)
+        styled(upper)
+        val foot = Path().apply {
+            moveTo(x(left), y(top + .08f))
+            quadraticBezierTo(x(.50f), y(top + .045f), x(right), y(top + .08f))
+            lineTo(x(right - .025f), y(.91f))
+            quadraticBezierTo(x(.50f), y(.935f), x(left + .025f), y(.91f))
+            close()
+        }
+        styled(foot)
+        drawLine(highlight, point(left + .11f, top + .105f), point(.58f, top + .082f), scale * .014f)
+    }
+    fun stem(top: Float, shoulder: Float = .31f, waist: Float = .70f) {
+        val path = Path().apply {
+            moveTo(x(.50f - shoulder / 2f), y(top))
+            quadraticBezierTo(x(.50f), y(top - .035f), x(.50f + shoulder / 2f), y(top))
+            lineTo(x(.65f), y(waist))
+            quadraticBezierTo(x(.50f), y(waist + .025f), x(.35f), y(waist))
+            close()
+        }
+        styled(path)
+        drawLine(highlight, point(.405f, top + .06f), point(.37f, waist - .035f), scale * .013f)
     }
 
     when (type) {
         PieceType.PAWN -> {
-            styledCircle(0.50f, 0.29f, 0.105f)
-            torso(0.44f, 0.69f)
-            base()
+            circle(.50f, .245f, .115f)
+            val collar = Path().apply {
+                moveTo(x(.36f), y(.36f)); quadraticBezierTo(x(.50f), y(.33f), x(.64f), y(.36f))
+                lineTo(x(.62f), y(.43f)); lineTo(x(.38f), y(.43f)); close()
+            }
+            styled(collar)
+            stem(.42f, .25f, .70f)
+            base(.70f, .20f, .80f)
         }
+
         PieceType.ROOK -> {
             val crown = Path().apply {
-                moveTo(x(0.25f), y(0.24f)); lineTo(x(0.25f), y(0.40f))
-                lineTo(x(0.31f), y(0.44f)); lineTo(x(0.69f), y(0.44f)); lineTo(x(0.75f), y(0.40f))
-                lineTo(x(0.75f), y(0.24f)); lineTo(x(0.65f), y(0.24f)); lineTo(x(0.65f), y(0.33f))
-                lineTo(x(0.56f), y(0.33f)); lineTo(x(0.56f), y(0.24f)); lineTo(x(0.44f), y(0.24f))
-                lineTo(x(0.44f), y(0.33f)); lineTo(x(0.35f), y(0.33f)); lineTo(x(0.35f), y(0.24f)); close()
+                moveTo(x(.19f), y(.15f)); lineTo(x(.31f), y(.15f)); lineTo(x(.31f), y(.25f))
+                lineTo(x(.43f), y(.25f)); lineTo(x(.43f), y(.15f)); lineTo(x(.57f), y(.15f))
+                lineTo(x(.57f), y(.25f)); lineTo(x(.69f), y(.25f)); lineTo(x(.69f), y(.15f))
+                lineTo(x(.81f), y(.15f)); lineTo(x(.79f), y(.39f));
+                quadraticBezierTo(x(.50f), y(.44f), x(.21f), y(.39f)); close()
             }
-            styledPath(crown)
-            val body = Path().apply {
-                moveTo(x(0.32f), y(0.45f)); lineTo(x(0.68f), y(0.45f)); lineTo(x(0.64f), y(0.69f)); lineTo(x(0.36f), y(0.69f)); close()
+            styled(crown)
+            val bodyPath = Path().apply {
+                moveTo(x(.29f), y(.40f)); lineTo(x(.71f), y(.40f)); lineTo(x(.66f), y(.73f));
+                quadraticBezierTo(x(.50f), y(.75f), x(.34f), y(.73f)); close()
             }
-            styledPath(body); base()
+            styled(bodyPath)
+            drawLine(highlight, point(.34f,.46f), point(.31f,.68f), scale*.014f)
+            base(.72f, .14f, .86f)
         }
+
         PieceType.KNIGHT -> {
             val horse = Path().apply {
-                moveTo(x(0.28f), y(0.69f))
-                quadraticBezierTo(x(0.34f), y(0.58f), x(0.34f), y(0.48f))
-                quadraticBezierTo(x(0.31f), y(0.39f), x(0.40f), y(0.31f))
-                lineTo(x(0.53f), y(0.20f)); lineTo(x(0.69f), y(0.31f)); lineTo(x(0.62f), y(0.39f))
-                quadraticBezierTo(x(0.75f), y(0.48f), x(0.66f), y(0.60f))
-                lineTo(x(0.72f), y(0.69f)); close()
+                moveTo(x(.22f), y(.75f))
+                quadraticBezierTo(x(.29f), y(.62f), x(.34f), y(.53f))
+                quadraticBezierTo(x(.28f), y(.43f), x(.35f), y(.31f))
+                lineTo(x(.48f), y(.10f)); lineTo(x(.56f), y(.23f)); lineTo(x(.69f), y(.18f))
+                quadraticBezierTo(x(.83f), y(.29f), x(.72f), y(.41f))
+                lineTo(x(.61f), y(.49f))
+                quadraticBezierTo(x(.70f), y(.61f), x(.75f), y(.75f))
+                close()
             }
-            styledPath(horse)
-            drawCircle(shine, scale * 0.025f, point(0.55f, 0.32f))
-            drawLine(shine, point(0.42f, 0.38f), point(0.57f, 0.45f), scale * 0.018f)
-            base()
+            styled(horse)
+            drawCircle(highlight, scale*.022f, point(.58f,.31f))
+            val mane = Path().apply {
+                moveTo(x(.36f), y(.31f)); lineTo(x(.29f), y(.45f)); lineTo(x(.38f), y(.43f));
+                lineTo(x(.32f), y(.55f)); lineTo(x(.43f), y(.49f));
+            }
+            drawPath(mane, resolvedEdge, style = Stroke(scale*.018f))
+            base(.73f, .14f, .86f)
         }
+
         PieceType.BISHOP -> {
-            val mitre = Path().apply {
-                moveTo(x(0.50f), y(0.18f))
-                quadraticBezierTo(x(0.33f), y(0.31f), x(0.39f), y(0.43f))
-                quadraticBezierTo(x(0.43f), y(0.50f), x(0.50f), y(0.51f))
-                quadraticBezierTo(x(0.57f), y(0.50f), x(0.61f), y(0.43f))
-                quadraticBezierTo(x(0.67f), y(0.31f), x(0.50f), y(0.18f)); close()
+            val head = Path().apply {
+                moveTo(x(.50f), y(.09f))
+                quadraticBezierTo(x(.28f), y(.27f), x(.37f), y(.43f))
+                quadraticBezierTo(x(.41f), y(.51f), x(.50f), y(.53f))
+                quadraticBezierTo(x(.59f), y(.51f), x(.63f), y(.43f))
+                quadraticBezierTo(x(.72f), y(.27f), x(.50f), y(.09f)); close()
             }
-            styledPath(mitre)
-            drawLine(edge, point(0.57f, 0.25f), point(0.43f, 0.42f), scale * 0.035f)
-            torso(0.49f, 0.69f); base()
+            styled(head)
+            drawLine(resolvedEdge, point(.60f,.20f), point(.42f,.43f), scale*.032f)
+            stem(.50f, .34f, .73f)
+            base(.72f, .15f, .85f)
         }
+
         PieceType.QUEEN -> {
             val crown = Path().apply {
-                moveTo(x(0.24f), y(0.43f)); lineTo(x(0.22f), y(0.24f)); lineTo(x(0.38f), y(0.37f))
-                lineTo(x(0.50f), y(0.18f)); lineTo(x(0.62f), y(0.37f)); lineTo(x(0.78f), y(0.24f))
-                lineTo(x(0.76f), y(0.43f)); quadraticBezierTo(x(0.50f), y(0.52f), x(0.24f), y(0.43f)); close()
+                moveTo(x(.20f), y(.38f)); lineTo(x(.16f), y(.17f)); lineTo(x(.34f), y(.31f))
+                lineTo(x(.50f), y(.10f)); lineTo(x(.66f), y(.31f)); lineTo(x(.84f), y(.17f))
+                lineTo(x(.80f), y(.38f)); quadraticBezierTo(x(.50f), y(.47f), x(.20f), y(.38f)); close()
             }
-            styledPath(crown)
-            styledCircle(0.22f, 0.22f, 0.035f); styledCircle(0.50f, 0.16f, 0.035f); styledCircle(0.78f, 0.22f, 0.035f)
-            torso(0.48f, 0.69f); base()
+            styled(crown)
+            circle(.16f,.15f,.032f); circle(.50f,.08f,.035f); circle(.84f,.15f,.032f)
+            val collar = Path().apply {
+                moveTo(x(.28f),y(.40f)); quadraticBezierTo(x(.50f),y(.46f),x(.72f),y(.40f))
+                lineTo(x(.68f),y(.48f)); lineTo(x(.32f),y(.48f)); close()
+            }
+            styled(collar)
+            stem(.47f, .37f, .74f)
+            base(.73f, .13f, .87f)
         }
+
         PieceType.KING -> {
-            drawLine(edge, point(0.50f, 0.13f), point(0.50f, 0.31f), scale * 0.09f)
-            drawLine(tint, point(0.50f, 0.13f), point(0.50f, 0.31f), scale * 0.052f)
-            drawLine(edge, point(0.41f, 0.20f), point(0.59f, 0.20f), scale * 0.09f)
-            drawLine(tint, point(0.41f, 0.20f), point(0.59f, 0.20f), scale * 0.052f)
+            val crossStroke = scale * .075f
+            drawLine(resolvedEdge, point(.50f,.055f), point(.50f,.255f), crossStroke)
+            drawLine(body, point(.50f,.06f), point(.50f,.25f), scale*.046f)
+            drawLine(resolvedEdge, point(.39f,.145f), point(.61f,.145f), crossStroke)
+            drawLine(body, point(.395f,.145f), point(.605f,.145f), scale*.046f)
             val crown = Path().apply {
-                moveTo(x(0.32f), y(0.37f)); quadraticBezierTo(x(0.50f), y(0.28f), x(0.68f), y(0.37f))
-                lineTo(x(0.63f), y(0.49f)); lineTo(x(0.37f), y(0.49f)); close()
+                moveTo(x(.28f),y(.33f)); quadraticBezierTo(x(.50f),y(.23f),x(.72f),y(.33f))
+                lineTo(x(.66f),y(.47f)); quadraticBezierTo(x(.50f),y(.50f),x(.34f),y(.47f)); close()
             }
-            styledPath(crown); torso(0.48f, 0.69f); base()
+            styled(crown)
+            stem(.46f, .38f, .74f)
+            base(.73f, .12f, .88f)
         }
     }
 }
