@@ -60,6 +60,7 @@ data class EngineSearchRequest(
     val position: Position,
     val limits: EngineSearchLimits,
     val multiPv: Int = 1,
+    val strength: EngineStrengthSettings = EngineStrengthSettings.fullStrength(),
 ) {
     init { require(multiPv > 0) { "Requested MultiPV line count must be positive" } }
 }
