@@ -47,7 +47,7 @@ class GameFeedbackDispatcherTest {
             FeedbackSettings(soundsEnabled = false, hapticsEnabled = true),
         )
 
-        assertEquals(emptyList(), output.sounds)
+        assertEquals(emptyList<GameFeedbackEvent>(), output.sounds)
         assertEquals(listOf(GameFeedbackEvent.Move), output.haptics)
     }
 
@@ -80,7 +80,7 @@ class GameFeedbackDispatcherTest {
         val output = RecordingOutput()
         GameFeedbackDispatcher(output).dispatch(emptyList(), FeedbackSettings())
 
-        assertEquals(emptyList(), output.sounds)
-        assertEquals(emptyList(), output.haptics)
+        assertEquals(emptyList<GameFeedbackEvent>(), output.sounds)
+        assertEquals(emptyList<GameFeedbackEvent>(), output.haptics)
     }
 }
