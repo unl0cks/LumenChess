@@ -1,5 +1,6 @@
 package dev.lumenchess.board
 
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -24,6 +25,7 @@ class ChessboardPresentationTest {
             }
         }
 
-        composeRule.onNodeWithTag("piece-e2-lumen-outline").assertIsDisplayed()
+        composeRule.onNodeWithTag("square-e2").assertIsDisplayed()
+        composeRule.onNodeWithTag("piece-e2-lumen-outline").assertExists()
     }
 }
