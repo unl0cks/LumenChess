@@ -28,6 +28,7 @@ data class PlayUiState(
     val mode: PlayScreenMode = PlayScreenMode.SETUP,
     val setup: PlaySetupConfig = PlaySetupConfig(),
     val setupValidation: PlaySetupValidation = PlaySetupValidation.Valid,
+    val resolvedSetup: ResolvedPlaySetup? = null,
     val restorableGame: RestoredPlayGame? = null,
     val runtime: RuntimeState? = null,
     val clock: ClockReading? = null,
@@ -84,8 +85,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     fun startNewGame() {
         val config = mutableUiState.value.setup
         if (PlaySetupValidator.validate(config) !is PlaySetupValidation.Valid) return
-        val resolved = PlaySetupResolver.resolve(config)
-        startResolvedGame(resolved, restored = null)
+        startResolvedGame(PlaySetupResolver.resolve(config), restored = null)
     }
 
     fun resumeLastGame() {
@@ -97,6 +97,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
         stopLiveAdapters()
         mutableUiState.value = mutableUiState.value.copy(
             mode = PlayScreenMode.SETUP,
+            resolvedSetup = null,
             runtime = null,
             clock = null,
             engineStatus = "Not connected",
@@ -254,6 +255,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
         mutableUiState.value = mutableUiState.value.copy(
             mode = PlayScreenMode.LIVE,
+            resolvedSetup = setup,
             restorableGame = null,
             runtime = runtimeCoordinator.state,
             engineStatus = "Connecting ${setup.engine.displayName}…",
@@ -342,9 +344,9 @@ fun RuntimeState.humanSideFromControllers(): Color? = when {
 }
 
 fun RuntimeTerminal.presentationLabel(): String = when (this) {
-    is RuntimeTerminal.Timeout -> "${loser.name.lowercase().replaceFirstChar(Char::uppercase)} lost on time"
-    is RuntimeTerminal.Resignation -> "${loser.name.lowercase().replaceFirstChar(Char::uppercase)} resigned"
+    is RuntimeTerminal.Timeout -> "${loser.name.lowercase().replaceFirstChar { it.uppercase() }} lost on time"
+    is RuntimeTerminal.Resignation -> "${loser.name.lowercase().replaceFirstChar { it.uppercase() }} resigned"
     RuntimeTerminal.DrawAgreement -> "Draw by agreement"
-    is RuntimeTerminal.Checkmate -> "Checkmate · ${winner.name.lowercase().replaceFirstChar(Char::uppercase)} wins"
+    is RuntimeTerminal.Checkmate -> "Checkmate · ${winner.name.lowercase().replaceFirstChar { it.uppercase() }} wins"
     RuntimeTerminal.Stalemate -> "Draw by stalemate"
 }
