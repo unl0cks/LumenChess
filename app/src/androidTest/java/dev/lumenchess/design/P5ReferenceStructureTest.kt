@@ -33,6 +33,13 @@ class P5ReferenceStructureTest {
     }
 
     @Test
+    fun setupPrimaryChoiceUsesReferenceControlScale() {
+        val choice = composeRule.onNodeWithTag("p5-setup-standard").fetchSemanticsNode().boundsInRoot
+        val nav = composeRule.onNodeWithTag("main-tab-play").fetchSemanticsNode().boundsInRoot
+        assertTrue("Reference setup choice should be at least as tall as the compact navigation item", choice.height >= nav.height)
+    }
+
+    @Test
     fun liveGameUsesIntegratedReferenceFrameAndCompactActionStrip() {
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 12_000L) {
@@ -51,6 +58,19 @@ class P5ReferenceStructureTest {
         composeRule.onAllNodesWithText("presentation-only", substring = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("Chess rules", substring = true).assertCountEquals(0)
         composeRule.onNodeWithTag("settings-category-list").assertIsDisplayed()
+    }
+
+    @Test
+    fun referenceTopBarIsCenteredAndSettingsRowsCarryClientScale() {
+        composeRule.onNodeWithTag("main-tab-settings").performClick()
+
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val title = composeRule.onNodeWithTag("lumen-topbar-title").fetchSemanticsNode().boundsInRoot
+        val row = composeRule.onNodeWithTag("settings-board-pieces").fetchSemanticsNode().boundsInRoot
+        val nav = composeRule.onNodeWithTag("main-tab-settings").fetchSemanticsNode().boundsInRoot
+
+        assertTrue("Reference top bar title should be horizontally centered", abs(title.center.x - root.center.x) < root.width * 0.03f)
+        assertTrue("Reference settings rows should be visibly taller than the compact bottom navigation", row.height > nav.height * 1.06f)
     }
 
     @Test
