@@ -129,31 +129,31 @@ object LumenSpacing {
 }
 
 object LumenRadii {
-    val Compact = 7.dp
-    val Control = 8.dp
-    val Panel = 10.dp
-    val RaisedPanel = 12.dp
+    val Compact = 6.dp
+    val Control = 7.dp
+    val Panel = 9.dp
+    val RaisedPanel = 11.dp
     val Dialog = 14.dp
 }
 
 private val LumenTypography = Typography(
-    headlineLarge = TextStyle(fontSize = 23.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.25).sp),
-    headlineMedium = TextStyle(fontSize = 21.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.15).sp),
-    titleLarge = TextStyle(fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 22.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 19.sp),
-    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 17.sp),
-    labelLarge = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.12.sp),
+    headlineLarge = TextStyle(fontSize = 21.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.20).sp),
+    headlineMedium = TextStyle(fontSize = 19.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.12).sp),
+    titleLarge = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
+    bodyLarge = TextStyle(fontSize = 14.sp, lineHeight = 19.sp),
+    bodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 18.sp),
+    bodySmall = TextStyle(fontSize = 11.sp, lineHeight = 15.sp),
+    labelLarge = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold),
+    labelMedium = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 9.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.08.sp),
 )
 
 private val LumenShapes = Shapes(
-    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
-    small = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-    medium = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-    large = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+    extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(5.dp),
+    small = androidx.compose.foundation.shape.RoundedCornerShape(7.dp),
+    medium = androidx.compose.foundation.shape.RoundedCornerShape(9.dp),
+    large = androidx.compose.foundation.shape.RoundedCornerShape(11.dp),
     extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
 )
 
