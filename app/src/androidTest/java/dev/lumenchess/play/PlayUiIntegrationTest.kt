@@ -27,7 +27,7 @@ class PlayUiIntegrationTest {
 
     @Test
     fun setupShowsTypedRecklessNativeConstraintInsteadOfSendingUnsupportedOptions() {
-        composeRule.onNodeWithTag(PLAY_SETUP_TEST_TAG).assertIsDisplayed()
+        openSetup()
         composeRule.onNodeWithText("Stockfish 18").performScrollTo().performClick()
         composeRule.onNodeWithText("Reckless 0.9.0").performScrollTo().performClick()
         composeRule.onNodeWithText("Engine Native").performScrollTo().performClick()
@@ -40,6 +40,7 @@ class PlayUiIntegrationTest {
 
     @Test
     fun standardSetupStartsCleanLiveScreenAndConfigurationRecreationRetainsOwner() {
+        openSetup()
         composeRule.onNodeWithText("Standard").performScrollTo().performClick()
         composeRule.onNodeWithText("White").performScrollTo().performClick()
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
@@ -67,6 +68,7 @@ class PlayUiIntegrationTest {
 
     @Test
     fun boardBoundsStayStableAcrossHumanMoveEngineThinkingAndEngineResult() {
+        openSetup()
         composeRule.onNodeWithText("Standard").performScrollTo().performClick()
         composeRule.onNodeWithText("White").performScrollTo().performClick()
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
@@ -95,6 +97,7 @@ class PlayUiIntegrationTest {
 
     @Test
     fun chess960BlackSetupStartsWithResolvedChess960Runtime() {
+        openSetup()
         composeRule.onNodeWithText("Chess960").performScrollTo().performClick()
         composeRule.onNodeWithText("Black").performScrollTo().performClick()
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
@@ -108,6 +111,12 @@ class PlayUiIntegrationTest {
         assertEquals(Variant.CHESS960, runtime.position.variant)
         assertTrue(requireNotNull(setup.chess960Index) in 0..959)
         composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).assertIsDisplayed()
+    }
+
+    private fun openSetup() {
+        composeRule.onNodeWithTag("p5-play-overview").assertIsDisplayed()
+        composeRule.onNodeWithTag("play-overview-vs-engine").performClick()
+        composeRule.onNodeWithTag(PLAY_SETUP_TEST_TAG).assertIsDisplayed()
     }
 
     private fun boardBounds(): Rect = composeRule

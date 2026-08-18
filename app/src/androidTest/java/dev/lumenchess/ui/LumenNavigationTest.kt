@@ -19,12 +19,16 @@ class LumenNavigationTest {
     @Test
     fun navigationUsesCompactIconLabelTabsAndIntentionalProductPreview() {
         composeRule.onNodeWithTag("main-tab-play").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-play-overview").assertIsDisplayed()
         composeRule.onNodeWithTag("main-tab-arena").performClick()
         assertTrue(composeRule.onAllNodesWithText("Arena").fetchSemanticsNodes().isNotEmpty())
         composeRule.onNodeWithText("Set up engine battles and take over positions").assertIsDisplayed()
         composeRule.onAllNodesWithText("not available in this build", substring = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("Coming in a later milestone", substring = true).assertCountEquals(0)
         composeRule.onNodeWithTag("main-tab-play").performClick()
+        composeRule.onNodeWithTag("p5-play-overview").assertIsDisplayed()
+        composeRule.onAllNodesWithText("New Game").assertCountEquals(0)
+        composeRule.onNodeWithTag("play-overview-vs-engine").performClick()
         composeRule.onNodeWithText("New Game").assertIsDisplayed()
         composeRule.onAllNodesWithText("Human vs Engine").assertCountEquals(0)
     }

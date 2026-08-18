@@ -16,6 +16,8 @@ class SettingsUiTest {
     @Test
     fun compactAppearancePresetAndIndividualOverridesRemainComposable() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
+        composeRule.onNodeWithTag("settings-play").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("play-settings-root").assertIsDisplayed()
         composeRule.onNodeWithTag("appearance-oled_dark").assertIsDisplayed().performClick()
         composeRule.onNodeWithTag("settings-board-pieces").assertIsDisplayed().performClick()
 
