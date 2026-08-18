@@ -123,15 +123,15 @@ internal fun ReferencePlayOverviewScreen(
             Text(
                 "Quick Start",
                 style = LumenTypography.SectionTitle.copy(
-                    fontSize = 15.sp,
-                    lineHeight = 18.sp,
+                    fontSize = 18.sp,
+                    lineHeight = 21.sp,
                     fontWeight = FontWeight.Bold,
                 ),
                 color = LumenColors.OnSurface,
             )
             Text(
                 "Last used",
-                style = LumenTypography.Meta.copy(fontSize = 11.5.sp, lineHeight = 14.sp),
+                style = LumenTypography.Meta.copy(fontSize = 13.sp, lineHeight = 16.sp),
                 color = LumenColors.OnSurfaceMuted,
             )
         }
@@ -281,8 +281,8 @@ private fun PlayModeCard(
             Text(
                 title,
                 style = LumenTypography.ModeTitle.copy(
-                    fontSize = 19.sp,
-                    lineHeight = 22.sp,
+                    fontSize = 23.sp,
+                    lineHeight = 26.sp,
                     fontWeight = FontWeight.Bold,
                 ),
                 color = LumenColors.OnSurface,
@@ -290,13 +290,13 @@ private fun PlayModeCard(
             Text(
                 subtitle,
                 modifier = if (artwork == PlayOverviewArtwork.ARENA) {
-                    Modifier.fillMaxWidth(.86f)
+                    Modifier.fillMaxWidth(.72f)
                 } else {
                     Modifier
                 },
                 style = LumenTypography.ModeSubtitle.copy(
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp,
+                    fontSize = 16.sp,
+                    lineHeight = 20.sp,
                     fontWeight = FontWeight.Medium,
                 ),
                 color = LumenColors.OnSurfaceMuted,
@@ -541,7 +541,7 @@ private fun QuickStartCard(
         verticalArrangement = Arrangement.Center,
     ) {
         QuickStartLine(QuickGlyph.CLOCK, primary, emphasized = true)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(5.dp))
         QuickStartLine(QuickGlyph.ENGINE, secondary, emphasized = false)
     }
 }
@@ -557,13 +557,13 @@ private fun QuickStartLine(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        QuickStartGlyph(glyph, Modifier.size(26.dp))
+        QuickStartGlyph(glyph, Modifier.size(28.dp))
         Text(
             text,
             style = if (emphasized) {
-                LumenTypography.QuickPrimary.copy(fontSize = 14.sp, lineHeight = 17.sp)
+                LumenTypography.QuickPrimary.copy(fontSize = 17.sp, lineHeight = 20.sp)
             } else {
-                LumenTypography.QuickSecondary.copy(fontSize = 12.5.sp, lineHeight = 16.sp)
+                LumenTypography.QuickSecondary.copy(fontSize = 15.sp, lineHeight = 18.sp)
             },
             color = if (emphasized) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
             fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
