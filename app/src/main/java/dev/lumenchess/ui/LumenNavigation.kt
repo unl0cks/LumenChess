@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -43,42 +45,71 @@ import androidx.compose.ui.unit.dp
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenRadii
+import dev.lumenchess.design.LumenTypography
 
 @Composable
 internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit) {
+    val divider = LumenColors.Outline.copy(alpha = .72f)
     Box(
-        Modifier.fillMaxWidth().height(50.dp).background(LumenColors.Surface.copy(alpha=.99f))
-            .border(1.dp,LumenColors.Outline.copy(alpha=.62f),RoundedCornerShape(0.dp)),
+        Modifier.fillMaxWidth().height(66.dp).background(LumenColors.Surface.copy(alpha = .99f))
+            .drawBehind {
+                drawLine(
+                    color = divider,
+                    start = Offset.Zero,
+                    end = Offset(size.width, 0f),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            },
     ) {
-        Row(Modifier.fillMaxSize().padding(horizontal=5.dp).selectableGroup(), horizontalArrangement=Arrangement.spacedBy(1.dp)) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 7.dp).selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(1.dp),
+        ) {
             MainTab.entries.forEach { tab ->
                 val selected = tab == current
                 val interaction = remember { MutableInteractionSource() }
                 val pressed by interaction.collectIsPressedAsState()
                 val tint by animateColorAsState(
                     if (selected) LumenColors.AccentBlueBright else LumenColors.OnSurfaceMuted,
-                    LumenMotion.fastTween(), label="nav-tint-${tab.label}",
+                    LumenMotion.fastTween(),
+                    label = "nav-tint-${tab.label}",
                 )
                 val scale by animateFloatAsState(
-                    if (pressed) .94f else if (selected) 1.03f else 1f,
-                    if (pressed) LumenMotion.fastTween() else LumenMotion.normalTween(),
-                    label="nav-scale-${tab.label}",
+                    if (pressed) LumenMotion.IconPressScale else if (selected) 1.025f else 1f,
+                    if (pressed) LumenMotion.pressTween() else LumenMotion.normalTween(),
+                    label = "nav-scale-${tab.label}",
                 )
                 Column(
-                    Modifier.weight(1f).height(50.dp)
-                        .clickable(interactionSource=interaction,indication=null,role=Role.Tab,onClick={ onSelect(tab) })
+                    Modifier.weight(1f).height(66.dp)
+                        .clickable(
+                            interactionSource = interaction,
+                            indication = null,
+                            role = Role.Tab,
+                            onClick = { onSelect(tab) },
+                        )
                         .semantics { contentDescription = "${tab.label} tab" }
                         .testTag("main-tab-${tab.label.lowercase()}"),
-                    horizontalAlignment=Alignment.CenterHorizontally,
-                    verticalArrangement=Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Box(Modifier.height(1.5.dp).fillMaxWidth(.26f).background(if (selected) LumenColors.AccentBlueBright else Color.Transparent,RoundedCornerShape(2.dp)))
-                    Spacer(Modifier.height(2.dp))
-                    Box(Modifier.size(18.dp).graphicsLayer { scaleX=scale; scaleY=scale }, contentAlignment=Alignment.Center) {
-                        TabIcon(tab,tint,Modifier.fillMaxSize())
+                    Box(
+                        Modifier.width(20.dp).height(2.dp).background(
+                            if (selected) LumenColors.AccentBlueBright else Color.Transparent,
+                            RoundedCornerShape(2.dp),
+                        ),
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Box(
+                        Modifier.size(22.dp).graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TabIcon(tab, tint, Modifier.fillMaxSize())
                     }
-                    Spacer(Modifier.height(1.dp))
-                    Text(tab.label,style=MaterialTheme.typography.labelSmall,color=tint,maxLines=1)
+                    Spacer(Modifier.height(3.dp))
+                    Text(tab.label, style = LumenTypography.BottomNav, color = tint, maxLines = 1)
                 }
             }
         }
@@ -116,7 +147,9 @@ internal fun FutureSurfacePreview(tab: MainTab) {
 @Composable
 private fun TabIcon(tab: MainTab,color: Color,modifier: Modifier=Modifier.size(18.dp)) {
     Canvas(modifier) {
-        val w=size.width; val h=size.height; val s=size.minDimension*.082f
+        val w=size.width
+        val h=size.height
+        val s=size.minDimension*.082f
         when(tab) {
             MainTab.Play -> {
                 drawCircle(color,w*.34f,Offset(w*.5f,h*.5f),style=Stroke(s))
@@ -126,11 +159,15 @@ private fun TabIcon(tab: MainTab,color: Color,modifier: Modifier=Modifier.size(1
             MainTab.Arena -> {
                 drawLine(color,Offset(w*.24f,h*.22f),Offset(w*.76f,h*.78f),s,StrokeCap.Round)
                 drawLine(color,Offset(w*.76f,h*.22f),Offset(w*.24f,h*.78f),s,StrokeCap.Round)
-                drawCircle(color,s*1.25f,Offset(w*.23f,h*.21f)); drawCircle(color,s*1.25f,Offset(w*.77f,h*.21f))
+                drawCircle(color,s*1.25f,Offset(w*.23f,h*.21f))
+                drawCircle(color,s*1.25f,Offset(w*.77f,h*.21f))
             }
             MainTab.Games -> {
                 drawRoundRect(color,Offset(w*.2f,h*.18f),Size(w*.6f,h*.64f),CornerRadius(w*.08f),style=Stroke(s))
-                repeat(3) { i -> val y=h*(.34f+i*.16f); drawLine(color,Offset(w*.32f,y),Offset(w*.68f,y),s*.75f,StrokeCap.Round) }
+                repeat(3) { i ->
+                    val y=h*(.34f+i*.16f)
+                    drawLine(color,Offset(w*.32f,y),Offset(w*.68f,y),s*.75f,StrokeCap.Round)
+                }
             }
             MainTab.Insights -> {
                 drawLine(color,Offset(w*.22f,h*.76f),Offset(w*.22f,h*.52f),s*1.45f,StrokeCap.Round)
@@ -138,9 +175,12 @@ private fun TabIcon(tab: MainTab,color: Color,modifier: Modifier=Modifier.size(1
                 drawLine(color,Offset(w*.78f,h*.76f),Offset(w*.78f,h*.2f),s*1.45f,StrokeCap.Round)
             }
             MainTab.Settings -> {
-                drawCircle(color,w*.29f,Offset(w*.5f,h*.5f),style=Stroke(s)); drawCircle(color,w*.09f,Offset(w*.5f,h*.5f),style=Stroke(s))
-                drawLine(color,Offset(w*.08f,h*.5f),Offset(w*.2f,h*.5f),s,StrokeCap.Round); drawLine(color,Offset(w*.8f,h*.5f),Offset(w*.92f,h*.5f),s,StrokeCap.Round)
-                drawLine(color,Offset(w*.5f,h*.08f),Offset(w*.5f,h*.2f),s,StrokeCap.Round); drawLine(color,Offset(w*.5f,h*.8f),Offset(w*.5f,h*.92f),s,StrokeCap.Round)
+                drawCircle(color,w*.29f,Offset(w*.5f,h*.5f),style=Stroke(s))
+                drawCircle(color,w*.09f,Offset(w*.5f,h*.5f),style=Stroke(s))
+                drawLine(color,Offset(w*.08f,h*.5f),Offset(w*.2f,h*.5f),s,StrokeCap.Round)
+                drawLine(color,Offset(w*.8f,h*.5f),Offset(w*.92f,h*.5f),s,StrokeCap.Round)
+                drawLine(color,Offset(w*.5f,h*.08f),Offset(w*.5f,h*.2f),s,StrokeCap.Round)
+                drawLine(color,Offset(w*.5f,h*.8f),Offset(w*.5f,h*.92f),s,StrokeCap.Round)
             }
         }
     }
