@@ -2,6 +2,7 @@ package dev.lumenchess.play
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -31,7 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -48,7 +52,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTypography
@@ -72,6 +75,7 @@ private enum class PlayOverviewArtwork(
 }
 
 private enum class QuickGlyph { CLOCK, ENGINE }
+private enum class PlaySurfaceKind { ENGINE, ARENA, QUICK }
 
 @Composable
 internal fun ReferencePlayOverviewScreen(
@@ -99,15 +103,37 @@ internal fun ReferencePlayOverviewScreen(
         append(setup.engine.displayName)
         if (elo != null) append(" · $elo Elo")
     }
+    val pageGlow = LumenColors.AccentBlueBright
 
     Column(
         modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    listOf(LumenColors.BackgroundLift, LumenColors.Background),
+                    colorStops = arrayOf(
+                        0f to LumenColors.BackgroundLift,
+                        .54f to LumenColors.Background,
+                        1f to LumenColors.Background,
+                    ),
                 ),
             )
+            .drawBehind {
+                val glowCenter = Offset(size.width * .28f, size.height * .31f)
+                val glowRadius = size.width * .72f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            pageGlow.copy(alpha = .018f),
+                            pageGlow.copy(alpha = .006f),
+                            Color.Transparent,
+                        ),
+                        center = glowCenter,
+                        radius = glowRadius,
+                    ),
+                    center = glowCenter,
+                    radius = glowRadius,
+                )
+            }
             .padding(horizontal = 24.dp, vertical = 22.dp)
             .testTag("p5-play-overview"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -141,17 +167,13 @@ internal fun ReferencePlayOverviewScreen(
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 "Quick Start",
-                style = LumenTypography.SectionTitle.copy(
-                    fontSize = 18.sp,
-                    lineHeight = 21.sp,
-                    fontWeight = FontWeight.Bold,
-                ),
-                color = LumenColors.OnSurface,
+                style = LumenTypography.SectionTitle,
+                color = LumenColors.OnSurface.copy(alpha = .98f),
             )
             Text(
                 "Last used",
-                style = LumenTypography.Meta.copy(fontSize = 13.sp, lineHeight = 16.sp),
-                color = LumenColors.OnSurfaceMuted,
+                style = LumenTypography.Meta,
+                color = LumenColors.OnSurfaceMuted.copy(alpha = .96f),
             )
         }
 
@@ -163,6 +185,7 @@ internal fun ReferencePlayOverviewScreen(
                 .fillMaxWidth()
                 .aspectRatio(2.95f)
                 .testTag("play-overview-quick-start"),
+            onClick = onPlayVsEngine,
         )
     }
 }
@@ -176,18 +199,14 @@ private fun PlayOverviewTopBar(title: String, onBack: () -> Unit) {
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseSpring(),
         label = "play-overview-back-scale",
     )
-    val backColor = LumenColors.OnSurfaceMuted
+    val backColor = LumenColors.OnSurfaceMuted.copy(alpha = .92f)
 
     Box(Modifier.fillMaxWidth().height(36.dp)) {
         Text(
             text = title,
             modifier = Modifier.align(Alignment.Center),
-            style = LumenTypography.PlayTitle.copy(
-                fontSize = 18.sp,
-                lineHeight = 20.sp,
-                fontWeight = FontWeight.Medium,
-            ),
-            color = LumenColors.OnSurface,
+            style = LumenTypography.PlayTitle,
+            color = LumenColors.OnSurface.copy(alpha = .98f),
         )
         Box(
             Modifier
@@ -229,6 +248,223 @@ private fun PlayOverviewTopBar(title: String, onBack: () -> Unit) {
 }
 
 @Composable
+private fun PlayTactileSurface(
+    kind: PlaySurfaceKind,
+    modifier: Modifier,
+    interactionSource: MutableInteractionSource,
+    onClick: () -> Unit,
+    depthTestTag: String? = null,
+    content: @Composable () -> Unit,
+) {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val isQuick = kind == PlaySurfaceKind.QUICK
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) {
+            if (isQuick) .989f else LumenMotion.PlayCardPressScale
+        } else {
+            1f
+        },
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "play-tactile-scale-$kind",
+    )
+    val pressOffset by animateDpAsState(
+        targetValue = if (pressed) {
+            if (isQuick) .45.dp else .8.dp
+        } else {
+            0.dp
+        },
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "play-tactile-offset-$kind",
+    )
+    val shadowElevation by animateDpAsState(
+        targetValue = if (pressed) {
+            if (isQuick) .7.dp else 1.dp
+        } else {
+            if (isQuick) 2.5.dp else 4.dp
+        },
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "play-tactile-shadow-$kind",
+    )
+    val lowerEdge by animateDpAsState(
+        targetValue = if (pressed) {
+            if (isQuick) .4.dp else .55.dp
+        } else {
+            if (isQuick) 1.6.dp else 2.4.dp
+        },
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "play-tactile-edge-$kind",
+    )
+    val pressDarken by animateFloatAsState(
+        targetValue = if (pressed) {
+            if (isQuick) .032f else .048f
+        } else {
+            0f
+        },
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "play-tactile-darken-$kind",
+    )
+    val illuminationGain by animateFloatAsState(
+        targetValue = if (pressed) 1.08f else 1f,
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "play-tactile-glow-$kind",
+    )
+    val border by animateColorAsState(
+        targetValue = if (pressed) {
+            LumenColors.OutlineStrong.copy(alpha = .94f)
+        } else {
+            LumenColors.Outline.copy(alpha = if (isQuick) .74f else .82f)
+        },
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "play-tactile-border-$kind",
+    )
+
+    val shape = RoundedCornerShape(if (isQuick) 10.dp else 11.dp)
+    val surface = LumenColors.Surface
+    val raised = LumenColors.SurfaceRaised
+    val highest = LumenColors.SurfaceHighest
+    val faceLeft = when (kind) {
+        PlaySurfaceKind.ENGINE -> lerp(surface, raised, .47f)
+        PlaySurfaceKind.ARENA -> lerp(surface, raised, .42f)
+        PlaySurfaceKind.QUICK -> lerp(surface, raised, .31f)
+    }
+    val faceMiddle = when (kind) {
+        PlaySurfaceKind.QUICK -> lerp(surface, raised, .17f)
+        else -> lerp(surface, raised, .25f)
+    }
+    val faceRight = lerp(surface, Color.Black, if (isQuick) .035f else .06f)
+    val coolGlow = LumenColors.AccentBlueBright
+    val warmGlow = Color(0xFFE3AC61)
+    val edgeHighlight = LumenColors.OnSurface
+
+    Box(
+        modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = pressOffset.toPx()
+            }
+            .shadow(
+                elevation = shadowElevation,
+                shape = shape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = if (pressed) .20f else .34f),
+                spotColor = Color.Black.copy(alpha = if (pressed) .28f else .48f),
+            )
+            .clip(shape)
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(faceLeft, faceMiddle, faceRight),
+                ),
+            )
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            edgeHighlight.copy(alpha = if (isQuick) .028f else .040f),
+                            edgeHighlight.copy(alpha = .010f),
+                            Color.Transparent,
+                        ),
+                        startY = 0f,
+                        endY = size.height * .58f,
+                    ),
+                )
+
+                if (!isQuick) {
+                    val glowCenter = Offset(size.width * .18f, size.height * .49f)
+                    val glowRadius = size.height * .63f
+                    val primaryAlpha = when (kind) {
+                        PlaySurfaceKind.ENGINE -> .116f
+                        PlaySurfaceKind.ARENA -> .104f
+                        PlaySurfaceKind.QUICK -> 0f
+                    } * illuminationGain
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                coolGlow.copy(alpha = primaryAlpha),
+                                coolGlow.copy(alpha = .036f * illuminationGain),
+                                Color.Transparent,
+                            ),
+                            center = glowCenter,
+                            radius = glowRadius,
+                        ),
+                        center = glowCenter,
+                        radius = glowRadius,
+                    )
+                    if (kind == PlaySurfaceKind.ARENA) {
+                        val warmCenter = Offset(size.width * .275f, size.height * .53f)
+                        val warmRadius = size.height * .31f
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    warmGlow.copy(alpha = .026f * illuminationGain),
+                                    warmGlow.copy(alpha = .009f * illuminationGain),
+                                    Color.Transparent,
+                                ),
+                                center = warmCenter,
+                                radius = warmRadius,
+                            ),
+                            center = warmCenter,
+                            radius = warmRadius,
+                        )
+                    }
+                }
+
+                if (pressDarken > 0f) {
+                    drawRect(Color.Black.copy(alpha = pressDarken))
+                }
+
+                val lowerEdgePx = lowerEdge.toPx()
+                if (lowerEdgePx > 0f) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = .08f),
+                                Color.Black.copy(alpha = if (isQuick) .24f else .31f),
+                            ),
+                            startY = size.height - lowerEdgePx,
+                            endY = size.height,
+                        ),
+                        topLeft = Offset(0f, size.height - lowerEdgePx),
+                        size = Size(size.width, lowerEdgePx),
+                    )
+                }
+
+                val inset = 1.dp.toPx()
+                val innerWidth = (size.width - inset * 2f).coerceAtLeast(0f)
+                val innerHeight = (size.height - inset * 2f).coerceAtLeast(0f)
+                drawRoundRect(
+                    color = edgeHighlight.copy(alpha = if (pressed) .068f else .038f),
+                    topLeft = Offset(inset, inset),
+                    size = Size(innerWidth, innerHeight),
+                    cornerRadius = CornerRadius((if (isQuick) 9.dp else 10.dp).toPx()),
+                    style = Stroke(width = .55.dp.toPx()),
+                )
+                drawLine(
+                    color = edgeHighlight.copy(alpha = if (pressed) .088f else .062f),
+                    start = Offset(13.dp.toPx(), 1.dp.toPx()),
+                    end = Offset(size.width - 13.dp.toPx(), 1.dp.toPx()),
+                    strokeWidth = .6.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+            .border(1.dp, border, shape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+    ) {
+        val innerModifier = if (depthTestTag != null) {
+            Modifier.fillMaxSize().testTag(depthTestTag)
+        } else {
+            Modifier.fillMaxSize()
+        }
+        Box(innerModifier) { content() }
+    }
+}
+
+@Composable
 private fun PlayModeCard(
     title: String,
     subtitle: String,
@@ -237,123 +473,52 @@ private fun PlayModeCard(
     onClick: () -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) LumenMotion.PlayCardPressScale else 1f,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseSpring(),
-        label = "play-mode-card-scale",
-    )
-    val border by animateColorAsState(
-        targetValue = if (pressed) {
-            LumenColors.OutlineStrong
-        } else {
-            LumenColors.Outline.copy(alpha = .82f)
-        },
-        animationSpec = LumenMotion.pressTween(),
-        label = "play-mode-card-border",
-    )
-    val shape = RoundedCornerShape(11.dp)
-    val illumination = LumenColors.AccentBlueBright
-    val edgeHighlight = LumenColors.OnSurface
-    val fill = if (pressed) {
-        Brush.horizontalGradient(
-            listOf(
-                LumenColors.SurfaceHighest,
-                LumenColors.SurfaceRaised,
-                LumenColors.SurfaceRaised,
-            ),
-        )
+    val surfaceKind = if (artwork == PlayOverviewArtwork.ENGINE) {
+        PlaySurfaceKind.ENGINE
     } else {
-        Brush.horizontalGradient(
-            listOf(
-                LumenColors.SurfaceHighest.copy(alpha = .82f),
-                LumenColors.SurfaceRaised.copy(alpha = .97f),
-                LumenColors.Surface.copy(alpha = .99f),
-            ),
-        )
+        PlaySurfaceKind.ARENA
     }
 
-    Row(
-        modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .shadow(
-                elevation = 3.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = Color.Black.copy(alpha = .34f),
-                spotColor = Color.Black.copy(alpha = .46f),
-            )
-            .clip(shape)
-            .background(fill)
-            .drawBehind {
-                val glowCenter = Offset(size.width * .18f, size.height * .50f)
-                val glowRadius = size.height * .74f
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            illumination.copy(alpha = if (pressed) .20f else .145f),
-                            illumination.copy(alpha = .055f),
-                            Color.Transparent,
-                        ),
-                        center = glowCenter,
-                        radius = glowRadius,
-                    ),
-                    center = glowCenter,
-                    radius = glowRadius,
-                )
-                drawLine(
-                    color = edgeHighlight.copy(alpha = .055f),
-                    start = Offset(13.dp.toPx(), 1.dp.toPx()),
-                    end = Offset(size.width - 13.dp.toPx(), 1.dp.toPx()),
-                    strokeWidth = .65.dp.toPx(),
-                    cap = StrokeCap.Round,
-                )
-            }
-            .border(1.dp, border, shape)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .padding(horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    PlayTactileSurface(
+        kind = surfaceKind,
+        modifier = modifier,
+        interactionSource = interaction,
+        onClick = onClick,
+        depthTestTag = if (artwork == PlayOverviewArtwork.ENGINE) {
+            "play-overview-vs-engine-depth-surface"
+        } else {
+            null
+        },
     ) {
-        PlayModeArtwork(
-            kind = artwork,
-            modifier = Modifier.size(86.dp),
-        )
-        Column(
-            Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                title,
-                style = LumenTypography.ModeTitle.copy(
-                    fontSize = 19.sp,
-                    lineHeight = 22.sp,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                color = LumenColors.OnSurface,
+            PlayModeArtwork(
+                kind = artwork,
+                modifier = Modifier.size(86.dp),
             )
-            Text(
-                subtitle,
-                modifier = if (artwork == PlayOverviewArtwork.ARENA) {
-                    Modifier.fillMaxWidth(.80f)
-                } else {
-                    Modifier
-                },
-                style = LumenTypography.ModeSubtitle.copy(
-                    fontSize = 14.sp,
-                    lineHeight = 17.sp,
-                    fontWeight = FontWeight.Normal,
-                ),
-                color = LumenColors.OnSurfaceMuted.copy(alpha = .94f),
-            )
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Text(
+                    title,
+                    style = LumenTypography.ModeTitle,
+                    color = LumenColors.OnSurface.copy(alpha = .985f),
+                )
+                Text(
+                    subtitle,
+                    modifier = if (artwork == PlayOverviewArtwork.ARENA) {
+                        Modifier.fillMaxWidth(.68f)
+                    } else {
+                        Modifier
+                    },
+                    style = LumenTypography.ModeSubtitle,
+                    color = LumenColors.OnSurfaceMuted.copy(alpha = .985f),
+                )
+            }
         }
     }
 }
@@ -385,33 +550,23 @@ private fun QuickStartCard(
     primary: String,
     secondary: String,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(10.dp)
-    Column(
-        modifier
-            .shadow(
-                elevation = 2.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = Color.Black.copy(alpha = .28f),
-                spotColor = Color.Black.copy(alpha = .36f),
-            )
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        LumenColors.SurfaceRaised.copy(alpha = .97f),
-                        LumenColors.Surface.copy(alpha = .99f),
-                    ),
-                ),
-            )
-            .border(1.dp, LumenColors.Outline.copy(alpha = .80f), shape)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.Center,
+    val interaction = remember { MutableInteractionSource() }
+    PlayTactileSurface(
+        kind = PlaySurfaceKind.QUICK,
+        modifier = modifier,
+        interactionSource = interaction,
+        onClick = onClick,
     ) {
-        QuickStartLine(QuickGlyph.CLOCK, primary, emphasized = true)
-        Spacer(Modifier.height(4.dp))
-        QuickStartLine(QuickGlyph.ENGINE, secondary, emphasized = false)
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            QuickStartLine(QuickGlyph.CLOCK, primary, emphasized = true)
+            Spacer(Modifier.height(4.dp))
+            QuickStartLine(QuickGlyph.ENGINE, secondary, emphasized = false)
+        }
     }
 }
 
@@ -430,12 +585,15 @@ private fun QuickStartLine(
         Text(
             text,
             style = if (emphasized) {
-                LumenTypography.QuickPrimary.copy(fontSize = 17.sp, lineHeight = 20.sp)
+                LumenTypography.QuickPrimary
             } else {
-                LumenTypography.QuickSecondary.copy(fontSize = 15.sp, lineHeight = 18.sp)
+                LumenTypography.QuickSecondary
             },
-            color = if (emphasized) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
-            fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
+            color = if (emphasized) {
+                LumenColors.OnSurface.copy(alpha = .98f)
+            } else {
+                LumenColors.OnSurfaceMuted.copy(alpha = .985f)
+            },
         )
     }
 }
@@ -443,44 +601,56 @@ private fun QuickStartLine(
 @Composable
 private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
     val tint = LumenColors.AccentBlueBright
+    val well = LumenColors.SurfaceHighest
+    val wellOutline = LumenColors.OutlineStrong
     Canvas(modifier) {
         val stroke = 1.45.dp.toPx()
+        drawCircle(well.copy(alpha = .92f), size.minDimension * .48f)
+        drawCircle(
+            wellOutline.copy(alpha = .72f),
+            size.minDimension * .46f,
+            style = Stroke(stroke * .62f),
+        )
+        drawCircle(
+            Color.Black.copy(alpha = .12f),
+            size.minDimension * .38f,
+            style = Stroke(stroke * .50f),
+        )
         when (kind) {
             QuickGlyph.CLOCK -> {
-                drawCircle(tint.copy(alpha = .15f), size.minDimension * .48f)
+                drawCircle(tint.copy(alpha = .10f), size.minDimension * .34f)
                 drawCircle(
-                    tint.copy(alpha = .98f),
-                    size.minDimension * .35f,
-                    style = Stroke(stroke * 1.20f),
+                    tint.copy(alpha = .94f),
+                    size.minDimension * .30f,
+                    style = Stroke(stroke * 1.02f),
                 )
                 drawCircle(
-                    Color.White.copy(alpha = .12f),
-                    size.minDimension * .28f,
-                    style = Stroke(stroke * .52f),
+                    Color.White.copy(alpha = .10f),
+                    size.minDimension * .24f,
+                    style = Stroke(stroke * .46f),
                 )
                 drawLine(
                     tint,
                     center,
-                    Offset(center.x, size.height * .27f),
-                    stroke * 1.12f,
+                    Offset(center.x, size.height * .29f),
+                    stroke,
                     StrokeCap.Round,
                 )
                 drawLine(
                     tint,
                     center,
-                    Offset(size.width * .65f, size.height * .57f),
-                    stroke * 1.12f,
+                    Offset(size.width * .63f, size.height * .56f),
+                    stroke,
                     StrokeCap.Round,
                 )
             }
             QuickGlyph.ENGINE -> {
-                drawCircle(tint.copy(alpha = .12f), size.minDimension * .48f)
                 val badge = Path()
                 repeat(6) { index ->
                     val angle = (-PI / 2) + index * PI / 3
                     val point = Offset(
-                        center.x + cos(angle).toFloat() * size.minDimension * .34f,
-                        center.y + sin(angle).toFloat() * size.minDimension * .34f,
+                        center.x + cos(angle).toFloat() * size.minDimension * .30f,
+                        center.y + sin(angle).toFloat() * size.minDimension * .30f,
                     )
                     if (index == 0) badge.moveTo(point.x, point.y) else badge.lineTo(point.x, point.y)
                 }
@@ -489,25 +659,25 @@ private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
                     badge,
                     brush = Brush.radialGradient(
                         listOf(
-                            tint.copy(alpha = .26f),
-                            tint.copy(alpha = .10f),
+                            tint.copy(alpha = .22f),
+                            tint.copy(alpha = .075f),
                         ),
                         center = Offset(size.width * .40f, size.height * .35f),
-                        radius = size.minDimension * .40f,
+                        radius = size.minDimension * .36f,
                     ),
                 )
                 drawPath(
                     badge,
-                    tint.copy(alpha = .96f),
-                    style = Stroke(width = stroke * 1.05f, join = StrokeJoin.Round),
+                    tint.copy(alpha = .92f),
+                    style = Stroke(width = stroke * .94f, join = StrokeJoin.Round),
                 )
-                drawCircle(tint.copy(alpha = .94f), size.minDimension * .115f)
+                drawCircle(tint.copy(alpha = .92f), size.minDimension * .105f)
                 repeat(4) { index ->
                     val angle = index * PI / 2
-                    val inner = size.minDimension * .17f
-                    val outer = size.minDimension * .25f
+                    val inner = size.minDimension * .16f
+                    val outer = size.minDimension * .225f
                     drawLine(
-                        tint.copy(alpha = .88f),
+                        tint.copy(alpha = .84f),
                         Offset(
                             center.x + cos(angle).toFloat() * inner,
                             center.y + sin(angle).toFloat() * inner,
@@ -516,11 +686,11 @@ private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
                             center.x + cos(angle).toFloat() * outer,
                             center.y + sin(angle).toFloat() * outer,
                         ),
-                        stroke * .95f,
+                        stroke * .88f,
                         StrokeCap.Round,
                     )
                 }
-                drawCircle(Color.White.copy(alpha = .36f), size.minDimension * .035f)
+                drawCircle(Color.White.copy(alpha = .32f), size.minDimension * .032f)
             }
         }
     }
