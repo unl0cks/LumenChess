@@ -2,6 +2,8 @@ package dev.lumenchess.visual
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.MainActivity
@@ -61,7 +64,9 @@ class P5PlayOverviewScreenshotQaTest {
 
         composeRule.onNodeWithTag("main-tab-play").performClick()
         waitForTag("p5-play-overview")
+        waitForTag("play-overview-vs-engine-depth-surface")
         capture("00-play-overview.png")
+        capturePressState("play-overview-vs-engine")
     }
 
     private fun verifyInterTightRuntimeResource() {
@@ -110,14 +115,51 @@ class P5PlayOverviewScreenshotQaTest {
         composeRule.waitForIdle()
     }
 
+    private fun capturePressState(tag: String) {
+        composeRule.waitForIdle()
+        val node = composeRule.onNodeWithTag(tag)
+        val rest = node.captureToImage().asAndroidBitmap()
+
+        node.performTouchInput {
+            down(center)
+            advanceEventTime(90L)
+        }
+        composeRule.waitForIdle()
+        val pressed = node.captureToImage().asAndroidBitmap()
+        node.performTouchInput { up() }
+        composeRule.waitForIdle()
+
+        val labelHeight = 34
+        val gap = 10
+        val width = rest.width + gap + pressed.width
+        val height = labelHeight + maxOf(rest.height, pressed.height)
+        val comparison = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = AndroidCanvas(comparison)
+        canvas.drawColor(android.graphics.Color.rgb(8, 8, 8))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(224, 228, 230)
+            textSize = 22f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        }
+        canvas.drawText("REST", 8f, 25f, paint)
+        canvas.drawText("PRESSED", (rest.width + gap + 8).toFloat(), 25f, paint)
+        canvas.drawBitmap(rest, 0f, labelHeight.toFloat(), null)
+        canvas.drawBitmap(pressed, (rest.width + gap).toFloat(), labelHeight.toFloat(), null)
+        writeBitmap("00-play-overview-press-state.png", comparison)
+    }
+
     private fun capture(name: String) {
         composeRule.waitForIdle()
+        val screenshot = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        writeBitmap(name, screenshot)
+    }
+
+    private fun writeBitmap(name: String, bitmap: Bitmap) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val root = requireNotNull(instrumentation.targetContext.getExternalFilesDir(null))
         val directory = File(root, "p5-screenshots").apply { mkdirs() }
-        val screenshot = composeRule.onRoot().captureToImage().asAndroidBitmap()
         FileOutputStream(File(directory, name)).use { output ->
-            check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
                 "Failed to encode $name"
             }
         }
