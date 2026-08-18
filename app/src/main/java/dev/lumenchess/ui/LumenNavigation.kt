@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenRadii
@@ -100,9 +101,9 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                             RoundedCornerShape(2.dp),
                         ),
                     )
-                    Spacer(Modifier.height(5.dp))
+                    Spacer(Modifier.height(3.dp))
                     Box(
-                        Modifier.size(22.dp).graphicsLayer {
+                        Modifier.size(28.dp).graphicsLayer {
                             scaleX = scale
                             scaleY = scale
                         },
@@ -110,8 +111,13 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                     ) {
                         TabIcon(tab, tint, Modifier.fillMaxSize())
                     }
-                    Spacer(Modifier.height(3.dp))
-                    Text(tab.label, style = LumenTypography.BottomNav, color = tint, maxLines = 1)
+                    Spacer(Modifier.height(1.dp))
+                    Text(
+                        tab.label,
+                        style = LumenTypography.BottomNav.copy(fontSize = 11.sp, lineHeight = 12.sp),
+                        color = tint,
+                        maxLines = 1,
+                    )
                 }
             }
         }
@@ -155,32 +161,32 @@ private fun TabIcon(tab: MainTab,color: Color,modifier: Modifier=Modifier.size(1
         when(tab) {
             MainTab.Play -> {
                 val knight = Path().apply {
-                    moveTo(w*.28f,h*.76f)
-                    lineTo(w*.70f,h*.76f)
-                    lineTo(w*.66f,h*.67f)
-                    cubicTo(w*.70f,h*.58f,w*.68f,h*.46f,w*.58f,h*.39f)
-                    lineTo(w*.69f,h*.28f)
-                    lineTo(w*.57f,h*.20f)
-                    lineTo(w*.46f,h*.26f)
-                    lineTo(w*.38f,h*.36f)
-                    lineTo(w*.27f,h*.51f)
-                    lineTo(w*.44f,h*.48f)
-                    lineTo(w*.31f,h*.63f)
+                    moveTo(w*.18f,h*.80f)
+                    lineTo(w*.80f,h*.80f)
+                    lineTo(w*.74f,h*.68f)
+                    cubicTo(w*.82f,h*.56f,w*.77f,h*.41f,w*.62f,h*.31f)
+                    lineTo(w*.79f,h*.17f)
+                    lineTo(w*.61f,h*.08f)
+                    lineTo(w*.45f,h*.16f)
+                    lineTo(w*.34f,h*.30f)
+                    lineTo(w*.17f,h*.51f)
+                    lineTo(w*.43f,h*.47f)
+                    lineTo(w*.23f,h*.65f)
                 }
                 drawPath(
                     knight,
                     color,
-                    style=Stroke(width=s*1.04f,cap=StrokeCap.Round,join=StrokeJoin.Round),
+                    style=Stroke(width=s*1.08f,cap=StrokeCap.Round,join=StrokeJoin.Round),
                 )
-                drawLine(color,Offset(w*.25f,h*.81f),Offset(w*.73f,h*.81f),s,StrokeCap.Round)
-                drawCircle(color,s*.62f,Offset(w*.50f,h*.33f))
+                drawLine(color,Offset(w*.14f,h*.88f),Offset(w*.84f,h*.88f),s*1.06f,StrokeCap.Round)
+                drawCircle(color,s*.67f,Offset(w*.50f,h*.25f))
                 val play = Path().apply {
-                    moveTo(w*.59f,h*.51f)
-                    lineTo(w*.71f,h*.57f)
-                    lineTo(w*.59f,h*.63f)
+                    moveTo(w*.56f,h*.48f)
+                    lineTo(w*.75f,h*.58f)
+                    lineTo(w*.56f,h*.68f)
                     close()
                 }
-                drawPath(play,color.copy(alpha=.92f))
+                drawPath(play,color.copy(alpha=.94f))
             }
             MainTab.Arena -> {
                 drawLine(color,Offset(w*.24f,h*.22f),Offset(w*.76f,h*.78f),s,StrokeCap.Round)
