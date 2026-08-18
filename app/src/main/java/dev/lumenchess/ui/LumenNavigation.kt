@@ -56,7 +56,7 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
     val divider = LumenColors.Outline.copy(alpha = .72f)
     val selectedIndicator = LumenColors.AccentBlueBright
     Box(
-        Modifier.fillMaxWidth().height(66.dp).background(LumenColors.Surface.copy(alpha = .99f))
+        Modifier.fillMaxWidth().height(62.dp).background(LumenColors.Surface.copy(alpha = .99f))
             .drawBehind {
                 drawLine(
                     color = divider,
@@ -85,7 +85,7 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                     label = "nav-scale-${tab.label}",
                 )
                 Column(
-                    Modifier.weight(1f).height(66.dp)
+                    Modifier.weight(1f).height(62.dp)
                         .clickable(
                             interactionSource = interaction,
                             indication = null,
@@ -98,7 +98,7 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Box(
-                        Modifier.width(16.dp).height(2.dp).drawBehind {
+                        Modifier.width(14.dp).height(2.dp).drawBehind {
                             if (selected) {
                                 drawLine(
                                     color = selectedIndicator,
@@ -110,22 +110,22 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                             }
                         },
                     )
-                    Spacer(Modifier.height(3.dp))
+                    Spacer(Modifier.height(2.dp))
                     Box(
-                        Modifier.size(28.dp).graphicsLayer {
+                        Modifier.size(25.dp).graphicsLayer {
                             scaleX = scale
                             scaleY = scale
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        TabIcon(tab, tint, Modifier.size(25.5.dp))
+                        TabIcon(tab, tint, Modifier.size(23.dp))
                     }
                     Spacer(Modifier.height(1.dp))
                     Text(
                         tab.label,
                         style = LumenTypography.BottomNav.copy(
-                            fontSize = 10.25.sp,
-                            lineHeight = 12.sp,
+                            fontSize = 9.75.sp,
+                            lineHeight = 11.5.sp,
                             fontWeight = FontWeight.Normal,
                         ),
                         color = tint,
