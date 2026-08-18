@@ -1,4 +1,4 @@
-name: P5 reference fidelity
+name: P5 Play overview reference
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Mark P5 reference verification pending
+      - name: Mark P5 Play overview verification pending
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -30,7 +30,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification and screenshot QA are running' \
+            -f description='API37 verification and Play overview capture are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -118,7 +118,7 @@ jobs:
           elif failures == 0:
               print(f"::error title=Instrumentation diagnostics::{len(reports)} report(s) found but no failing testcase element was parsed")
           PY
-      - name: Capture mandatory P5 Pixel screenshots
+      - name: Capture Play overview screenshot only
         id: screenshots
         if: steps.verify.outcome == 'success'
         continue-on-error: true
@@ -131,25 +131,26 @@ jobs:
           rm -rf p5-screenshots
           mkdir -p p5-screenshots
           adb shell am instrument -w -r \
-            -e p5ScreenshotQa true \
-            -e class dev.lumenchess.visual.P5ScreenshotQaTest \
+            -e p5PlayOverviewQa true \
+            -e class dev.lumenchess.visual.P5PlayOverviewScreenshotQaTest \
             dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
             | tee "$RUNNER_TEMP/p5-screenshot-instrumentation.txt"
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
           COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$COUNT" != "13" ]; then
-            echo "::error title=P5 screenshot set::Expected 13 screenshots, found $COUNT"
+          if [ "$COUNT" != "1" ]; then
+            echo "::error title=P5 Play overview screenshot::Expected 1 screenshot, found $COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
-          printf 'Captured %s mandatory screenshots\n' "$COUNT"
-      - name: Upload P5 screenshot QA artifact
+          test -f p5-screenshots/00-play-overview.png
+          printf 'Captured Play overview screenshot\n'
+      - name: Upload Play overview candidate
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: p5-reference-screenshots-${{ github.sha }}
+          name: p5-play-overview-${{ github.sha }}
           path: |
-            p5-screenshots/
+            p5-screenshots/00-play-overview.png
             docs/references/LumenChess_UI_Concept_Blue.png
             docs/references/REFERENCE-MANIFEST.md
             ${{ runner.temp }}/p5-screenshot-instrumentation.txt
@@ -171,7 +172,7 @@ jobs:
             app/build/reports/androidTests/
           if-no-files-found: warn
           retention-days: 7
-      - name: Publish P5 reference verification success
+      - name: Publish P5 Play overview verification success
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -180,7 +181,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification and 13-state screenshot capture passed' \
+            -f description='API37 verification and Play overview screenshot capture passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
@@ -191,7 +192,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification or screenshot QA failed' \
+            -f description='API37 verification or Play overview screenshot capture failed' \
             -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
