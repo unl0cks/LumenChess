@@ -47,7 +47,7 @@ class PlayUiIntegrationTest {
 
         composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("You").assertIsDisplayed()
-        composeRule.onNodeWithText("Stockfish 18").assertIsDisplayed()
+        composeRule.onNodeWithTag(PLAY_ENGINE_STATUS_TEST_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("Resign").assertIsDisplayed()
 
         val beforeViewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
