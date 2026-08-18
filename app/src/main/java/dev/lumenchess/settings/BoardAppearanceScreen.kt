@@ -123,7 +123,10 @@ fun BoardAppearanceScreen(
 }
 
 @Composable
-private fun VisualOptionRow(itemCount: Int,content: @Composable RowScope.()->Unit) {
+private fun VisualOptionRow(
+    itemCount: Int,
+    content: @Composable RowScope.() -> Unit,
+) {
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
         content(); if(itemCount==1) Spacer(Modifier.weight(1f))
     }
@@ -132,7 +135,8 @@ private fun VisualOptionRow(itemCount: Int,content: @Composable RowScope.()->Uni
 @Composable
 private fun VisualOptionCard(
     title:String,subtitle:String,selected:Boolean,tag:String,modifier:Modifier=Modifier,
-    preview:@Composable()->Unit,onClick:()->Unit,
+    preview: @Composable () -> Unit,
+    onClick:()->Unit,
 ) {
     val shape=RoundedCornerShape(7.dp)
     Column(

@@ -239,7 +239,14 @@ private fun ReferenceSetupScreen(ui: PlayUiState, viewModel: PlayViewModel, modi
     }
 }
 
-@Composable private fun ReferenceSection(label:String,content:@Composable ColumnScope.()->Unit) = Column(verticalArrangement=Arrangement.spacedBy(4.dp)) { Text(label,style=MaterialTheme.typography.labelLarge,fontWeight=FontWeight.SemiBold,color=LumenColors.OnSurface); content() }
+@Composable
+private fun ReferenceSection(
+    label: String,
+    content: @Composable ColumnScope.() -> Unit,
+) = Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+    Text(label,style=MaterialTheme.typography.labelLarge,fontWeight=FontWeight.SemiBold,color=LumenColors.OnSurface)
+    content()
+}
 
 @Composable
 private fun ReferenceChoice(label:String,glyph:RefGlyph,selected:Boolean,modifier:Modifier=Modifier,onClick:()->Unit) {
@@ -250,7 +257,14 @@ private fun ReferenceChoice(label:String,glyph:RefGlyph,selected:Boolean,modifie
 }
 
 @Composable
-private fun ReferenceDropdown(title:String,trailing:String,expanded:Boolean,modifier:Modifier=Modifier,leading:(@Composable()->Unit)?=null,onClick:()->Unit) {
+private fun ReferenceDropdown(
+    title: String,
+    trailing: String,
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     val shape=RoundedCornerShape(5.dp)
     Row(modifier.fillMaxWidth().height(44.dp).background(LumenColors.SurfaceRaised,shape).border(1.dp,if(expanded)LumenColors.AccentBlueBright else LumenColors.Outline,shape).clickable(role=Role.Button,onClick=onClick).padding(horizontal=9.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(7.dp)) {
         leading?.invoke(); Text(title,Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis); Text(trailing,style=MaterialTheme.typography.labelMedium,color=LumenColors.OnSurfaceMuted)
@@ -281,7 +295,13 @@ private fun ReferenceFlatButton(label:String,glyph:RefGlyph,modifier:Modifier=Mo
     }
 }
 
-@Composable private fun CompactSurface(modifier:Modifier=Modifier,content:@Composable()->Unit) = Box(modifier.background(LumenColors.SurfaceRaised,RoundedCornerShape(6.dp)).border(1.dp,LumenColors.Outline,RoundedCornerShape(6.dp))) { content() }
+@Composable
+private fun CompactSurface(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) = Box(modifier.background(LumenColors.SurfaceRaised,RoundedCornerShape(6.dp)).border(1.dp,LumenColors.Outline,RoundedCornerShape(6.dp))) {
+    content()
+}
 
 @Composable
 private fun RefIcon(glyph:RefGlyph,color:UiColor,modifier:Modifier=Modifier.size(16.dp)) {
@@ -304,7 +324,8 @@ private fun ReferenceLiveScreen(ui:PlayUiState,viewModel:PlayViewModel,modifier:
     val humanTurn=runtime.position.sideToMove==humanSide&&runtime.controllers.forSide(humanSide)==RuntimeController.HUMAN
     val inputEnabled=humanTurn&&!runtime.paused&&runtime.terminal==null; val premoveEnabled=!humanTurn&&!runtime.paused&&runtime.terminal==null
     val lastMove=runtime.gameTree.mainline().lastOrNull()?.move; val queuedPremove=runtime.queuedPremove?.move
-    val status=when { ui.message!=null->ui.message; runtime.terminal!=null->runtime.terminal.presentationLabel(); queuedPremove!=null->"Premove ${queuedPremove.uci} queued"; runtime.paused->"Game paused"; else->null }
+    val terminal = runtime.terminal
+    val status=when { ui.message!=null->ui.message; terminal!=null->terminal.presentationLabel(); queuedPremove!=null->"Premove ${queuedPremove.uci} queued"; runtime.paused->"Game paused"; else->null }
     Column(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift,LumenColors.Background))).padding(horizontal=8.dp,vertical=6.dp).testTag(PLAY_LIVE_TEST_TAG),verticalArrangement=Arrangement.spacedBy(7.dp)) {
         val shape=RoundedCornerShape(9.dp)
         Column(Modifier.fillMaxWidth().background(LumenColors.Surface,shape).border(1.dp,LumenColors.OutlineStrong,shape).padding(5.dp).testTag("p5-live-shell"),verticalArrangement=Arrangement.spacedBy(3.dp)) {
@@ -357,14 +378,24 @@ private fun ReferencePremoveOverlay(runtime:RuntimeState,humanSide:Color,orienta
     var from by remember(runtime.positionRevision){mutableStateOf<Square?>(null)};LaunchedEffect(runtime.queuedPremove){if(runtime.queuedPremove==null)from=null}
     Box(modifier.semantics{contentDescription="Premove input board"}.testTag(PLAY_PREMOVE_OVERLAY_TEST_TAG).pointerInput(runtime.positionRevision,orientation,humanSide){detectTapGestures{offset->
         val square=referenceSquareFromOffset(offset,size,orientation)?:return@detectTapGestures;val selected=from
-        if(selected==null){if(runtime.position[square]?.color==humanSide)from=square}else if(runtime.position[square]?.color==humanSide){from=square}else{val piece=runtime.position[selected];val promotion=if(piece?.type==PieceType.PAWN&&square.rank==if(humanSide==Color.WHITE)7 else 0)PieceType.QUEEN else null;onPremove(Move(selected,square,promotion));from=null}
+        if(selected==null){if(runtime.position[square]?.color==humanSide)from=square}else if(runtime.position[square]?.color==humanSide){from=square}else{
+            val piece=runtime.position[selected]
+            val promotion = if (
+                piece?.type == PieceType.PAWN &&
+                square.rank == if (humanSide == Color.WHITE) 7 else 0
+            ) PieceType.QUEEN else null
+            onPremove(Move(selected,square,promotion));from=null
+        }
     }})
 }
 
 private fun referenceSquareFromOffset(offset:Offset,size:IntSize,orientation:ChessboardOrientation):Square? {
     if(size.width<=0||size.height<=0||offset.x !in 0f..size.width.toFloat()||offset.y !in 0f..size.height.toFloat())return null
     val vf=floor(offset.x/(size.width/8f)).toInt().coerceIn(0,7);val vr=floor(offset.y/(size.height/8f)).toInt().coerceIn(0,7)
-    return when(orientation){ChessboardOrientation.WHITE->Square.of(vf,7-vr);ChessboardOrientation.BLACK->Square.of(7-vf,vr)}
+    return when(orientation) {
+        ChessboardOrientation.WHITE -> Square.of(vf, 7 - vr)
+        ChessboardOrientation.BLACK -> Square.of(7 - vf, vr)
+    }
 }
 
 private data class RefTimeControlOption(val label:String,val control:PlayTimeControl)
