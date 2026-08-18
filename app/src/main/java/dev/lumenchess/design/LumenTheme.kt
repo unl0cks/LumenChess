@@ -11,7 +11,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.TextGeometricTransform
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,55 +43,56 @@ private data class LumenPalette(
     val warning: Color,
 )
 
+/* Values sampled from the supplied blue concept, not Material dark defaults. */
 private val DarkPalette = LumenPalette(
     isLight = false,
-    accentBlue = Color(0xFF4F879B),
-    accentBlueBright = Color(0xFF68A3B7),
-    accentBlueSoft = Color(0xFF1D343C),
-    accentBlueGhost = Color(0x1F68A3B7),
-    background = Color(0xFF0F1112),
-    backgroundLift = Color(0xFF141718),
-    surface = Color(0xFF181A1C),
-    surfaceRaised = Color(0xFF202326),
-    surfaceHighest = Color(0xFF272A2D),
-    outline = Color(0xFF35393C),
-    outlineStrong = Color(0xFF474D51),
-    onSurface = Color(0xFFF2F3F3),
-    onSurfaceMuted = Color(0xFFA4AAAD),
-    onSurfaceFaint = Color(0xFF737A7E),
-    destructive = Color(0xFFE56D78),
-    destructiveSoft = Color(0xFF351E22),
+    accentBlue = Color(0xFF4B849A),
+    accentBlueBright = Color(0xFF5A93A9),
+    accentBlueSoft = Color(0xFF1B3037),
+    accentBlueGhost = Color(0x1D5A93A9),
+    background = Color(0xFF0D0E0F),
+    backgroundLift = Color(0xFF111213),
+    surface = Color(0xFF181919),
+    surfaceRaised = Color(0xFF1D1F20),
+    surfaceHighest = Color(0xFF242627),
+    outline = Color(0xFF343838),
+    outlineStrong = Color(0xFF4A5051),
+    onSurface = Color(0xFFF1F2F2),
+    onSurfaceMuted = Color(0xFFA5AAAB),
+    onSurfaceFaint = Color(0xFF73797A),
+    destructive = Color(0xFFE06B75),
+    destructiveSoft = Color(0xFF341E21),
     success = Color(0xFF69B997),
     warning = Color(0xFFE3B766),
 )
 
 private val OledPalette = DarkPalette.copy(
     background = Color.Black,
-    backgroundLift = Color(0xFF030404),
-    surface = Color(0xFF090A0B),
-    surfaceRaised = Color(0xFF111315),
-    surfaceHighest = Color(0xFF191C1E),
-    outline = Color(0xFF303436),
-    outlineStrong = Color(0xFF43484B),
-    accentBlueSoft = Color(0xFF162B32),
+    backgroundLift = Color(0xFF030303),
+    surface = Color(0xFF090A0A),
+    surfaceRaised = Color(0xFF111212),
+    surfaceHighest = Color(0xFF181A1A),
+    outline = Color(0xFF2E3232),
+    outlineStrong = Color(0xFF444949),
+    accentBlueSoft = Color(0xFF14292F),
 )
 
 private val LightPalette = LumenPalette(
     isLight = true,
-    accentBlue = Color(0xFF3F778B),
-    accentBlueBright = Color(0xFF2F687D),
+    accentBlue = Color(0xFF447C91),
+    accentBlueBright = Color(0xFF326D83),
     accentBlueSoft = Color(0xFFDCE9ED),
-    accentBlueGhost = Color(0x1F3F778B),
-    background = Color(0xFFF1F3F3),
-    backgroundLift = Color(0xFFE8ECEE),
-    surface = Color(0xFFF8F9F9),
-    surfaceRaised = Color(0xFFE6EAEC),
-    surfaceHighest = Color(0xFFDCE2E4),
-    outline = Color(0xFFC3CBCD),
-    outlineStrong = Color(0xFFA6B0B3),
-    onSurface = Color(0xFF171A1C),
-    onSurfaceMuted = Color(0xFF586164),
-    onSurfaceFaint = Color(0xFF778185),
+    accentBlueGhost = Color(0x1D447C91),
+    background = Color(0xFFF2F4F4),
+    backgroundLift = Color(0xFFE9EDEE),
+    surface = Color(0xFFF9FAFA),
+    surfaceRaised = Color(0xFFE7EBEC),
+    surfaceHighest = Color(0xFFDDE3E4),
+    outline = Color(0xFFC4CCCE),
+    outlineStrong = Color(0xFFA8B1B3),
+    onSurface = Color(0xFF171A1B),
+    onSurfaceMuted = Color(0xFF596164),
+    onSurfaceFaint = Color(0xFF788184),
     destructive = Color(0xFFB84B58),
     destructiveSoft = Color(0xFFF6E1E4),
     success = Color(0xFF397B63),
@@ -131,23 +134,38 @@ object LumenSpacing {
 object LumenRadii {
     val Compact = 6.dp
     val Control = 7.dp
-    val Panel = 9.dp
-    val RaisedPanel = 11.dp
+    val Panel = 10.dp
+    val RaisedPanel = 12.dp
     val Dialog = 14.dp
 }
 
-private val LumenTypography = Typography(
-    headlineLarge = TextStyle(fontSize = 21.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.20).sp),
-    headlineMedium = TextStyle(fontSize = 19.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.12).sp),
-    titleLarge = TextStyle(fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 14.sp, lineHeight = 19.sp),
-    bodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 18.sp),
-    bodySmall = TextStyle(fontSize = 11.sp, lineHeight = 15.sp),
-    labelLarge = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 9.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.08.sp),
-)
+/** Central typographic identity. Metrics are intentionally narrower/denser than stock Material. */
+object LumenTypography {
+    private val family = FontFamily.SansSerif
+    private val compact = TextGeometricTransform(scaleX = .965f)
+
+    val Material = Typography(
+        headlineLarge = TextStyle(fontFamily = family, fontSize = 20.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.25).sp, textGeometricTransform = compact),
+        headlineMedium = TextStyle(fontFamily = family, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.18).sp, textGeometricTransform = compact),
+        titleLarge = TextStyle(fontFamily = family, fontSize = 18.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.12).sp, textGeometricTransform = compact),
+        titleMedium = TextStyle(fontFamily = family, fontSize = 13.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.04).sp, textGeometricTransform = compact),
+        bodyLarge = TextStyle(fontFamily = family, fontSize = 14.sp, lineHeight = 18.sp, textGeometricTransform = compact),
+        bodyMedium = TextStyle(fontFamily = family, fontSize = 12.5.sp, lineHeight = 17.sp, textGeometricTransform = compact),
+        bodySmall = TextStyle(fontFamily = family, fontSize = 11.sp, lineHeight = 14.sp, textGeometricTransform = compact),
+        labelLarge = TextStyle(fontFamily = family, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold, textGeometricTransform = compact),
+        labelMedium = TextStyle(fontFamily = family, fontSize = 10.5.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, textGeometricTransform = compact),
+        labelSmall = TextStyle(fontFamily = family, fontSize = 9.5.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = .02.sp, textGeometricTransform = compact),
+    )
+
+    val Clock = TextStyle(
+        fontFamily = family,
+        fontSize = 24.sp,
+        lineHeight = 26.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.2).sp,
+        textGeometricTransform = TextGeometricTransform(scaleX = .94f),
+    )
+}
 
 private val LumenShapes = Shapes(
     extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(5.dp),
@@ -158,10 +176,7 @@ private val LumenShapes = Shapes(
 )
 
 @Composable
-fun LumenTheme(
-    settings: AppearanceSettings = AppearanceSettings(),
-    content: @Composable () -> Unit,
-) {
+fun LumenTheme(settings: AppearanceSettings = AppearanceSettings(), content: @Composable () -> Unit) {
     val systemDark = isSystemInDarkTheme()
     val appearanceBase = when (settings.appearance) {
         AppAppearance.SYSTEM -> if (systemDark) DarkPalette else LightPalette
@@ -177,58 +192,35 @@ fun LumenTheme(
     val accent = Color(settings.accentArgb.toInt())
     val palette = base.copy(
         accentBlue = accent,
-        accentBlueBright = lerp(accent, if (base.isLight) Color.Black else Color.White, if (base.isLight) 0.10f else 0.17f),
-        accentBlueSoft = lerp(base.surface, accent, if (base.isLight) 0.13f else 0.20f),
-        accentBlueGhost = accent.copy(alpha = 0.10f),
+        accentBlueBright = lerp(accent, if (base.isLight) Color.Black else Color.White, if (base.isLight) .10f else .14f),
+        accentBlueSoft = lerp(base.surface, accent, if (base.isLight) .13f else .17f),
+        accentBlueGhost = accent.copy(alpha = .09f),
     )
     val scheme = if (palette.isLight) {
         lightColorScheme(
-            primary = palette.accentBlue,
-            onPrimary = Color.White,
-            primaryContainer = palette.accentBlueSoft,
-            onPrimaryContainer = palette.onSurface,
-            background = palette.background,
-            onBackground = palette.onSurface,
-            surface = palette.surface,
-            surfaceVariant = palette.surfaceRaised,
-            surfaceContainer = palette.surface,
-            surfaceContainerHigh = palette.surfaceRaised,
+            primary = palette.accentBlue, onPrimary = Color.White,
+            primaryContainer = palette.accentBlueSoft, onPrimaryContainer = palette.onSurface,
+            background = palette.background, onBackground = palette.onSurface,
+            surface = palette.surface, surfaceVariant = palette.surfaceRaised,
+            surfaceContainer = palette.surface, surfaceContainerHigh = palette.surfaceRaised,
             surfaceContainerHighest = palette.surfaceHighest,
-            onSurface = palette.onSurface,
-            onSurfaceVariant = palette.onSurfaceMuted,
-            outline = palette.outline,
-            error = palette.destructive,
-            onError = Color.White,
-            errorContainer = palette.destructiveSoft,
+            onSurface = palette.onSurface, onSurfaceVariant = palette.onSurfaceMuted,
+            outline = palette.outline, error = palette.destructive, onError = Color.White, errorContainer = palette.destructiveSoft,
         )
     } else {
         darkColorScheme(
-            primary = palette.accentBlue,
-            onPrimary = Color.White,
-            primaryContainer = palette.accentBlueSoft,
-            onPrimaryContainer = palette.onSurface,
-            background = palette.background,
-            onBackground = palette.onSurface,
-            surface = palette.surface,
-            surfaceVariant = palette.surfaceRaised,
-            surfaceContainer = palette.surface,
-            surfaceContainerHigh = palette.surfaceRaised,
+            primary = palette.accentBlue, onPrimary = Color.White,
+            primaryContainer = palette.accentBlueSoft, onPrimaryContainer = palette.onSurface,
+            background = palette.background, onBackground = palette.onSurface,
+            surface = palette.surface, surfaceVariant = palette.surfaceRaised,
+            surfaceContainer = palette.surface, surfaceContainerHigh = palette.surfaceRaised,
             surfaceContainerHighest = palette.surfaceHighest,
-            onSurface = palette.onSurface,
-            onSurfaceVariant = palette.onSurfaceMuted,
-            outline = palette.outline,
-            error = palette.destructive,
-            onError = Color.White,
-            errorContainer = palette.destructiveSoft,
+            onSurface = palette.onSurface, onSurfaceVariant = palette.onSurfaceMuted,
+            outline = palette.outline, error = palette.destructive, onError = Color.White, errorContainer = palette.destructiveSoft,
         )
     }
 
     CompositionLocalProvider(LocalLumenPalette provides palette) {
-        MaterialTheme(
-            colorScheme = scheme,
-            typography = LumenTypography,
-            shapes = LumenShapes,
-            content = content,
-        )
+        MaterialTheme(colorScheme = scheme, typography = LumenTypography.Material, shapes = LumenShapes, content = content)
     }
 }

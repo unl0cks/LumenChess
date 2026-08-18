@@ -17,14 +17,18 @@ class SoundsHapticsUiTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun soundsAndHapticsExposeMasterAndPerEventControls() {
+    fun soundsAndHapticsExposeCompactMasterRowsAndEventDetailControls() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
+        composeRule.onNodeWithTag("settings-play").performClick()
         composeRule.onNodeWithTag("settings-sounds-haptics").performScrollTo().performClick()
 
         composeRule.onNodeWithTag("sounds-haptics-screen").assertIsDisplayed()
         composeRule.onNodeWithTag("feedback-sounds-master").assertIsDisplayed()
         composeRule.onNodeWithTag("feedback-haptics-master").assertIsDisplayed()
         composeRule.onNodeWithTag("feedback-import-pack").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("feedback-preview-move").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-feedback-event-move").performScrollTo().performClick()
+        composeRule.onNodeWithTag("p5-feedback-event-detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("feedback-preview-move").assertIsDisplayed()
+        composeRule.onNodeWithTag("feedback-import-move").assertIsDisplayed()
     }
 }

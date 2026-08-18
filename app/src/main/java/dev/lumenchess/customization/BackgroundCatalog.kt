@@ -17,18 +17,18 @@ object BackgroundCatalog {
     val LumenNight = BackgroundDefinition(
         id = AppearanceSettings.DEFAULT_BACKGROUND_ID,
         displayName = "Lumen Night",
-        description = "Neutral graphite with a restrained blue-steel lift.",
-        darkTop = Color(0xFF151718),
-        darkBottom = Color(0xFF0F1112),
-        lightTop = Color(0xFFE8ECEE),
-        lightBottom = Color(0xFFF1F3F3),
+        description = "Reference-sampled neutral graphite with a restrained steel lift.",
+        darkTop = Color(0xFF111213),
+        darkBottom = Color(0xFF0D0E0F),
+        lightTop = Color(0xFFE9EDEE),
+        lightBottom = Color(0xFFF2F4F4),
     )
 
     val Void = BackgroundDefinition(
         id = "void",
         displayName = "Void",
         description = "True-black OLED field with just enough panel separation.",
-        darkTop = Color(0xFF050606),
+        darkTop = Color(0xFF030303),
         darkBottom = Color.Black,
         lightTop = Color(0xFFE5E9EA),
         lightBottom = Color(0xFFF2F4F4),
@@ -37,9 +37,9 @@ object BackgroundCatalog {
     val GraphiteHaze = BackgroundDefinition(
         id = "graphite-haze",
         displayName = "Graphite Haze",
-        description = "Cool charcoal layers that keep attention on the board.",
-        darkTop = Color(0xFF1A1D1F),
-        darkBottom = Color(0xFF101213),
+        description = "Layered charcoal that keeps attention on the board.",
+        darkTop = Color(0xFF181A1B),
+        darkBottom = Color(0xFF0E1011),
         lightTop = Color(0xFFE2E6E7),
         lightBottom = Color(0xFFF1F3F3),
     )

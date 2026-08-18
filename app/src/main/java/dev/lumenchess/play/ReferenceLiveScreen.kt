@@ -78,24 +78,23 @@ internal fun ReferenceLiveScreen(ui: PlayUiState, viewModel: PlayViewModel, modi
         runtime.paused -> "Game paused"
         else -> null
     }
+    var lowerTab by remember { mutableStateOf(0) }
 
     Column(
-        modifier
-            .fillMaxSize()
+        modifier.fillMaxSize()
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .padding(horizontal = 7.dp, vertical = 5.dp)
             .testTag(PLAY_LIVE_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         val shape = RoundedCornerShape(9.dp)
         Column(
-            Modifier
-                .fillMaxWidth()
+            Modifier.fillMaxWidth()
                 .background(LumenColors.Surface, shape)
                 .border(1.dp, LumenColors.OutlineStrong, shape)
-                .padding(5.dp)
+                .padding(4.dp)
                 .testTag("p5-live-shell"),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             ReferenceParticipantRow(
                 setup.engine.displayName,
@@ -107,9 +106,7 @@ internal fun ReferenceLiveScreen(ui: PlayUiState, viewModel: PlayViewModel, modi
                 Modifier.testTag(PLAY_ENGINE_STATUS_TEST_TAG),
             )
             Box(
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
+                Modifier.fillMaxWidth().aspectRatio(1f)
                     .border(1.dp, LumenColors.OutlineStrong)
                     .testTag(PLAY_BOARD_STAGE_TEST_TAG),
             ) {
@@ -155,23 +152,14 @@ internal fun ReferenceLiveScreen(ui: PlayUiState, viewModel: PlayViewModel, modi
             )
         }
 
-        ReferenceMovePanel(
+        ReferenceLowerGameFrame(
             runtime = runtime,
             setup = setup,
-            modifier = Modifier.fillMaxWidth().height(270.dp).testTag("p5-live-lower-region"),
-        )
-        Spacer(Modifier.weight(1f))
-        Text(
-            "In-game",
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            style = MaterialTheme.typography.labelSmall,
-            color = LumenColors.AccentBlueBright,
-        )
-        ReferenceActionStrip(
-            runtime,
-            queuedPremove != null,
-            viewModel,
-            Modifier.fillMaxWidth().height(52.dp).testTag("p5-live-action-strip"),
+            selectedTab = lowerTab,
+            onTabSelected = { lowerTab = it },
+            hasPremove = queuedPremove != null,
+            viewModel = viewModel,
+            modifier = Modifier.fillMaxWidth().height(202.dp).testTag("p5-live-lower-region"),
         )
     }
 }
@@ -189,11 +177,9 @@ private fun ReferenceParticipantRow(
     val millis = if (side == Color.WHITE) clock?.whiteRemainingMillis else clock?.blackRemainingMillis
     val active = side == activeSide
     Row(
-        modifier
-            .fillMaxWidth()
-            .height(46.dp)
+        modifier.fillMaxWidth().height(45.dp)
             .background(if (active) LumenColors.SurfaceRaised else LumenColors.Surface)
-            .padding(horizontal = 7.dp, vertical = 3.dp),
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
@@ -203,11 +189,9 @@ private fun ReferenceParticipantRow(
             Box(
                 Modifier.size(28.dp).background(LumenColors.SurfaceHighest, RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center,
-            ) {
-                Text("♟", style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurface)
-            }
+            ) { Text("♟", style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurface) }
         }
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(name, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(detail, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -221,98 +205,136 @@ private fun ReferenceParticipantRow(
 }
 
 @Composable
-private fun ReferenceMovePanel(runtime: RuntimeState, setup: ResolvedPlaySetup, modifier: Modifier = Modifier) {
+private fun ReferenceLowerGameFrame(
+    runtime: RuntimeState,
+    setup: ResolvedPlaySetup,
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit,
+    hasPremove: Boolean,
+    viewModel: PlayViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    Column(
+        modifier.background(LumenColors.Surface.copy(alpha = .94f), shape)
+            .border(1.dp, LumenColors.Outline, shape)
+            .padding(horizontal = 7.dp, vertical = 5.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        ReferenceLowerTabs(selectedTab, onTabSelected)
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            if (selectedTab == 0) ReferenceMovesRail(runtime, Modifier.fillMaxSize())
+            else ReferenceInfoPane(runtime, setup, Modifier.fillMaxSize())
+        }
+        ReferenceActionStrip(
+            runtime,
+            hasPremove,
+            viewModel,
+            Modifier.fillMaxWidth().height(48.dp).testTag("p5-live-action-strip"),
+        )
+    }
+}
+
+@Composable
+private fun ReferenceLowerTabs(selected: Int, onSelected: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().height(32.dp)) {
+        listOf("Moves", "Info").forEachIndexed { index, label ->
+            val selectedNow = selected == index
+            Column(
+                Modifier.weight(1f).fillMaxSize()
+                    .clickable(role = Role.Tab) { onSelected(index) }
+                    .testTag(if (index == 0) "p5-live-tab-moves" else "p5-live-tab-info"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom,
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (selectedNow) LumenColors.AccentBlueBright else LumenColors.OnSurfaceMuted,
+                    fontWeight = if (selectedNow) FontWeight.SemiBold else FontWeight.Medium,
+                )
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    Modifier.fillMaxWidth(.55f).height(2.dp)
+                        .background(if (selectedNow) LumenColors.AccentBlueBright else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(2.dp)),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReferenceMovesRail(runtime: RuntimeState, modifier: Modifier = Modifier) {
     val mainline = runtime.gameTree.mainline()
     val rows = mainline.chunked(2).takeLast(4)
     val firstMoveNumber = ((mainline.size + 1) / 2 - rows.size + 1).coerceAtLeast(1)
-    val shape = RoundedCornerShape(8.dp)
-    val minutes = setup.clockConfig.initialMillis / 60_000L
-    val increment = setup.clockConfig.incrementMillis / 1_000L
-    val variantLabel = if (setup.variant == Variant.STANDARD) "Standard" else "Chess960"
-
     Column(
-        modifier
-            .background(LumenColors.Surface.copy(alpha = .92f), shape)
-            .border(1.dp, LumenColors.Outline, shape)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier.background(LumenColors.SurfaceRaised.copy(alpha = .44f), RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 5.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Moves", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-            Text(
-                if (runtime.position.sideToMove == Color.WHITE) "White to move" else "Black to move",
-                style = MaterialTheme.typography.labelSmall,
-                color = LumenColors.OnSurfaceMuted,
-            )
-        }
-
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(116.dp)
-                .background(LumenColors.SurfaceRaised.copy(alpha = .58f), RoundedCornerShape(5.dp))
-                .padding(horizontal = 9.dp, vertical = 7.dp),
-        ) {
-            if (rows.isEmpty()) {
-                Column(
-                    Modifier.align(Alignment.CenterStart),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+        if (rows.isEmpty()) {
+            Text("No moves yet", style = MaterialTheme.typography.labelMedium, color = LumenColors.OnSurfaceMuted)
+        } else {
+            rows.forEachIndexed { index, pair ->
+                val number = firstMoveNumber + index
+                Row(
+                    Modifier.fillMaxWidth().height(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Text("No moves yet", style = MaterialTheme.typography.labelMedium, color = LumenColors.OnSurfaceMuted)
-                    Text(
-                        "Your moves and the engine replies will appear here.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LumenColors.OnSurfaceFaint,
-                    )
-                }
-            } else {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    rows.forEachIndexed { index, pair ->
-                        Row(
-                            Modifier.fillMaxWidth().height(23.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                        ) {
-                            Text("${firstMoveNumber + index}.", Modifier.weight(.18f), style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
-                            Text(
-                                pair.getOrNull(0)?.san ?: pair.getOrNull(0)?.move?.uci.orEmpty(),
-                                Modifier.weight(.41f),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = LumenColors.OnSurface,
-                            )
-                            Text(
-                                pair.getOrNull(1)?.san ?: pair.getOrNull(1)?.move?.uci.orEmpty(),
-                                Modifier.weight(.41f),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = LumenColors.OnSurfaceMuted,
-                            )
-                        }
-                    }
+                    Text("$number.", Modifier.weight(.16f), style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
+                    ReferenceMoveCell(pair.getOrNull(0)?.san ?: pair.getOrNull(0)?.move?.uci.orEmpty(), Modifier.weight(.42f), latest = mainline.lastOrNull() == pair.getOrNull(0))
+                    ReferenceMoveCell(pair.getOrNull(1)?.san ?: pair.getOrNull(1)?.move?.uci.orEmpty(), Modifier.weight(.42f), latest = mainline.lastOrNull() == pair.getOrNull(1))
                 }
             }
         }
+    }
+}
 
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+@Composable
+private fun ReferenceMoveCell(text: String, modifier: Modifier, latest: Boolean) {
+    Box(
+        modifier.fillMaxSize()
+            .background(if (latest) LumenColors.SurfaceHighest else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(4.dp))
+            .padding(horizontal = 5.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(text, style = MaterialTheme.typography.labelMedium, color = if (latest) LumenColors.OnSurface else LumenColors.OnSurfaceMuted, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ReferenceInfoPane(runtime: RuntimeState, setup: ResolvedPlaySetup, modifier: Modifier = Modifier) {
+    val minutes = setup.clockConfig.initialMillis / 60_000L
+    val increment = setup.clockConfig.incrementMillis / 1_000L
+    val variantLabel = if (setup.variant == Variant.STANDARD) "Standard" else "Chess960"
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             ReferenceGameFact("Mode", variantLabel, Modifier.weight(1f))
             ReferenceGameFact("Time", "$minutes+$increment", Modifier.weight(1f))
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             ReferenceGameFact("Opponent", setup.engine.displayName, Modifier.weight(1f))
             ReferenceGameFact("Side", setup.humanSide.name.lowercase().replaceFirstChar { it.uppercase() }, Modifier.weight(1f))
         }
+        Text(
+            if (runtime.position.sideToMove == Color.WHITE) "White to move" else "Black to move",
+            style = MaterialTheme.typography.labelSmall,
+            color = LumenColors.OnSurfaceMuted,
+            modifier = Modifier.padding(start = 2.dp),
+        )
     }
 }
 
 @Composable
 private fun ReferenceGameFact(label: String, value: String, modifier: Modifier = Modifier) {
     Row(
-        modifier
-            .height(42.dp)
+        modifier.height(36.dp)
             .background(LumenColors.SurfaceRaised.copy(alpha = .72f), RoundedCornerShape(5.dp))
-            .border(1.dp, LumenColors.Outline.copy(alpha = .75f), RoundedCornerShape(5.dp))
-            .padding(horizontal = 8.dp),
+            .border(1.dp, LumenColors.Outline.copy(alpha = .72f), RoundedCornerShape(5.dp))
+            .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
         Text(value, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurface, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -322,23 +344,20 @@ private fun ReferenceGameFact(label: String, value: String, modifier: Modifier =
 private enum class RefActionGlyph { PLAY, PAUSE, FLAG, MORE, CANCEL }
 
 @Composable
-private fun ReferenceActionStrip(runtime: RuntimeState, hasPremove: Boolean, viewModel: PlayViewModel, modifier: Modifier) =
-    Row(
-        modifier
-            .background(LumenColors.Surface, RoundedCornerShape(8.dp))
-            .border(1.dp, LumenColors.Outline, RoundedCornerShape(8.dp)),
-    ) {
-        if (hasPremove) ReferenceAction("Cancel", RefActionGlyph.CANCEL, onClick = viewModel::cancelPremove)
-        if (runtime.terminal == null) {
-            ReferenceAction(
-                if (runtime.paused) "Resume" else "Pause",
-                if (runtime.paused) RefActionGlyph.PLAY else RefActionGlyph.PAUSE,
-                onClick = if (runtime.paused) viewModel::resume else viewModel::pause,
-            )
-            ReferenceAction("Resign", RefActionGlyph.FLAG, destructive = true, onClick = viewModel::resign)
-        }
-        ReferenceAction("More", RefActionGlyph.MORE, onClick = viewModel::backToSetup)
+private fun ReferenceActionStrip(runtime: RuntimeState, hasPremove: Boolean, viewModel: PlayViewModel, modifier: Modifier) = Row(
+    modifier.background(LumenColors.Background.copy(alpha = .38f), RoundedCornerShape(6.dp)),
+) {
+    if (hasPremove) ReferenceAction("Cancel", RefActionGlyph.CANCEL, onClick = viewModel::cancelPremove)
+    if (runtime.terminal == null) {
+        ReferenceAction(
+            if (runtime.paused) "Resume" else "Pause",
+            if (runtime.paused) RefActionGlyph.PLAY else RefActionGlyph.PAUSE,
+            onClick = if (runtime.paused) viewModel::resume else viewModel::pause,
+        )
+        ReferenceAction("Resign", RefActionGlyph.FLAG, destructive = true, onClick = viewModel::resign)
     }
+    ReferenceAction("More", RefActionGlyph.MORE, onClick = viewModel::backToSetup)
+}
 
 @Composable
 private fun RowScope.ReferenceAction(label: String, glyph: RefActionGlyph, destructive: Boolean = false, onClick: () -> Unit) {
@@ -352,32 +371,21 @@ private fun RowScope.ReferenceAction(label: String, glyph: RefActionGlyph, destr
             val s = size.minDimension * .10f
             when (glyph) {
                 RefActionGlyph.PLAY -> {
-                    val path = Path().apply {
-                        moveTo(size.width * .30f, size.height * .18f)
-                        lineTo(size.width * .78f, size.height * .50f)
-                        lineTo(size.width * .30f, size.height * .82f)
-                        close()
-                    }
-                    drawPath(path, tint)
+                    val path = Path().apply { moveTo(size.width*.30f,size.height*.18f);lineTo(size.width*.78f,size.height*.50f);lineTo(size.width*.30f,size.height*.82f);close() }
+                    drawPath(path,tint)
                 }
                 RefActionGlyph.PAUSE -> {
-                    drawLine(tint, Offset(size.width * .36f, size.height * .2f), Offset(size.width * .36f, size.height * .8f), s * 1.6f, StrokeCap.Round)
-                    drawLine(tint, Offset(size.width * .64f, size.height * .2f), Offset(size.width * .64f, size.height * .8f), s * 1.6f, StrokeCap.Round)
+                    drawLine(tint,Offset(size.width*.36f,size.height*.2f),Offset(size.width*.36f,size.height*.8f),s*1.6f,StrokeCap.Round)
+                    drawLine(tint,Offset(size.width*.64f,size.height*.2f),Offset(size.width*.64f,size.height*.8f),s*1.6f,StrokeCap.Round)
                 }
                 RefActionGlyph.FLAG -> {
-                    drawLine(tint, Offset(size.width * .30f, size.height * .14f), Offset(size.width * .30f, size.height * .86f), s, StrokeCap.Round)
-                    val path = Path().apply {
-                        moveTo(size.width * .32f, size.height * .20f)
-                        lineTo(size.width * .78f, size.height * .32f)
-                        lineTo(size.width * .32f, size.height * .48f)
-                        close()
-                    }
-                    drawPath(path, tint)
+                    drawLine(tint,Offset(size.width*.30f,size.height*.14f),Offset(size.width*.30f,size.height*.86f),s,StrokeCap.Round)
+                    val path=Path().apply{moveTo(size.width*.32f,size.height*.20f);lineTo(size.width*.78f,size.height*.32f);lineTo(size.width*.32f,size.height*.48f);close()};drawPath(path,tint)
                 }
-                RefActionGlyph.MORE -> repeat(3) { i -> drawCircle(tint, s, Offset(size.width * (.28f + i * .22f), size.height * .5f)) }
+                RefActionGlyph.MORE -> repeat(3){i->drawCircle(tint,s,Offset(size.width*(.28f+i*.22f),size.height*.5f))}
                 RefActionGlyph.CANCEL -> {
-                    drawLine(tint, Offset(size.width * .25f, size.height * .25f), Offset(size.width * .75f, size.height * .75f), s, StrokeCap.Round)
-                    drawLine(tint, Offset(size.width * .75f, size.height * .25f), Offset(size.width * .25f, size.height * .75f), s, StrokeCap.Round)
+                    drawLine(tint,Offset(size.width*.25f,size.height*.25f),Offset(size.width*.75f,size.height*.75f),s,StrokeCap.Round)
+                    drawLine(tint,Offset(size.width*.75f,size.height*.25f),Offset(size.width*.25f,size.height*.75f),s,StrokeCap.Round)
                 }
             }
         }
@@ -397,8 +405,7 @@ private fun ReferencePremoveOverlay(
     var from by remember(runtime.positionRevision) { mutableStateOf<Square?>(null) }
     LaunchedEffect(runtime.queuedPremove) { if (runtime.queuedPremove == null) from = null }
     Box(
-        modifier
-            .semantics { contentDescription = "Premove input board" }
+        modifier.semantics { contentDescription = "Premove input board" }
             .testTag(PLAY_PREMOVE_OVERLAY_TEST_TAG)
             .pointerInput(runtime.positionRevision, orientation, humanSide) {
                 detectTapGestures { offset ->
@@ -410,10 +417,7 @@ private fun ReferencePremoveOverlay(
                         from = square
                     } else {
                         val piece = runtime.position[selected]
-                        val promotion = if (
-                            piece?.type == PieceType.PAWN &&
-                            square.rank == if (humanSide == Color.WHITE) 7 else 0
-                        ) PieceType.QUEEN else null
+                        val promotion = if (piece?.type == PieceType.PAWN && square.rank == if (humanSide == Color.WHITE) 7 else 0) PieceType.QUEEN else null
                         onPremove(Move(selected, square, promotion))
                         from = null
                     }

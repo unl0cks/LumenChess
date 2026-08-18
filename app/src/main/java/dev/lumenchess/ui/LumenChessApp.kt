@@ -36,6 +36,7 @@ import dev.lumenchess.play.ReferencePlayRoute
 import dev.lumenchess.settings.AppearanceSettings
 import dev.lumenchess.settings.BoardAppearanceScreen
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
+import dev.lumenchess.settings.PlaySettingsScreen
 import dev.lumenchess.settings.SettingsScreen
 import dev.lumenchess.settings.SoundsHapticsScreen
 import kotlinx.coroutines.launch
@@ -47,7 +48,7 @@ internal enum class MainTab(val label:String,val previewCopy:String) {
     Insights("Insights","Explore performance trends and chess statistics"),
     Settings("Settings","Tune LumenChess to your board and feedback preferences"),
 }
-private enum class SettingsDestination { ROOT,BOARD_APPEARANCE,SOUNDS_HAPTICS }
+private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS }
 
 @Composable
 fun LumenChessApp() {
@@ -85,9 +86,24 @@ fun LumenChessApp() {
                         when(tab) {
                             MainTab.Play -> ReferencePlayRoute(viewModel=playViewModel,modifier=Modifier.fillMaxSize())
                             MainTab.Settings -> when(destination) {
-                                SettingsDestination.ROOT -> SettingsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.BOARD_APPEARANCE},{settingsDestination=SettingsDestination.SOUNDS_HAPTICS},Modifier.fillMaxSize())
-                                SettingsDestination.BOARD_APPEARANCE -> BoardAppearanceScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
-                                SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.ROOT -> SettingsScreen(
+                                    settings=appearanceSettings,
+                                    onSettingsChange=::persist,
+                                    onOpenBoardAppearance={settingsDestination=SettingsDestination.BOARD_APPEARANCE},
+                                    onOpenSoundsHaptics={settingsDestination=SettingsDestination.SOUNDS_HAPTICS},
+                                    modifier=Modifier.fillMaxSize(),
+                                    onOpenPlaySettings={settingsDestination=SettingsDestination.PLAY},
+                                )
+                                SettingsDestination.PLAY -> PlaySettingsScreen(
+                                    settings=appearanceSettings,
+                                    onSettingsChange=::persist,
+                                    onBack={settingsDestination=SettingsDestination.ROOT},
+                                    onOpenBoardAppearance={settingsDestination=SettingsDestination.BOARD_APPEARANCE},
+                                    onOpenSoundsHaptics={settingsDestination=SettingsDestination.SOUNDS_HAPTICS},
+                                    modifier=Modifier.fillMaxSize(),
+                                )
+                                SettingsDestination.BOARD_APPEARANCE -> BoardAppearanceScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
+                                SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
                             }
                             else -> FutureSurfacePreview(tab)
                         }
