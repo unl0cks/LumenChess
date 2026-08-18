@@ -73,30 +73,31 @@ class P5SetupScreenshotQaTest {
         waitForTag(PLAY_SETUP_TEST_TAG)
 
         composeRule.onNodeWithTag("main-tab-play").assertDoesNotExist()
-        waitForTag("p5-setup-shell")
-        waitForTag("p5-setup-standard")
-        waitForTag("p5-setup-opponent")
-        waitForTag("p5-setup-strength-slider")
-        waitForTag("p5-match-my-elo")
-        waitForTag("p5-setup-strength-model")
-        waitForTag("p5-setup-side")
-        waitForTag("p5-setup-time")
-        waitForTag("p5-inc-delay")
-        waitForTag("p5-setup-start")
-        waitForTag("p5-setup-back")
+        listOf(
+            "p5-setup-shell",
+            "p5-setup-standard",
+            "p5-setup-opponent",
+            "p5-setup-strength-slider",
+            "p5-match-my-elo",
+            "p5-setup-strength-model",
+            "p5-setup-side",
+            "p5-setup-time",
+            "p5-inc-delay",
+            "p5-setup-start",
+            "p5-setup-note-1",
+            "p5-setup-note-2",
+            "p5-setup-back",
+        ).forEach(::waitForTag)
 
         composeRule.onNodeWithTag("p5-match-my-elo").assertIsNotEnabled()
-        composeRule.onNodeWithText("1450").assertIsDisplayed()
-        composeRule.onNodeWithText("Stockfish 18").assertIsDisplayed()
-        composeRule.onNodeWithText("Hybrid").assertIsDisplayed()
-        composeRule.onNodeWithText("White").assertIsDisplayed()
-        composeRule.onNodeWithText("Rapid").assertIsDisplayed()
-        composeRule.onNodeWithText("10 sec").assertIsDisplayed()
-        composeRule.onNodeWithText("Start Game").assertIsDisplayed()
+        listOf("1450", "Stockfish 18", "Hybrid", "White", "Rapid", "10 sec", "Start Game").forEach {
+            composeRule.onNodeWithText(it).assertIsDisplayed()
+        }
         composeRule.onNodeWithText("Match My Elo is preview-only in this build.").assertIsDisplayed()
         composeRule.onNodeWithText("Your selected strength, side and clock apply when the game starts.").assertIsDisplayed()
 
         assertReferenceWidthRelationships()
+        assertReferenceVerticalRelationships()
         logReferenceMetrics()
         capture("01-setup.png")
         capturePressState("p5-setup-standard")
@@ -117,65 +118,70 @@ class P5SetupScreenshotQaTest {
 
     private fun verifyInterTightRuntimeResource() {
         val resources = composeRule.activity.resources
-        check(resources.getResourceEntryName(R.font.inter_tight_regular) == "inter_tight_regular") {
-            "New Game typography resource did not resolve to Inter Tight"
-        }
+        check(resources.getResourceEntryName(R.font.inter_tight_regular) == "inter_tight_regular")
         val typeface = resources.getFont(R.font.inter_tight_regular)
-        check(typeface != Typeface.DEFAULT && typeface != Typeface.DEFAULT_BOLD) {
-            "Inter Tight resolved to a platform default typeface"
-        }
+        check(typeface != Typeface.DEFAULT && typeface != Typeface.DEFAULT_BOLD)
     }
 
     private fun assertReferenceWidthRelationships() {
         val metrics = composeRule.activity.resources.displayMetrics
         val screenWidth = metrics.widthPixels.toFloat()
-        val shellInner = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot
-        // The shell tag intentionally sits on the inner content box after 11dp horizontal padding.
-        // Add that known padding back to measure the actual rendered outer frame without moving the
-        // production semantics modifier and risking a visual/layout change.
+        val shellInner = bounds("p5-setup-shell")
         val shellOuterWidth = shellInner.width + 22f * metrics.density
-        val opponentWidth = composeRule.onNodeWithTag("p5-setup-opponent").fetchSemanticsNode().boundsInRoot.width
-        val shellRatio = shellOuterWidth / screenWidth
-        val opponentRatio = opponentWidth / screenWidth
-        assertTrue(
-            "Setup shell should occupy roughly the reference phone width; ratio=$shellRatio",
-            shellRatio in 0.91f..0.96f,
-        )
-        assertTrue(
-            "Main setup controls should occupy roughly 89.5% of screen width; ratio=$opponentRatio",
-            opponentRatio in 0.86f..0.92f,
-        )
+        val opponentWidth = bounds("p5-setup-opponent").width
+        assertTrue("shell width ratio=${shellOuterWidth / screenWidth}", shellOuterWidth / screenWidth in 0.91f..0.96f)
+        assertTrue("control width ratio=${opponentWidth / screenWidth}", opponentWidth / screenWidth in 0.86f..0.92f)
+    }
+
+    private fun assertReferenceVerticalRelationships() {
+        val metrics = composeRule.activity.resources.displayMetrics
+        val screenHeight = metrics.heightPixels.toFloat()
+        val density = metrics.density
+        val shellInner = bounds("p5-setup-shell")
+        val shellTop = shellInner.top - 7f * density
+        val shellBottom = shellInner.bottom + 7f * density
+        val shellRatio = (shellBottom - shellTop) / screenHeight
+        val compositionBottomRatio = bounds("p5-setup-note-2").bottom / screenHeight
+
+        assertTrue("setup shell must occupy most of Pixel content; ratio=$shellRatio", shellRatio in 0.84f..0.91f)
+        assertTrue("setup composition including truthful notes should reach 90-95% of viewport; bottom=$compositionBottomRatio", compositionBottomRatio in 0.90f..0.95f)
+
+        assertHeightDp("p5-setup-header", 38f, 44f)
+        assertHeightDp("p5-setup-standard", 56f, 64f)
+        assertHeightDp("p5-setup-opponent", 56f, 64f)
+        assertHeightDp("p5-setup-strength-slider", 24f, 30f)
+        assertHeightDp("p5-match-my-elo", 48f, 54f)
+        assertHeightDp("p5-setup-strength-model", 46f, 52f)
+        assertHeightDp("p5-setup-side", 78f, 92f)
+        assertHeightDp("p5-setup-time", 52f, 58f)
+        assertHeightDp("p5-inc-delay", 52f, 58f)
+        assertHeightDp("p5-setup-start", 48f, 54f)
+    }
+
+    private fun assertHeightDp(tag: String, min: Float, max: Float) {
+        val density = composeRule.activity.resources.displayMetrics.density
+        val height = bounds(tag).height / density
+        assertTrue("$tag height=${height}dp expected $min..$max", height in min..max)
     }
 
     private fun logReferenceMetrics() {
         val metrics = composeRule.activity.resources.displayMetrics
-        val shellInner = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot
-        val horizontalPadding = 11f * metrics.density
-        val verticalPadding = 7f * metrics.density
-        println(
-            "P5_SETUP_METRIC p5-setup-shell " +
-                "x=${shellInner.left - horizontalPadding} " +
-                "y=${shellInner.top - verticalPadding} " +
-                "w=${shellInner.width + horizontalPadding * 2f} " +
-                "h=${shellInner.height + verticalPadding * 2f}",
-        )
+        val shellInner = bounds("p5-setup-shell")
+        val hp = 11f * metrics.density
+        val vp = 7f * metrics.density
+        println("P5_SETUP_METRIC viewport w=${metrics.widthPixels} h=${metrics.heightPixels}")
+        println("P5_SETUP_METRIC p5-setup-shell x=${shellInner.left - hp} y=${shellInner.top - vp} w=${shellInner.width + hp * 2f} h=${shellInner.height + vp * 2f}")
         listOf(
-            "p5-setup-header",
-            "p5-setup-game-mode",
-            "p5-setup-opponent",
-            "p5-setup-strength-slider",
-            "p5-match-my-elo",
-            "p5-setup-strength-model",
-            "p5-setup-side",
-            "p5-setup-time",
-            "p5-inc-delay",
-            "p5-setup-start",
-            "p5-setup-note-1",
+            "p5-setup-header", "p5-setup-game-mode", "p5-setup-standard", "p5-setup-opponent",
+            "p5-setup-strength-slider", "p5-match-my-elo", "p5-setup-strength-model", "p5-setup-side",
+            "p5-setup-time", "p5-inc-delay", "p5-setup-start", "p5-setup-note-1", "p5-setup-note-2",
         ).forEach { tag ->
-            val bounds = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
-            println("P5_SETUP_METRIC $tag x=${bounds.left} y=${bounds.top} w=${bounds.width} h=${bounds.height}")
+            val b = bounds(tag)
+            println("P5_SETUP_METRIC $tag x=${b.left} y=${b.top} w=${b.width} h=${b.height}")
         }
     }
+
+    private fun bounds(tag: String) = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
 
     private fun waitForTag(tag: String, timeoutMillis: Long = 5_000L) {
         composeRule.waitUntil(timeoutMillis = timeoutMillis) {
@@ -189,23 +195,17 @@ class P5SetupScreenshotQaTest {
         composeRule.waitForIdle()
         val node = composeRule.onNodeWithTag(tag)
         val rest = node.captureToImage().asAndroidBitmap()
-
-        node.performTouchInput {
-            down(center)
-            advanceEventTime(90L)
-        }
+        node.performTouchInput { down(center); advanceEventTime(90L) }
         composeRule.waitForIdle()
         val pressed = node.captureToImage().asAndroidBitmap()
-        val changedPixels = countDifferentPixels(rest, pressed)
-        assertTrue("REST and PRESSED must visibly differ in depth treatment; changed=$changedPixels", changedPixels > 250)
+        val changedRatio = countDifferentPixels(rest, pressed).toFloat() / (rest.width * rest.height).toFloat()
+        assertTrue("REST/PRESSED depth change must be immediately perceptible; changedRatio=$changedRatio", changedRatio > 0.055f)
         node.performTouchInput { up() }
         composeRule.waitForIdle()
 
         val labelHeight = 34
         val gap = 10
-        val width = rest.width + gap + pressed.width
-        val height = labelHeight + maxOf(rest.height, pressed.height)
-        val comparison = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val comparison = Bitmap.createBitmap(rest.width + gap + pressed.width, labelHeight + maxOf(rest.height, pressed.height), Bitmap.Config.ARGB_8888)
         val canvas = AndroidCanvas(comparison)
         canvas.drawColor(android.graphics.Color.rgb(8, 8, 8))
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -239,7 +239,7 @@ class P5SetupScreenshotQaTest {
         val root = requireNotNull(instrumentation.targetContext.getExternalFilesDir(null))
         val directory = File(root, "p5-screenshots").apply { mkdirs() }
         FileOutputStream(File(directory, name)).use { output ->
-            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) { "Failed to encode $name" }
+            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
         }
     }
 }
