@@ -2,11 +2,13 @@ package dev.lumenchess.settings
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,13 +44,10 @@ import dev.lumenchess.customization.BoardThemeCatalog
 import dev.lumenchess.customization.LumenPreset
 import dev.lumenchess.customization.LumenPresetCatalog
 import dev.lumenchess.design.LumenColors
-import dev.lumenchess.design.LumenPanel
 import dev.lumenchess.design.LumenTabs
 import dev.lumenchess.design.LumenTopBar
 
-private enum class CustomizationTab(val label: String) {
-    BOARD("Board"), PIECES("Pieces"), BACKGROUND("Background"), PRESETS("Presets"),
-}
+private enum class CustomizationTab(val label: String) { BOARD("Board"), PIECES("Pieces"), BACKGROUND("Background"), PRESETS("Presets") }
 
 @Composable
 fun BoardAppearanceScreen(
@@ -58,203 +57,124 @@ fun BoardAppearanceScreen(
     modifier: Modifier = Modifier,
 ) {
     var tab by remember { mutableStateOf(CustomizationTab.BOARD) }
-
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+        modifier.fillMaxSize().background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift,LumenColors.Background)))
+            .padding(horizontal=13.dp,vertical=3.dp),
+        verticalArrangement=Arrangement.spacedBy(5.dp),
     ) {
-        LumenTopBar("Board & Pieces", onBack = onBack, backTestTag = "customization-back")
+        LumenTopBar("Board & Pieces",onBack=onBack,backTestTag="customization-back")
         Text(
-            settings.presetId?.let { id -> LumenPresetCatalog.definition(id)?.let { "${it.displayName} preset active" } } ?: "Custom mix",
-            style = MaterialTheme.typography.bodySmall,
-            color = LumenColors.OnSurfaceMuted,
-            modifier = Modifier.padding(start = 2.dp).testTag("customization-status"),
+            settings.presetId?.let { id -> LumenPresetCatalog.definition(id)?.let { "${it.displayName} preset" } } ?: "Custom mix",
+            style=MaterialTheme.typography.labelSmall,color=LumenColors.OnSurfaceMuted,
+            modifier=Modifier.padding(start=2.dp).testTag("customization-status"),
         )
+        Box(
+            Modifier.fillMaxWidth().background(LumenColors.Surface,RoundedCornerShape(8.dp))
+                .border(1.dp,LumenColors.Outline,RoundedCornerShape(8.dp)).padding(6.dp),
+        ) { BoardPreview(settings,Modifier.fillMaxWidth().height(248.dp)) }
 
-        LumenPanel(Modifier.fillMaxWidth()) {
-            BoardPreview(settings, Modifier.fillMaxWidth().height(380.dp))
-        }
-
-        LumenTabs(
-            labels = CustomizationTab.entries.map { it.label },
-            selectedIndex = tab.ordinal,
-            onSelected = { tab = CustomizationTab.entries[it] },
-            testTagPrefix = "customization-tab",
-        )
+        LumenTabs(CustomizationTab.entries.map{it.label},tab.ordinal,{ tab=CustomizationTab.entries[it] },testTagPrefix="customization-tab")
 
         Column(
-            Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .testTag("customization-options-grid"),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).testTag("customization-options-grid"),
+            verticalArrangement=Arrangement.spacedBy(6.dp),
         ) {
-            when (tab) {
+            when(tab) {
                 CustomizationTab.BOARD -> BoardThemeCatalog.builtIns.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pair.forEach { definition ->
-                            VisualOptionCard(
-                                title = definition.displayName,
-                                subtitle = definition.description,
-                                selected = settings.boardThemeId == definition.id,
-                                tag = "customization-board-${definition.id}",
-                                modifier = Modifier.weight(1f),
-                                preview = { BoardSwatch(definition.palette.lightSquare, definition.palette.darkSquare) },
-                            ) {
-                                onSettingsChange(
-                                    settings.withBoardTheme(definition.id).copy(
-                                        customLightSquareArgb = null,
-                                        customDarkSquareArgb = null,
-                                    ),
-                                )
+                    VisualOptionRow(pair.size) {
+                        pair.forEach { d ->
+                            VisualOptionCard(d.displayName,d.description,settings.boardThemeId==d.id,"customization-board-${d.id}",Modifier.weight(1f),{ BoardSwatch(d.palette.lightSquare,d.palette.darkSquare) }) {
+                                onSettingsChange(settings.withBoardTheme(d.id).copy(customLightSquareArgb=null,customDarkSquareArgb=null))
                             }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
-
                 CustomizationTab.PIECES -> PieceSetCatalog.builtIns.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pair.forEach { definition ->
-                            VisualOptionCard(
-                                title = definition.displayName,
-                                subtitle = if (definition.id == AppearanceSettings.DEFAULT_PIECE_SET_ID) "Filled Staunton" else "Geometric outline",
-                                selected = settings.pieceSetId == definition.id,
-                                tag = "customization-piece-${definition.id}",
-                                modifier = Modifier.weight(1f),
-                                preview = { PieceMiniatures(definition) },
-                            ) { onSettingsChange(settings.withPieceSet(definition.id)) }
+                    VisualOptionRow(pair.size) {
+                        pair.forEach { d ->
+                            VisualOptionCard(d.displayName,if(d.id==AppearanceSettings.DEFAULT_PIECE_SET_ID) "Classic shaded" else "Outline",settings.pieceSetId==d.id,"customization-piece-${d.id}",Modifier.weight(1f),{ PieceMiniatures(d) }) {
+                                onSettingsChange(settings.withPieceSet(d.id))
+                            }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
-
                 CustomizationTab.BACKGROUND -> BackgroundCatalog.builtIns.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pair.forEach { definition ->
-                            VisualOptionCard(
-                                title = definition.displayName,
-                                subtitle = definition.description,
-                                selected = settings.backgroundId == definition.id,
-                                tag = "customization-background-${definition.id}",
-                                modifier = Modifier.weight(1f),
-                                preview = {
-                                    Box(
-                                        Modifier
-                                            .fillMaxSize()
-                                            .background(Brush.verticalGradient(listOf(definition.darkTop, definition.darkBottom)), RoundedCornerShape(6.dp)),
-                                    )
-                                },
-                            ) { onSettingsChange(settings.withBackground(definition.id)) }
+                    VisualOptionRow(pair.size) {
+                        pair.forEach { d ->
+                            VisualOptionCard(d.displayName,d.description,settings.backgroundId==d.id,"customization-background-${d.id}",Modifier.weight(1f),{
+                                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(d.darkTop,d.darkBottom)),RoundedCornerShape(5.dp)))
+                            }) { onSettingsChange(settings.withBackground(d.id)) }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
-
                 CustomizationTab.PRESETS -> LumenPresetCatalog.builtIns.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pair.forEach { definition ->
-                            VisualOptionCard(
-                                title = definition.displayName,
-                                subtitle = "Board · pieces · background",
-                                selected = settings.presetId == definition.id,
-                                tag = "customization-preset-${definition.id}",
-                                modifier = Modifier.weight(1f),
-                                preview = { PresetMiniature(definition) },
-                            ) { onSettingsChange(definition.applyTo(settings)) }
+                    VisualOptionRow(pair.size) {
+                        pair.forEach { d ->
+                            VisualOptionCard(d.displayName,"Board · pieces · background",settings.presetId==d.id,"customization-preset-${d.id}",Modifier.weight(1f),{ PresetMiniature(d) }) {
+                                onSettingsChange(d.applyTo(settings))
+                            }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
-            Box(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
         }
+    }
+}
+
+@Composable
+private fun VisualOptionRow(itemCount: Int,content: @Composable RowScope.()->Unit) {
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+        content(); if(itemCount==1) Spacer(Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun VisualOptionCard(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    tag: String,
-    modifier: Modifier = Modifier,
-    preview: @Composable () -> Unit,
-    onClick: () -> Unit,
+    title:String,subtitle:String,selected:Boolean,tag:String,modifier:Modifier=Modifier,
+    preview:@Composable()->Unit,onClick:()->Unit,
 ) {
-    LumenPanel(
-        modifier = modifier.height(128.dp).clickable(onClick = onClick).testTag(tag),
-        selected = selected,
+    val shape=RoundedCornerShape(7.dp)
+    Column(
+        modifier.height(96.dp).background(if(selected)LumenColors.AccentBlueGhost else LumenColors.Surface,shape)
+            .border(1.dp,if(selected)LumenColors.AccentBlueBright else LumenColors.Outline,shape)
+            .clickable(onClick=onClick).testTag(tag).padding(6.dp),
+        verticalArrangement=Arrangement.spacedBy(3.dp),
     ) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(LumenColors.Background.copy(alpha = .55f), RoundedCornerShape(7.dp))
-                    .padding(5.dp),
-                contentAlignment = Alignment.Center,
-            ) { preview() }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    title,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (selected) LumenColors.AccentBlueBright else LumenColors.OnSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (selected) Text("✓", style = MaterialTheme.typography.labelLarge, color = LumenColors.AccentBlueBright)
-            }
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Box(
+            Modifier.fillMaxWidth().height(52.dp).background(LumenColors.Background.copy(alpha=.52f),RoundedCornerShape(5.dp)).padding(3.dp),
+            contentAlignment=Alignment.Center,
+        ) { preview() }
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(3.dp)) {
+            Text(title,Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.SemiBold,color=if(selected)LumenColors.AccentBlueBright else LumenColors.OnSurface,maxLines=1,overflow=TextOverflow.Ellipsis)
+            if(selected) Text("✓",style=MaterialTheme.typography.labelSmall,color=LumenColors.AccentBlueBright)
         }
+        Text(subtitle,style=MaterialTheme.typography.labelSmall,color=LumenColors.OnSurfaceMuted,maxLines=1,overflow=TextOverflow.Ellipsis)
     }
 }
 
 @Composable
-private fun BoardSwatch(light: Color, dark: Color) {
+private fun BoardSwatch(light:Color,dark:Color) {
     Canvas(Modifier.fillMaxSize()) {
-        val cellW = size.width / 4f
-        val cellH = size.height / 3f
-        repeat(3) { rank -> repeat(4) { file ->
-            drawRect(
-                color = if ((file + rank) % 2 == 0) light else dark,
-                topLeft = Offset(file * cellW, rank * cellH),
-                size = androidx.compose.ui.geometry.Size(cellW, cellH),
-            )
-        } }
+        val cw=size.width/4f; val ch=size.height/3f
+        repeat(3){r->repeat(4){f->drawRect(if((f+r)%2==0)light else dark,Offset(f*cw,r*ch),androidx.compose.ui.geometry.Size(cw,ch))}}
     }
 }
 
 @Composable
-private fun PieceMiniatures(pieceSet: PieceSet) {
-    Row(
-        Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        listOf(PieceType.KING, PieceType.KNIGHT, PieceType.ROOK).forEach { type ->
-            pieceSet.Piece(Piece(ChessColor.WHITE, type), Color(0xFFF0EBDD), Modifier.size(34.dp))
+private fun PieceMiniatures(pieceSet:PieceSet) {
+    Row(Modifier.fillMaxSize(),horizontalArrangement=Arrangement.SpaceEvenly,verticalAlignment=Alignment.CenterVertically) {
+        listOf(PieceType.KING,PieceType.KNIGHT,PieceType.ROOK).forEach { type ->
+            pieceSet.Piece(Piece(ChessColor.WHITE,type),Color(0xFFF0EBDD),Modifier.size(26.dp))
         }
     }
 }
 
 @Composable
-private fun PresetMiniature(preset: LumenPreset) {
-    val board = BoardThemeCatalog.definition(preset.boardThemeId).palette
-    val background = BackgroundCatalog.definition(preset.backgroundId)
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(background.darkTop, background.darkBottom)), RoundedCornerShape(6.dp))
-            .padding(7.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(Modifier.fillMaxSize(.78f)) { BoardSwatch(board.lightSquare, board.darkSquare) }
+private fun PresetMiniature(preset:LumenPreset) {
+    val board=BoardThemeCatalog.definition(preset.boardThemeId).palette
+    val bg=BackgroundCatalog.definition(preset.backgroundId)
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(bg.darkTop,bg.darkBottom)),RoundedCornerShape(5.dp)).padding(5.dp),contentAlignment=Alignment.Center) {
+        Box(Modifier.fillMaxSize(.78f)) { BoardSwatch(board.lightSquare,board.darkSquare) }
     }
 }
