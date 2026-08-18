@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,7 +43,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -103,6 +101,7 @@ internal fun ReferenceSetupScreen(
     var incrementExpanded by remember { mutableStateOf(false) }
     val shellShape = RoundedCornerShape(12.dp)
     val pageGlow = LumenColors.AccentBlueBright
+    val shellTopHighlight = LumenColors.OnSurface.copy(alpha = .055f)
 
     Column(
         modifier
@@ -158,7 +157,7 @@ internal fun ReferenceSetupScreen(
                 )
                 .drawBehind {
                     drawLine(
-                        color = LumenColors.OnSurface.copy(alpha = .055f),
+                        color = shellTopHighlight,
                         start = Offset(13.dp.toPx(), 1.dp.toPx()),
                         end = Offset(size.width - 13.dp.toPx(), 1.dp.toPx()),
                         strokeWidth = .65.dp.toPx(),
@@ -309,22 +308,25 @@ internal fun ReferenceSetupScreen(
                             .testTag("p5-setup-strength-model"),
                     ) {
                         SetupSegment(
-                            "Hybrid",
-                            ui.setup.strengthModel == EngineStrengthModel.HYBRID,
-                            Modifier.weight(1f),
+                            label = "Hybrid",
+                            selected = ui.setup.strengthModel == EngineStrengthModel.HYBRID,
+                            modifier = Modifier.weight(1f),
                             first = true,
-                        ) { viewModel.updateStrengthModel(EngineStrengthModel.HYBRID) }
+                            onClick = { viewModel.updateStrengthModel(EngineStrengthModel.HYBRID) },
+                        )
                         SetupSegment(
-                            "Engine Native",
-                            ui.setup.strengthModel == EngineStrengthModel.ENGINE_NATIVE,
-                            Modifier.weight(1.25f),
-                        ) { viewModel.updateStrengthModel(EngineStrengthModel.ENGINE_NATIVE) }
+                            label = "Engine Native",
+                            selected = ui.setup.strengthModel == EngineStrengthModel.ENGINE_NATIVE,
+                            modifier = Modifier.weight(1.25f),
+                            onClick = { viewModel.updateStrengthModel(EngineStrengthModel.ENGINE_NATIVE) },
+                        )
                         SetupSegment(
-                            "Humanized",
-                            ui.setup.strengthModel == EngineStrengthModel.HUMANIZED,
-                            Modifier.weight(1.12f),
+                            label = "Humanized",
+                            selected = ui.setup.strengthModel == EngineStrengthModel.HUMANIZED,
+                            modifier = Modifier.weight(1.12f),
                             last = true,
-                        ) { viewModel.updateStrengthModel(EngineStrengthModel.HUMANIZED) }
+                            onClick = { viewModel.updateStrengthModel(EngineStrengthModel.HUMANIZED) },
+                        )
                     }
                     Text(
                         when (ui.setup.strengthModel) {
@@ -469,6 +471,7 @@ internal fun ReferenceSetupScreen(
 private fun SetupHeader(onBack: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val backTint = LumenColors.OnSurfaceMuted.copy(alpha = .94f)
     val scale by animateFloatAsState(
         targetValue = if (pressed) .90f else 1f,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
@@ -500,16 +503,15 @@ private fun SetupHeader(onBack: () -> Unit) {
         ) {
             Canvas(Modifier.size(17.dp)) {
                 val stroke = 1.45.dp.toPx()
-                val tint = LumenColors.OnSurfaceMuted.copy(alpha = .94f)
                 drawLine(
-                    tint,
+                    backTint,
                     Offset(size.width * .70f, size.height * .16f),
                     Offset(size.width * .31f, size.height * .50f),
                     stroke,
                     StrokeCap.Round,
                 )
                 drawLine(
-                    tint,
+                    backTint,
                     Offset(size.width * .31f, size.height * .50f),
                     Offset(size.width * .70f, size.height * .84f),
                     stroke,
@@ -653,6 +655,7 @@ private fun SetupTactileSurface(
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "setup-surface-border-$mode",
     )
+    val selectedGlow = LumenColors.AccentBlueBright
 
     val baseLeft = when {
         primary -> lerp(LumenColors.AccentBlue, Color.White, .18f)
@@ -698,7 +701,7 @@ private fun SetupTactileSurface(
                     drawRect(
                         brush = Brush.radialGradient(
                             listOf(
-                                LumenColors.AccentBlueBright.copy(alpha = if (pressed) .10f else .065f),
+                                selectedGlow.copy(alpha = if (pressed) .10f else .065f),
                                 Color.Transparent,
                             ),
                             center = Offset(size.width * .28f, size.height * .45f),
@@ -769,6 +772,7 @@ private fun SetupSlider(
     )
     val fraction = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
     val accent = LumenColors.AccentBlueBright
+    val trackColor = LumenColors.SurfaceHighest.copy(alpha = .94f)
 
     Canvas(
         modifier
@@ -795,7 +799,7 @@ private fun SetupSlider(
         val track = 2.4.dp.toPx()
         val thumbX = size.width * fraction
         drawLine(
-            color = LumenColors.SurfaceHighest.copy(alpha = .94f),
+            color = trackColor,
             start = Offset(0f, y),
             end = Offset(size.width, y),
             strokeWidth = track,
@@ -815,7 +819,7 @@ private fun SetupSlider(
 }
 
 @Composable
-private fun RowScope.SetupSegment(
+private fun SetupSegment(
     label: String,
     selected: Boolean,
     modifier: Modifier,
@@ -856,7 +860,10 @@ private fun RowScope.SetupSegment(
     ) {
         Text(
             label,
-            style = SetupSupportingStyle.copy(fontSize = 10.5.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
+            style = SetupSupportingStyle.copy(
+                fontSize = 10.5.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            ),
             color = if (selected) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
             maxLines = 1,
             textAlign = TextAlign.Center,
@@ -906,8 +913,8 @@ private fun SetupChevron(expanded: Boolean) {
         animationSpec = LumenMotion.normalTween(),
         label = "setup-chevron",
     )
+    val tint = LumenColors.OnSurfaceMuted.copy(alpha = .94f)
     Canvas(Modifier.size(14.dp).graphicsLayer { rotationZ = rotation }) {
-        val tint = LumenColors.OnSurfaceMuted.copy(alpha = .94f)
         val stroke = 1.35.dp.toPx()
         drawLine(
             tint,
@@ -928,8 +935,8 @@ private fun SetupChevron(expanded: Boolean) {
 
 @Composable
 private fun SetupInfoIcon() {
+    val tint = LumenColors.OnSurfaceMuted.copy(alpha = .80f)
     Canvas(Modifier.size(12.dp)) {
-        val tint = LumenColors.OnSurfaceMuted.copy(alpha = .80f)
         drawCircle(tint, size.minDimension * .43f, style = Stroke(.9.dp.toPx()))
         drawCircle(tint, .75.dp.toPx(), Offset(center.x, size.height * .32f))
         drawLine(
@@ -956,8 +963,8 @@ private fun SetupNote(text: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun SetupCheck(modifier: Modifier = Modifier) {
+    val tint = LumenColors.AccentBlueBright.copy(alpha = .88f)
     Canvas(modifier) {
-        val tint = LumenColors.AccentBlueBright.copy(alpha = .88f)
         drawCircle(tint.copy(alpha = .10f), size.minDimension * .46f)
         drawCircle(tint.copy(alpha = .72f), size.minDimension * .43f, style = Stroke(.75.dp.toPx()))
         val stroke = .85.dp.toPx()
@@ -968,6 +975,7 @@ private fun SetupCheck(modifier: Modifier = Modifier) {
 
 @Composable
 private fun SetupIcon(glyph: SetupGlyph, tint: Color, modifier: Modifier = Modifier) {
+    val accent = LumenColors.AccentBlueBright.copy(alpha = .90f)
     Canvas(modifier) {
         val stroke = 1.1.dp.toPx()
         when (glyph) {
@@ -1000,7 +1008,7 @@ private fun SetupIcon(glyph: SetupGlyph, tint: Color, modifier: Modifier = Modif
                 }
                 if (glyph == SetupGlyph.CHESS960) {
                     drawLine(
-                        LumenColors.AccentBlueBright.copy(alpha = .90f),
+                        accent,
                         Offset(left + cell * .35f, top + cell * 3.55f),
                         Offset(left + cell * 3.65f, top + cell * .45f),
                         .85.dp.toPx(),
@@ -1021,10 +1029,15 @@ private fun SetupIcon(glyph: SetupGlyph, tint: Color, modifier: Modifier = Modif
                     close()
                 }
                 drawPath(body, pieceTint)
-                drawLine(pieceTint, Offset(size.width * .28f, size.height * .77f), Offset(size.width * .72f, size.height * .77f), stroke * 1.2f, StrokeCap.Round)
+                drawLine(
+                    pieceTint,
+                    Offset(size.width * .28f, size.height * .77f),
+                    Offset(size.width * .72f, size.height * .77f),
+                    stroke * 1.2f,
+                    StrokeCap.Round,
+                )
             }
             SetupGlyph.RANDOM -> {
-                val cardShape = RoundedCornerShape(1.5.dp)
                 drawRoundRect(
                     tint.copy(alpha = .24f),
                     Offset(size.width * .19f, size.height * .25f),
