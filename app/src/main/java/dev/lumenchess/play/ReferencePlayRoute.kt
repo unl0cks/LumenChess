@@ -1,5 +1,6 @@
 package dev.lumenchess.play
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -9,8 +10,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -25,12 +28,17 @@ private enum class ReferencePlayPage { OVERVIEW, SETUP, ARENA_PREVIEW }
 
 /** P5 reference-fidelity presentation only. Runtime ownership stays in [PlayViewModel]. */
 @Composable
-fun ReferencePlayRoute(modifier: Modifier = Modifier, viewModel: PlayViewModel) {
+fun ReferencePlayRoute(
+    modifier: Modifier = Modifier,
+    viewModel: PlayViewModel,
+    onFocusedSubpageChanged: (Boolean) -> Unit = {},
+) {
     val ui by viewModel.uiState
     var page by rememberSaveable { mutableStateOf(ReferencePlayPage.OVERVIEW) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val slideDistance = with(LocalDensity.current) { 10.dp.roundToPx() }
+    val focusedSubpageCallback by rememberUpdatedState(onFocusedSubpageChanged)
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -48,6 +56,17 @@ fun ReferencePlayRoute(modifier: Modifier = Modifier, viewModel: PlayViewModel) 
             lifecycleOwner.lifecycle.removeObserver(observer)
             viewModel.onScreenStopped()
         }
+    }
+
+    LaunchedEffect(ui.mode, page) {
+        focusedSubpageCallback(ui.mode == PlayScreenMode.SETUP && page == ReferencePlayPage.SETUP)
+    }
+    DisposableEffect(Unit) {
+        onDispose { focusedSubpageCallback(false) }
+    }
+
+    BackHandler(enabled = ui.mode == PlayScreenMode.SETUP && page == ReferencePlayPage.SETUP) {
+        page = ReferencePlayPage.OVERVIEW
     }
 
     when (ui.mode) {
@@ -75,7 +94,12 @@ fun ReferencePlayRoute(modifier: Modifier = Modifier, viewModel: PlayViewModel) 
                     onBack = { backDispatcher?.onBackPressed() },
                     modifier = Modifier,
                 )
-                ReferencePlayPage.SETUP -> ReferenceSetupScreen(ui, viewModel, Modifier)
+                ReferencePlayPage.SETUP -> ReferenceSetupScreen(
+                    ui = ui,
+                    viewModel = viewModel,
+                    onBack = { page = ReferencePlayPage.OVERVIEW },
+                    modifier = Modifier,
+                )
                 ReferencePlayPage.ARENA_PREVIEW -> ReferenceArenaPreviewScreen(
                     onBack = { page = ReferencePlayPage.OVERVIEW },
                     modifier = Modifier,
