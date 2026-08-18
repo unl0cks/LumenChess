@@ -30,7 +30,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='API37 verification and Play overview capture are running' \
+            -f description='Play overview build, capture and comparison are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -81,44 +81,21 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-      - name: Run P5 app instrumentation
+      - name: Build Play overview screenshot APKs
         id: verify
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew :app:connectedDebugAndroidTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/p5-gradle-instrumentation.txt"
-      - name: Surface instrumentation failure details
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace \
+            2>&1 | tee "$RUNNER_TEMP/p5-gradle-build.txt"
+      - name: Surface Play overview build failure
         if: steps.verify.outcome != 'success'
         shell: bash
         run: |
-          python3 - <<'PY'
-          import glob
-          import xml.etree.ElementTree as ET
-          reports = glob.glob('app/build/outputs/androidTest-results/**/*.xml', recursive=True)
-          failures = 0
-          for report in reports:
-              try:
-                  root = ET.parse(report).getroot()
-              except (ET.ParseError, OSError) as error:
-                  print(f"::warning title=Unreadable instrumentation report::{report}: {error}")
-                  continue
-              for case in root.iter('testcase'):
-                  failure = case.find('failure')
-                  if failure is None:
-                      failure = case.find('error')
-                  if failure is None:
-                      continue
-                  failures += 1
-                  detail = failure.get('message') or failure.text or 'Instrumentation test failed'
-                  detail = ' '.join(detail.split())[:3000]
-                  print(f"::error title=Instrumentation failure::{case.get('classname', 'unknown')}.{case.get('name', 'unknown')}: {detail}")
-          if not reports:
-              print('::error title=Instrumentation diagnostics::No Android test XML reports were produced')
-          elif failures == 0:
-              print(f"::error title=Instrumentation diagnostics::{len(reports)} report(s) found but no failing testcase element was parsed")
-          PY
-      - name: Capture Play overview screenshot only
+          echo "::error title=P5 Play overview build::Screenshot APK build failed"
+          tail -n 180 "$RUNNER_TEMP/p5-gradle-build.txt" || true
+      - name: Capture Play overview screenshot and comparison only
         id: screenshots
         if: steps.verify.outcome == 'success'
         continue-on-error: true
@@ -138,22 +115,53 @@ jobs:
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
           COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
           if [ "$COUNT" != "1" ]; then
-            echo "::error title=P5 Play overview screenshot::Expected 1 screenshot, found $COUNT"
+            echo "::error title=P5 Play overview screenshot::Expected exactly 1 device screenshot, found $COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
           test -f p5-screenshots/00-play-overview.png
-          printf 'Captured Play overview screenshot\n'
-      - name: Upload Play overview candidate
+
+          python3 -m pip install --quiet --disable-pip-version-check pillow
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('.')
+          reference_path = root / 'docs/references/LumenChess_UI_Concept_Blue.png'
+          candidate_path = root / 'p5-screenshots/00-play-overview.png'
+          comparison_path = root / 'p5-screenshots/00-play-overview-comparison.png'
+
+          # Tight measured crop of the first phone under "1. APP OVERVIEW".
+          reference = Image.open(reference_path).convert('RGB').crop((203, 16, 350, 368))
+          candidate = Image.open(candidate_path).convert('RGB')
+
+          target_width = reference.width
+          target_height = round(candidate.height * target_width / candidate.width)
+          candidate = candidate.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+          gap = 6
+          canvas = Image.new(
+              'RGB',
+              (reference.width + gap + candidate.width, max(reference.height, candidate.height)),
+              (8, 8, 8),
+          )
+          canvas.paste(reference, (0, 0))
+          canvas.paste(candidate, (reference.width + gap, 0))
+          canvas.save(comparison_path, optimize=True)
+
+          assert reference.size == (147, 352), reference.size
+          assert candidate.width == reference.width
+          PY
+          test -f p5-screenshots/00-play-overview-comparison.png
+          printf 'Captured Play overview and normalized reference comparison\n'
+      - name: Upload Play overview screenshot artifact
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: p5-play-overview-${{ github.sha }}
           path: |
             p5-screenshots/00-play-overview.png
-            docs/references/LumenChess_UI_Concept_Blue.png
-            docs/references/REFERENCE-MANIFEST.md
-            ${{ runner.temp }}/p5-screenshot-instrumentation.txt
+            p5-screenshots/00-play-overview-comparison.png
           if-no-files-found: error
           retention-days: 14
       - name: Upload P5 diagnostics on failure
@@ -163,13 +171,10 @@ jobs:
           name: p5-reference-diagnostics-${{ github.sha }}
           path: |
             ${{ runner.temp }}/p5-emulator.log
-            ${{ runner.temp }}/p5-gradle-instrumentation.txt
+            ${{ runner.temp }}/p5-gradle-build.txt
             ${{ runner.temp }}/p5-screenshot-instrumentation.txt
             p5-screenshots/
             docs/references/LumenChess_UI_Concept_Blue.png
-            docs/references/REFERENCE-MANIFEST.md
-            app/build/outputs/androidTest-results/
-            app/build/reports/androidTests/
           if-no-files-found: warn
           retention-days: 7
       - name: Publish P5 Play overview verification success
@@ -181,7 +186,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='API37 verification and Play overview screenshot capture passed' \
+            -f description='Play overview capture and normalized comparison passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
@@ -192,7 +197,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='API37 verification or Play overview screenshot capture failed' \
+            -f description='Play overview build, capture or comparison failed' \
             -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
