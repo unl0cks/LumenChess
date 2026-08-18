@@ -72,7 +72,6 @@ class P5SetupScreenshotQaTest {
         composeRule.onNodeWithTag("play-overview-vs-engine").performClick()
         waitForTag(PLAY_SETUP_TEST_TAG)
 
-        // New Game is a focused Play subpage: root tab navigation must not consume its bottom edge.
         composeRule.onNodeWithTag("main-tab-play").assertDoesNotExist()
         waitForTag("p5-setup-shell")
         waitForTag("p5-setup-standard")
@@ -128,11 +127,19 @@ class P5SetupScreenshotQaTest {
     }
 
     private fun assertReferenceWidthRelationships() {
-        val rootWidth = composeRule.onRoot().fetchSemanticsNode().boundsInRoot.width
+        val screenWidth = composeRule.activity.resources.displayMetrics.widthPixels.toFloat()
         val shellWidth = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot.width
         val opponentWidth = composeRule.onNodeWithTag("p5-setup-opponent").fetchSemanticsNode().boundsInRoot.width
-        assertTrue("Setup shell should occupy roughly the reference phone width", shellWidth / rootWidth in 0.91f..0.96f)
-        assertTrue("Main setup controls should occupy roughly 89.5% of screen width", opponentWidth / rootWidth in 0.86f..0.92f)
+        val shellRatio = shellWidth / screenWidth
+        val opponentRatio = opponentWidth / screenWidth
+        assertTrue(
+            "Setup shell should occupy roughly the reference phone width; ratio=$shellRatio",
+            shellRatio in 0.91f..0.96f,
+        )
+        assertTrue(
+            "Main setup controls should occupy roughly 89.5% of screen width; ratio=$opponentRatio",
+            opponentRatio in 0.86f..0.92f,
+        )
     }
 
     private fun logReferenceMetrics() {
