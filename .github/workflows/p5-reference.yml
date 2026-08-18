@@ -30,7 +30,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='Play overview build, capture and comparison are running' \
+            -f description='Play overview build, tactile capture and comparison are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -95,7 +95,7 @@ jobs:
         run: |
           echo "::error title=P5 Play overview build::Screenshot APK build failed"
           tail -n 180 "$RUNNER_TEMP/p5-gradle-build.txt" || true
-      - name: Capture Play overview screenshot and comparison only
+      - name: Capture Play overview, tactile press state and comparison only
         id: screenshots
         if: steps.verify.outcome == 'success'
         continue-on-error: true
@@ -114,12 +114,13 @@ jobs:
             | tee "$RUNNER_TEMP/p5-screenshot-instrumentation.txt"
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
           COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$COUNT" != "1" ]; then
-            echo "::error title=P5 Play overview screenshot::Expected exactly 1 device screenshot, found $COUNT"
+          if [ "$COUNT" != "2" ]; then
+            echo "::error title=P5 Play overview screenshot::Expected exactly 2 device screenshots, found $COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
           test -f p5-screenshots/00-play-overview.png
+          test -f p5-screenshots/00-play-overview-press-state.png
 
           python3 -m pip install --quiet --disable-pip-version-check pillow
           python3 - <<'PY'
@@ -153,7 +154,13 @@ jobs:
           assert candidate.width == reference.width
           PY
           test -f p5-screenshots/00-play-overview-comparison.png
-          printf 'Captured Play overview and normalized reference comparison\n'
+          FINAL_COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
+          if [ "$FINAL_COUNT" != "3" ]; then
+            echo "::error title=P5 Play overview artifact::Expected exactly 3 final PNGs, found $FINAL_COUNT"
+            find p5-screenshots -maxdepth 2 -type f -print || true
+            exit 1
+          fi
+          printf 'Captured Play overview, deterministic REST/PRESSED state and normalized reference comparison\n'
       - name: Upload Play overview screenshot artifact
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -162,6 +169,7 @@ jobs:
           path: |
             p5-screenshots/00-play-overview.png
             p5-screenshots/00-play-overview-comparison.png
+            p5-screenshots/00-play-overview-press-state.png
           if-no-files-found: error
           retention-days: 14
       - name: Upload P5 diagnostics on failure
@@ -186,7 +194,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='Play overview capture and normalized comparison passed' \
+            -f description='Play overview normal, tactile press-state and comparison passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
