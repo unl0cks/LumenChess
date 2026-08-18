@@ -148,7 +148,7 @@ private fun P5SetupScreen(ui: PlayUiState, viewModel: PlayViewModel, modifier: M
                             glyph = P5SetupGlyph.BOARD,
                             selected = ui.setup.variant == Variant.STANDARD,
                             onClick = { viewModel.updateVariant(Variant.STANDARD) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).testTag("p5-setup-standard"),
                         )
                         P5VisualSegment(
                             label = "Chess960",
@@ -331,7 +331,7 @@ private fun P5VisualSegment(
     val shape = RoundedCornerShape(8.dp)
     Row(
         modifier
-            .height(56.dp)
+            .height(62.dp)
             .background(
                 if (selected) Brush.verticalGradient(listOf(LumenColors.AccentBlueSoft, LumenColors.SurfaceRaised))
                 else Brush.verticalGradient(listOf(LumenColors.SurfaceHighest, LumenColors.SurfaceRaised)),
@@ -339,18 +339,18 @@ private fun P5VisualSegment(
             )
             .border(1.dp, if (selected) LumenColors.AccentBlueBright else LumenColors.OutlineStrong, shape)
             .clickable(role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
         P5SetupIcon(glyph, if (selected) LumenColors.AccentBlueBright else LumenColors.OnSurfaceMuted)
-        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = if (selected) LumenColors.OnSurface else LumenColors.OnSurfaceMuted, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = if (selected) LumenColors.OnSurface else LumenColors.OnSurfaceMuted, maxLines = 1)
     }
 }
 
 @Composable
 private fun P5SetupIcon(glyph: P5SetupGlyph, color: UiColor) {
-    Canvas(Modifier.size(20.dp)) {
+    Canvas(Modifier.size(24.dp)) {
         val w = size.width
         val h = size.height
         val s = size.minDimension * .08f
@@ -410,11 +410,11 @@ private fun P5DropdownSurface(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .height(56.dp)
             .background(Brush.verticalGradient(listOf(LumenColors.SurfaceHighest, LumenColors.SurfaceRaised)), shape)
             .border(1.dp, if (expanded) LumenColors.AccentBlueBright else LumenColors.OutlineStrong, shape)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 11.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
