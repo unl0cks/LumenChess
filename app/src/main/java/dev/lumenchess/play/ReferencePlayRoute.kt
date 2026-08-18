@@ -401,5 +401,13 @@ private fun referenceSquareFromOffset(offset:Offset,size:IntSize,orientation:Che
 private data class RefTimeControlOption(val label:String,val control:PlayTimeControl)
 private val REFERENCE_TIME_CONTROLS=listOf(RefTimeControlOption("1 min",PlayTimeControl(60_000L,0L)),RefTimeControlOption("3 min",PlayTimeControl(180_000L,0L)),RefTimeControlOption("5 min",PlayTimeControl(300_000L,0L)),RefTimeControlOption("10 min",PlayTimeControl(600_000L,0L)),RefTimeControlOption("15 min",PlayTimeControl(900_000L,0L)),RefTimeControlOption("30 min",PlayTimeControl(1_800_000L,0L)))
 private fun referenceTimeCategory(value:PlayTimeControl)=when{value.initialMillis<=120_000L->"Bullet";value.initialMillis<=300_000L->"Blitz";else->"Rapid"}
-private fun referenceClockText(millis:Long?):String{if(millis==null)return"--:--";val safe=millis.coerceAtLeast(0L);return"%d:%02d".format(safe/60_000L,(safe%60_000L)/1_000L)}
-private fun referenceClockAccessibility(millis:Long?):String{if(millis==null)return"unavailable";val safe=millis.coerceAtLeast(0L);return"${safe/60_000L} minutes ${(safe%60_000L)/1_000L} seconds"}
+private fun referenceClockText(millis: Long?): String {
+    if (millis == null) return "--:--"
+    val safe = millis.coerceAtLeast(0L)
+    return "%d:%02d".format(safe / 60_000L, (safe % 60_000L) / 1_000L)
+}
+private fun referenceClockAccessibility(millis: Long?): String {
+    if (millis == null) return "unavailable"
+    val safe = millis.coerceAtLeast(0L)
+    return "${safe / 60_000L} minutes ${(safe % 60_000L) / 1_000L} seconds"
+}
