@@ -33,7 +33,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -44,6 +46,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun LumenPanel(
@@ -56,12 +61,12 @@ fun LumenPanel(
         animationSpec = LumenMotion.fastTween(),
         label = "lumen-panel-border",
     )
-    val fill by animateColorAsState(
-        targetValue = if (selected) LumenColors.AccentBlueGhost else LumenColors.Surface,
-        animationSpec = LumenMotion.fastTween(),
-        label = "lumen-panel-fill",
-    )
     val shape = RoundedCornerShape(LumenRadii.Panel)
+    val fill = if (selected) {
+        Brush.verticalGradient(listOf(LumenColors.AccentBlueSoft, LumenColors.Surface))
+    } else {
+        Brush.verticalGradient(listOf(LumenColors.SurfaceRaised, LumenColors.Surface))
+    }
     Box(
         modifier = modifier
             .clip(shape)
@@ -84,24 +89,26 @@ fun LumenListRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val fill by animateColorAsState(
-        targetValue = if (pressed && enabled) LumenColors.SurfaceHighest else LumenColors.Surface,
-        animationSpec = LumenMotion.fastTween(),
-        label = "lumen-list-row-fill",
-    )
     val scale by animateFloatAsState(
         targetValue = if (pressed && enabled) 0.99f else 1f,
         animationSpec = if (pressed) LumenMotion.fastTween() else LumenMotion.releaseSpring(),
         label = "lumen-list-row-scale",
     )
     val shape = RoundedCornerShape(LumenRadii.Panel)
+    val fill = Brush.verticalGradient(
+        if (pressed && enabled) {
+            listOf(LumenColors.SurfaceHighest, LumenColors.SurfaceRaised)
+        } else {
+            listOf(LumenColors.SurfaceRaised, LumenColors.Surface)
+        },
+    )
     var rowModifier = modifier
         .fillMaxWidth()
-        .defaultMinSize(minHeight = 56.dp)
+        .defaultMinSize(minHeight = 58.dp)
         .graphicsLayer { scaleX = scale; scaleY = scale }
         .clip(shape)
         .background(fill)
-        .border(1.dp, LumenColors.Outline, shape)
+        .border(1.dp, if (pressed && enabled) LumenColors.OutlineStrong else LumenColors.Outline, shape)
     if (onClick != null) {
         rowModifier = rowModifier.clickable(
             interactionSource = interaction,
@@ -112,15 +119,12 @@ fun LumenListRow(
         )
     }
     Row(
-        modifier = rowModifier.padding(horizontal = 12.dp, vertical = 9.dp),
+        modifier = rowModifier.padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         leading?.let {
-            Box(
-                Modifier.size(30.dp),
-                contentAlignment = Alignment.Center,
-            ) { it() }
+            Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { it() }
         }
         Column(
             modifier = Modifier.weight(1f),
@@ -129,7 +133,7 @@ fun LumenListRow(
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (enabled) LumenColors.OnSurface else LumenColors.OnSurfaceFaint,
+                color = if (enabled) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -167,14 +171,17 @@ fun LumenSettingRow(
 ) {
     var resolved = modifier
     if (testTag != null) resolved = resolved.testTag(testTag)
-    LumenListRow(
-        title = title,
-        subtitle = subtitle,
-        modifier = resolved,
-        enabled = enabled,
-        trailingText = null,
-        showChevron = false,
-    )
+    Row(
+        resolved.fillMaxWidth().defaultMinSize(minHeight = 52.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = if (enabled) LumenColors.OnSurface else LumenColors.OnSurfaceMuted)
+            if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = LumenColors.OnSurfaceMuted)
+        }
+        LumenToggle(checked, onCheckedChange, enabled = enabled, contentDescription = title)
+    }
 }
 
 @Composable
@@ -187,7 +194,7 @@ fun LumenTopBar(
 ) {
     val backIconColor = LumenColors.OnSurfaceMuted
     Row(
-        modifier = modifier.fillMaxWidth().height(52.dp),
+        modifier = modifier.fillMaxWidth().height(48.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (onBack != null) {
@@ -199,7 +206,7 @@ fun LumenTopBar(
                 label = "lumen-back-scale",
             )
             var backModifier = Modifier
-                .size(48.dp)
+                .size(46.dp)
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(RoundedCornerShape(LumenRadii.Compact))
                 .clickable(
@@ -217,12 +224,12 @@ fun LumenTopBar(
                     drawLine(backIconColor, Offset(size.width * .35f, size.height * .5f), Offset(size.width * .72f, size.height * .82f), stroke, StrokeCap.Round)
                 }
             }
-            Spacer(Modifier.width(2.dp))
         }
         Text(
             title,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
             color = LumenColors.OnSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -261,7 +268,7 @@ fun LumenTabs(
     modifier: Modifier = Modifier,
     testTagPrefix: String? = null,
 ) {
-    Row(modifier = modifier.fillMaxWidth().height(48.dp)) {
+    Row(modifier = modifier.fillMaxWidth().height(46.dp)) {
         labels.forEachIndexed { index, label ->
             val selected = index == selectedIndex
             val interaction = remember { MutableInteractionSource() }
@@ -273,7 +280,7 @@ fun LumenTabs(
             )
             var tabModifier = Modifier
                 .weight(1f)
-                .height(48.dp)
+                .height(46.dp)
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
@@ -282,18 +289,13 @@ fun LumenTabs(
                 )
             if (testTagPrefix != null) tabModifier = tabModifier.testTag("$testTagPrefix-$index")
             Box(tabModifier, contentAlignment = Alignment.Center) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (pressed) LumenColors.OnSurface else tint,
-                    maxLines = 1,
-                )
+                Text(label, style = MaterialTheme.typography.labelMedium, color = if (pressed) LumenColors.OnSurface else tint, maxLines = 1)
                 if (selected) {
                     Box(
                         Modifier
                             .align(Alignment.BottomCenter)
                             .height(2.dp)
-                            .fillMaxWidth(.58f)
+                            .fillMaxWidth(.68f)
                             .clip(CircleShape)
                             .background(LumenColors.AccentBlueBright),
                     )
@@ -310,18 +312,29 @@ fun LumenEngineBadge(
 ) {
     Box(
         modifier = modifier
-            .size(28.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(LumenColors.AccentBlueSoft)
-            .border(1.dp, LumenColors.AccentBlue.copy(alpha = .55f), RoundedCornerShape(8.dp)),
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(Brush.radialGradient(listOf(LumenColors.AccentBlueBright, LumenColors.AccentBlue)))
+            .border(1.dp, LumenColors.AccentBlueBright.copy(alpha = .78f), CircleShape)
+            .semantics { contentDescription = "$label engine" },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            label.take(1).uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
-            color = LumenColors.AccentBlueBright,
-        )
+        Canvas(Modifier.size(16.dp)) {
+            val path = Path()
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val outer = size.minDimension * .48f
+            val inner = outer * .43f
+            repeat(10) { index ->
+                val radius = if (index % 2 == 0) outer else inner
+                val angle = -PI / 2 + index * PI / 5
+                val x = cx + cos(angle).toFloat() * radius
+                val y = cy + sin(angle).toFloat() * radius
+                if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            path.close()
+            drawPath(path, Color(0xFFF5F7F7))
+        }
     }
 }
 
@@ -330,28 +343,26 @@ fun LumenClock(
     text: String,
     modifier: Modifier = Modifier,
     active: Boolean = false,
+    light: Boolean = false,
 ) {
-    val border by animateColorAsState(
+    val animatedBorder by animateColorAsState(
         targetValue = if (active) LumenColors.AccentBlue.copy(alpha = .75f) else LumenColors.Outline,
         animationSpec = LumenMotion.fastTween(),
         label = "lumen-clock-border",
     )
+    val background = if (light) Color(0xFFF0EFE8) else if (active) LumenColors.SurfaceHighest else LumenColors.Background
+    val border = if (light) Color(0xFFCAC8BE) else animatedBorder
+    val textColor = if (light) Color(0xFF16191A) else LumenColors.OnSurface
     Box(
         modifier = modifier
             .defaultMinSize(minWidth = 88.dp, minHeight = 44.dp)
             .clip(RoundedCornerShape(LumenRadii.Control))
-            .background(if (active) LumenColors.SurfaceHighest else LumenColors.Background)
+            .background(background)
             .border(1.dp, border, RoundedCornerShape(LumenRadii.Control))
             .padding(horizontal = 12.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = LumenColors.OnSurface,
-            maxLines = 1,
-        )
+        Text(text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = textColor, maxLines = 1)
     }
 }
 
@@ -411,7 +422,7 @@ fun LumenToggle(
 
 @Composable
 private fun LumenChevron(enabled: Boolean) {
-    val chevronColor = if (enabled) LumenColors.OnSurfaceFaint else LumenColors.Outline
+    val chevronColor = if (enabled) LumenColors.OnSurfaceMuted else LumenColors.OutlineStrong
     Canvas(Modifier.size(16.dp)) {
         val stroke = 1.5.dp.toPx()
         drawLine(chevronColor, Offset(size.width * .36f, size.height * .25f), Offset(size.width * .64f, size.height * .5f), stroke, StrokeCap.Round)

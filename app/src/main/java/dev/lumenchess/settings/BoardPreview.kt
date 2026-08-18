@@ -26,11 +26,11 @@ fun BoardPreview(
         modifier = modifier
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .testTag("board-preview")
-            .padding(10.dp),
+            .padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val widthTarget = maxWidth * 0.84f
-        val heightTarget = maxHeight - 12.dp
+        val widthTarget = maxWidth * 0.97f
+        val heightTarget = maxHeight - 4.dp
         val boardSize = if (widthTarget <= heightTarget) widthTarget else heightTarget
         LumenChessboard(
             position = Position.initial(),

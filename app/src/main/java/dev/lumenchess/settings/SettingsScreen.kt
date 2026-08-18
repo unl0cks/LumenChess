@@ -27,7 +27,6 @@ import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenListRow
 import dev.lumenchess.design.LumenPanel
 import dev.lumenchess.design.LumenSegment
-import dev.lumenchess.design.LumenSpacing
 import dev.lumenchess.design.LumenTopBar
 
 @Composable
@@ -43,48 +42,54 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(LumenSpacing.Lg),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         LumenTopBar(title = "Settings")
 
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Appearance", style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurface)
             LumenPanel(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LumenSegment(
-                        label = "System",
-                        selected = settings.appearance == AppAppearance.SYSTEM,
-                        onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.SYSTEM)) },
-                        modifier = Modifier.weight(1f),
-                        testTag = "appearance-system",
-                    )
-                    LumenSegment(
-                        label = "Dark",
-                        selected = settings.appearance == AppAppearance.DARK,
-                        onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.DARK)) },
-                        modifier = Modifier.weight(1f),
-                        testTag = "appearance-dark",
-                    )
-                    LumenSegment(
-                        label = "OLED",
-                        selected = settings.appearance == AppAppearance.OLED_DARK,
-                        onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.OLED_DARK)) },
-                        modifier = Modifier.weight(1f),
-                        testTag = "appearance-oled_dark",
-                    )
-                    LumenSegment(
-                        label = "Light",
-                        selected = settings.appearance == AppAppearance.LIGHT,
-                        onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.LIGHT)) },
-                        modifier = Modifier.weight(1f),
-                        testTag = "appearance-light",
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Interface theme", style = MaterialTheme.typography.bodySmall, color = LumenColors.OnSurfaceMuted)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        LumenSegment(
+                            label = "System",
+                            selected = settings.appearance == AppAppearance.SYSTEM,
+                            onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.SYSTEM)) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "appearance-system",
+                        )
+                        LumenSegment(
+                            label = "Dark",
+                            selected = settings.appearance == AppAppearance.DARK,
+                            onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.DARK)) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "appearance-dark",
+                        )
+                        LumenSegment(
+                            label = "OLED",
+                            selected = settings.appearance == AppAppearance.OLED_DARK,
+                            onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.OLED_DARK)) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "appearance-oled_dark",
+                        )
+                        LumenSegment(
+                            label = "Light",
+                            selected = settings.appearance == AppAppearance.LIGHT,
+                            onClick = { onSettingsChange(settings.copy(appearance = AppAppearance.LIGHT)) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "appearance-light",
+                        )
+                    }
                 }
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().testTag("settings-category-list"),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
             SettingsRow(
                 kind = SettingsGlyphKind.ENGINE,
                 title = "Engines",
@@ -159,14 +164,17 @@ private enum class SettingsGlyphKind { ENGINE, PLAY, REVIEW, SOUND, RATING, ACCO
 
 @Composable
 private fun SettingsGlyph(kind: SettingsGlyphKind, enabled: Boolean) {
-    val tint = if (enabled) LumenColors.OnSurfaceMuted else LumenColors.OnSurfaceFaint
+    val tint = if (enabled) LumenColors.AccentBlueBright else LumenColors.OnSurfaceFaint
     Box(
         Modifier
             .fillMaxSize()
-            .background(LumenColors.SurfaceRaised, RoundedCornerShape(7.dp)),
+            .background(
+                if (enabled) LumenColors.AccentBlueSoft else LumenColors.SurfaceHighest,
+                RoundedCornerShape(8.dp),
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.fillMaxSize(.56f)) {
+        Canvas(Modifier.fillMaxSize(.58f)) {
             val s = 1.45.dp.toPx()
             val w = size.width
             val h = size.height
@@ -175,10 +183,10 @@ private fun SettingsGlyph(kind: SettingsGlyphKind, enabled: Boolean) {
                     drawCircle(tint, w * .31f, Offset(w * .5f, h * .5f), style = Stroke(s))
                     repeat(4) { i ->
                         val angle = Math.PI * .5 * i
-                        val x1 = (w * .5f + kotlin.math.cos(angle).toFloat() * w * .31f)
-                        val y1 = (h * .5f + kotlin.math.sin(angle).toFloat() * h * .31f)
-                        val x2 = (w * .5f + kotlin.math.cos(angle).toFloat() * w * .46f)
-                        val y2 = (h * .5f + kotlin.math.sin(angle).toFloat() * h * .46f)
+                        val x1 = w * .5f + kotlin.math.cos(angle).toFloat() * w * .31f
+                        val y1 = h * .5f + kotlin.math.sin(angle).toFloat() * h * .31f
+                        val x2 = w * .5f + kotlin.math.cos(angle).toFloat() * w * .46f
+                        val y2 = h * .5f + kotlin.math.sin(angle).toFloat() * h * .46f
                         drawLine(tint, Offset(x1, y1), Offset(x2, y2), s, StrokeCap.Round)
                     }
                 }

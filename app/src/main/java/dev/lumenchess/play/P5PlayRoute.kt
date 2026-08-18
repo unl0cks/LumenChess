@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color as UiColor
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -59,14 +60,12 @@ import dev.lumenchess.core.chess.Square
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.design.LumenClock
 import dev.lumenchess.design.LumenColors
-import dev.lumenchess.design.LumenDangerButton
 import dev.lumenchess.design.LumenEngineBadge
 import dev.lumenchess.design.LumenPanel
 import dev.lumenchess.design.LumenPrimaryButton
 import dev.lumenchess.design.LumenSecondaryButton
 import dev.lumenchess.design.LumenSegment
 import dev.lumenchess.design.LumenSlider
-import dev.lumenchess.design.LumenSpacing
 import dev.lumenchess.design.LumenTopBar
 import dev.lumenchess.engine.api.EngineStrengthModel
 import dev.lumenchess.engine.api.EngineStrengthTarget
@@ -93,9 +92,7 @@ fun P5PlayRoute(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            viewModel.onScreenStarted()
-        }
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) viewModel.onScreenStarted()
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             viewModel.onScreenStopped()
@@ -107,6 +104,8 @@ fun P5PlayRoute(
         PlayScreenMode.LIVE -> P5LiveScreen(ui, viewModel, modifier)
     }
 }
+
+private enum class P5SetupGlyph { BOARD, SHUFFLE, WHITE, BLACK, RANDOM, CLOCK }
 
 @Composable
 private fun P5SetupScreen(ui: PlayUiState, viewModel: PlayViewModel, modifier: Modifier) {
@@ -120,7 +119,7 @@ private fun P5SetupScreen(ui: PlayUiState, viewModel: PlayViewModel, modifier: M
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .testTag(PLAY_SETUP_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         LumenTopBar(title = "New Game")
 
@@ -135,198 +134,259 @@ private fun P5SetupScreen(ui: PlayUiState, viewModel: PlayViewModel, modifier: M
                             color = LumenColors.OnSurfaceMuted,
                         )
                     }
-                    LumenSecondaryButton(
-                        label = "Resume",
-                        onClick = viewModel::resumeLastGame,
-                        modifier = Modifier.testTag(PLAY_RESUME_TEST_TAG),
-                    )
+                    LumenSecondaryButton("Resume", viewModel::resumeLastGame, Modifier.testTag(PLAY_RESUME_TEST_TAG))
                 }
             }
         }
 
-        P5Section("Game Mode") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                LumenSegment(
-                    label = "Standard",
-                    selected = ui.setup.variant == Variant.STANDARD,
-                    onClick = { viewModel.updateVariant(Variant.STANDARD) },
-                    modifier = Modifier.weight(1f),
-                )
-                LumenSegment(
-                    label = "Chess960",
-                    selected = ui.setup.variant == Variant.CHESS960,
-                    onClick = { viewModel.updateVariant(Variant.CHESS960) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            if (ui.setup.variant == Variant.CHESS960) {
-                val index = ui.setup.chess960Index ?: 518
-                P5ValueLine("Starting position", "#$index")
-                LumenSlider(
-                    value = index.toFloat(),
-                    onValueChange = { viewModel.updateChess960Index(it.roundToInt().coerceIn(0, 959)) },
-                    valueRange = 0f..959f,
-                    steps = 958,
-                )
-            }
-        }
-
-        P5Section("Opponent") {
-            P5DropdownSurface(
-                title = ui.setup.engine.displayName,
-                value = "Engine",
-                expanded = engineExpanded,
-                leading = { LumenEngineBadge(ui.setup.engine.displayName) },
-                onClick = { engineExpanded = !engineExpanded },
-            )
-            if (engineExpanded) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    PlayEngine.entries.forEach { engine ->
-                        P5ChoiceRow(
-                            label = engine.displayName,
-                            selected = ui.setup.engine == engine,
-                            onClick = {
-                                viewModel.updateEngine(engine)
-                                engineExpanded = false
-                            },
+        LumenPanel(Modifier.fillMaxWidth().testTag("p5-setup-shell")) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                P5Section("Game Mode") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        P5VisualSegment(
+                            label = "Standard",
+                            glyph = P5SetupGlyph.BOARD,
+                            selected = ui.setup.variant == Variant.STANDARD,
+                            onClick = { viewModel.updateVariant(Variant.STANDARD) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        P5VisualSegment(
+                            label = "Chess960",
+                            glyph = P5SetupGlyph.SHUFFLE,
+                            selected = ui.setup.variant == Variant.CHESS960,
+                            onClick = { viewModel.updateVariant(Variant.CHESS960) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (ui.setup.variant == Variant.CHESS960) {
+                        val index = ui.setup.chess960Index ?: 518
+                        P5ValueLine("Starting position", "#$index")
+                        LumenSlider(
+                            value = index.toFloat(),
+                            onValueChange = { viewModel.updateChess960Index(it.roundToInt().coerceIn(0, 959)) },
+                            valueRange = 0f..959f,
+                            steps = 958,
                         )
                     }
                 }
-            }
-        }
 
-        P5Section("Strength (Elo)") {
-            when (val target = ui.setup.strengthTarget) {
-                is EngineStrengthTarget.Elo -> {
-                    Text(
-                        target.value.toString(),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = LumenColors.AccentBlueBright,
+                P5Section("Opponent") {
+                    P5DropdownSurface(
+                        title = ui.setup.engine.displayName,
+                        value = "Engine",
+                        expanded = engineExpanded,
+                        leading = { LumenEngineBadge(ui.setup.engine.displayName) },
+                        onClick = { engineExpanded = !engineExpanded },
                     )
-                    LumenSlider(
-                        value = target.value.toFloat(),
-                        onValueChange = {
-                            val snapped = ((it / 50f).roundToInt() * 50).coerceIn(400, 3000)
-                            viewModel.updateStrengthTarget(EngineStrengthTarget.Elo(snapped))
-                        },
-                        valueRange = 400f..3000f,
-                    )
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("400", style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
-                        Text("3000", style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
+                    if (engineExpanded) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            PlayEngine.entries.forEach { engine ->
+                                P5ChoiceRow(engine.displayName, ui.setup.engine == engine) {
+                                    viewModel.updateEngine(engine)
+                                    engineExpanded = false
+                                }
+                            }
+                        }
                     }
                 }
-                EngineStrengthTarget.FullStrength -> {
-                    Text("Maximum", style = MaterialTheme.typography.titleLarge, color = LumenColors.AccentBlueBright)
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                LumenSegment(
-                    label = "Elo",
-                    selected = ui.setup.strengthTarget is EngineStrengthTarget.Elo,
-                    onClick = { viewModel.updateStrengthTarget(EngineStrengthTarget.Elo(1600)) },
-                    modifier = Modifier.weight(1f),
-                )
-                LumenSegment(
-                    label = "Maximum",
-                    selected = ui.setup.strengthTarget == EngineStrengthTarget.FullStrength,
-                    onClick = { viewModel.updateStrengthTarget(EngineStrengthTarget.FullStrength) },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
 
-        if (ui.setup.strengthTarget is EngineStrengthTarget.Elo) {
-            P5Section("Strength Model") {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(
-                        EngineStrengthModel.HYBRID to "Hybrid",
-                        EngineStrengthModel.ENGINE_NATIVE to "Engine Native",
-                        EngineStrengthModel.HUMANIZED to "Humanized",
-                    ).forEach { (model, label) ->
+                P5Section("Strength (Elo)") {
+                    when (val target = ui.setup.strengthTarget) {
+                        is EngineStrengthTarget.Elo -> {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(target.value.toString(), style = MaterialTheme.typography.titleLarge, color = LumenColors.AccentBlueBright, fontWeight = FontWeight.SemiBold)
+                                Text("400 — 3000", style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
+                            }
+                            LumenSlider(
+                                value = target.value.toFloat(),
+                                onValueChange = {
+                                    val snapped = ((it / 50f).roundToInt() * 50).coerceIn(400, 3000)
+                                    viewModel.updateStrengthTarget(EngineStrengthTarget.Elo(snapped))
+                                },
+                                valueRange = 400f..3000f,
+                            )
+                        }
+                        EngineStrengthTarget.FullStrength -> Text("Maximum", style = MaterialTheme.typography.titleLarge, color = LumenColors.AccentBlueBright)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         LumenSegment(
-                            label = label,
-                            selected = ui.setup.strengthModel == model,
-                            onClick = { viewModel.updateStrengthModel(model) },
+                            label = "Elo",
+                            selected = ui.setup.strengthTarget is EngineStrengthTarget.Elo,
+                            onClick = { viewModel.updateStrengthTarget(EngineStrengthTarget.Elo(1600)) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        LumenSegment(
+                            label = "Maximum",
+                            selected = ui.setup.strengthTarget == EngineStrengthTarget.FullStrength,
+                            onClick = { viewModel.updateStrengthTarget(EngineStrengthTarget.FullStrength) },
                             modifier = Modifier.weight(1f),
                         )
                     }
                 }
-                Text(
-                    when (ui.setup.strengthModel) {
-                        EngineStrengthModel.HYBRID -> "Engine limits with restrained humanization."
-                        EngineStrengthModel.ENGINE_NATIVE -> "Use the engine's native strength controls."
-                        EngineStrengthModel.HUMANIZED -> "Increase Lumen's human-like move selection."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = LumenColors.OnSurfaceMuted,
-                )
-            }
-        }
 
-        P5Section("Side") {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                PlaySide.entries.forEach { side ->
-                    LumenSegment(
-                        label = p5SideLabel(side),
-                        selected = ui.setup.side == side,
-                        onClick = { viewModel.updateSide(side) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
-
-        P5Section("Time Control") {
-            val currentTime = P5_TIME_CONTROLS.firstOrNull { it.control == ui.setup.timeControl }?.label
-                ?: p5TimeControlLabel(ui.setup.timeControl)
-            P5DropdownSurface(
-                title = currentTime,
-                value = "Rapid",
-                expanded = timeExpanded,
-                onClick = { timeExpanded = !timeExpanded },
-            )
-            if (timeExpanded) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    P5_TIME_CONTROLS.forEach { option ->
-                        P5ChoiceRow(
-                            label = option.label,
-                            selected = ui.setup.timeControl == option.control,
-                            onClick = {
-                                viewModel.updateTimeControl(option.control)
-                                timeExpanded = false
+                if (ui.setup.strengthTarget is EngineStrengthTarget.Elo) {
+                    P5Section("Strength Model") {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                EngineStrengthModel.HYBRID to "Hybrid",
+                                EngineStrengthModel.ENGINE_NATIVE to "Engine Native",
+                                EngineStrengthModel.HUMANIZED to "Humanized",
+                            ).forEach { (model, label) ->
+                                LumenSegment(
+                                    label = label,
+                                    selected = ui.setup.strengthModel == model,
+                                    onClick = { viewModel.updateStrengthModel(model) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
+                        Text(
+                            when (ui.setup.strengthModel) {
+                                EngineStrengthModel.HYBRID -> "Engine limits with restrained humanization."
+                                EngineStrengthModel.ENGINE_NATIVE -> "Use the engine's native strength controls."
+                                EngineStrengthModel.HUMANIZED -> "Increase Lumen's human-like move selection."
                             },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LumenColors.OnSurfaceMuted,
                         )
                     }
                 }
+
+                P5Section("Side") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        PlaySide.entries.forEach { side ->
+                            P5VisualSegment(
+                                label = p5SideLabel(side),
+                                glyph = when (side) {
+                                    PlaySide.WHITE -> P5SetupGlyph.WHITE
+                                    PlaySide.BLACK -> P5SetupGlyph.BLACK
+                                    PlaySide.RANDOM -> P5SetupGlyph.RANDOM
+                                },
+                                selected = ui.setup.side == side,
+                                onClick = { viewModel.updateSide(side) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+
+                P5Section("Time Control") {
+                    val currentTime = P5_TIME_CONTROLS.firstOrNull { it.control == ui.setup.timeControl }?.label
+                        ?: p5TimeControlLabel(ui.setup.timeControl)
+                    P5DropdownSurface(
+                        title = currentTime,
+                        value = "Rapid",
+                        expanded = timeExpanded,
+                        leading = { P5SetupIcon(P5SetupGlyph.CLOCK, LumenColors.OnSurfaceMuted) },
+                        onClick = { timeExpanded = !timeExpanded },
+                    )
+                    if (timeExpanded) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            P5_TIME_CONTROLS.forEach { option ->
+                                P5ChoiceRow(option.label, ui.setup.timeControl == option.control) {
+                                    viewModel.updateTimeControl(option.control)
+                                    timeExpanded = false
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val validationMessage = when (val validation = ui.setupValidation) {
+                    PlaySetupValidation.Valid -> null
+                    is PlaySetupValidation.Invalid -> validation.reason
+                    is PlaySetupValidation.UnsupportedStrength -> validation.reason
+                }
+                (validationMessage ?: ui.message)?.let { message ->
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(LumenColors.DestructiveSoft, RoundedCornerShape(8.dp))
+                            .border(1.dp, LumenColors.Destructive.copy(alpha = .45f), RoundedCornerShape(8.dp))
+                            .padding(10.dp),
+                    ) { Text(message, style = MaterialTheme.typography.bodySmall, color = LumenColors.Destructive) }
+                }
+
+                LumenPrimaryButton(
+                    label = "Start Game",
+                    onClick = viewModel::startNewGame,
+                    enabled = ui.setupValidation is PlaySetupValidation.Valid,
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = PLAY_START_TEST_TAG,
+                )
             }
         }
+        Spacer(Modifier.height(8.dp))
+    }
+}
 
-        val validationMessage = when (val validation = ui.setupValidation) {
-            PlaySetupValidation.Valid -> null
-            is PlaySetupValidation.Invalid -> validation.reason
-            is PlaySetupValidation.UnsupportedStrength -> validation.reason
-        }
-        (validationMessage ?: ui.message)?.let { message ->
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(LumenColors.DestructiveSoft, RoundedCornerShape(8.dp))
-                    .border(1.dp, LumenColors.Destructive.copy(alpha = .45f), RoundedCornerShape(8.dp))
-                    .padding(10.dp),
-            ) {
-                Text(message, style = MaterialTheme.typography.bodySmall, color = LumenColors.Destructive)
+@Composable
+private fun P5VisualSegment(
+    label: String,
+    glyph: P5SetupGlyph,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    Row(
+        modifier
+            .height(56.dp)
+            .background(
+                if (selected) Brush.verticalGradient(listOf(LumenColors.AccentBlueSoft, LumenColors.SurfaceRaised))
+                else Brush.verticalGradient(listOf(LumenColors.SurfaceHighest, LumenColors.SurfaceRaised)),
+                shape,
+            )
+            .border(1.dp, if (selected) LumenColors.AccentBlueBright else LumenColors.OutlineStrong, shape)
+            .clickable(role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        P5SetupIcon(glyph, if (selected) LumenColors.AccentBlueBright else LumenColors.OnSurfaceMuted)
+        Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = if (selected) LumenColors.OnSurface else LumenColors.OnSurfaceMuted, maxLines = 1)
+    }
+}
+
+@Composable
+private fun P5SetupIcon(glyph: P5SetupGlyph, color: UiColor) {
+    Canvas(Modifier.size(20.dp)) {
+        val w = size.width
+        val h = size.height
+        val s = size.minDimension * .08f
+        when (glyph) {
+            P5SetupGlyph.BOARD -> repeat(2) { r -> repeat(2) { f ->
+                if ((r + f) % 2 == 0) drawRect(color, Offset(w * (.16f + f * .34f), h * (.16f + r * .34f)), androidx.compose.ui.geometry.Size(w*.30f, h*.30f))
+                else drawRect(color.copy(alpha = .42f), Offset(w * (.16f + f * .34f), h * (.16f + r * .34f)), androidx.compose.ui.geometry.Size(w*.30f, h*.30f))
+            } }
+            P5SetupGlyph.SHUFFLE -> {
+                drawLine(color, Offset(w*.18f,h*.30f), Offset(w*.75f,h*.30f), s, StrokeCap.Round)
+                drawLine(color, Offset(w*.67f,h*.20f), Offset(w*.78f,h*.30f), s, StrokeCap.Round)
+                drawLine(color, Offset(w*.67f,h*.40f), Offset(w*.78f,h*.30f), s, StrokeCap.Round)
+                drawLine(color, Offset(w*.18f,h*.70f), Offset(w*.75f,h*.70f), s, StrokeCap.Round)
+                drawLine(color, Offset(w*.18f,h*.70f), Offset(w*.32f,h*.56f), s, StrokeCap.Round)
+            }
+            P5SetupGlyph.WHITE, P5SetupGlyph.BLACK -> {
+                val fill = if (glyph == P5SetupGlyph.WHITE) Color.WHITE else UiColor(0xFF34393C)
+                drawCircle(fill, w*.17f, Offset(w*.5f,h*.27f))
+                val pawn = Path().apply {
+                    moveTo(w*.38f,h*.42f); lineTo(w*.62f,h*.42f); lineTo(w*.69f,h*.68f); lineTo(w*.78f,h*.80f); lineTo(w*.22f,h*.80f); lineTo(w*.31f,h*.68f); close()
+                }
+                drawPath(pawn, fill)
+                drawPath(pawn, color, style = androidx.compose.ui.graphics.drawscope.Stroke(s*.7f))
+            }
+            P5SetupGlyph.RANDOM -> {
+                drawLine(color, Offset(w*.18f,h*.30f), Offset(w*.78f,h*.70f), s, StrokeCap.Round)
+                drawLine(color, Offset(w*.18f,h*.70f), Offset(w*.42f,h*.54f), s, StrokeCap.Round)
+                drawLine(color, Offset(w*.68f,h*.58f), Offset(w*.78f,h*.70f), s, StrokeCap.Round)
+                drawLine(color, Offset(w*.66f,h*.78f), Offset(w*.78f,h*.70f), s, StrokeCap.Round)
+            }
+            P5SetupGlyph.CLOCK -> {
+                drawCircle(color, w*.34f, Offset(w*.5f,h*.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(s))
+                drawLine(color, Offset(w*.5f,h*.5f), Offset(w*.5f,h*.30f), s, StrokeCap.Round)
+                drawLine(color, Offset(w*.5f,h*.5f), Offset(w*.65f,h*.58f), s, StrokeCap.Round)
             }
         }
-
-        LumenPrimaryButton(
-            label = "Start Game",
-            onClick = viewModel::startNewGame,
-            enabled = ui.setupValidation is PlaySetupValidation.Valid,
-            modifier = Modifier.fillMaxWidth(),
-            testTag = PLAY_START_TEST_TAG,
-        )
-        Spacer(Modifier.height(6.dp))
     }
 }
 
@@ -350,9 +410,9 @@ private fun P5DropdownSurface(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(50.dp)
-            .background(LumenColors.Surface, shape)
-            .border(1.dp, if (expanded) LumenColors.AccentBlue else LumenColors.Outline, shape)
+            .height(52.dp)
+            .background(Brush.verticalGradient(listOf(LumenColors.SurfaceHighest, LumenColors.SurfaceRaised)), shape)
+            .border(1.dp, if (expanded) LumenColors.AccentBlueBright else LumenColors.OutlineStrong, shape)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -360,17 +420,14 @@ private fun P5DropdownSurface(
     ) {
         leading?.invoke()
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(value, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceFaint)
+        Text(value, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceMuted)
         Text(if (expanded) "⌃" else "⌄", color = LumenColors.OnSurfaceMuted)
     }
 }
 
 @Composable
 private fun P5ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    LumenPanel(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        selected = selected,
-    ) {
+    LumenPanel(Modifier.fillMaxWidth().clickable(onClick = onClick), selected = selected) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.bodyMedium, color = if (selected) LumenColors.AccentBlueBright else LumenColors.OnSurface)
             if (selected) Text("✓", color = LumenColors.AccentBlueBright)
@@ -413,55 +470,66 @@ private fun P5LiveScreen(ui: PlayUiState, viewModel: PlayViewModel, modifier: Mo
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .padding(horizontal = 8.dp, vertical = 6.dp)
             .testTag(PLAY_LIVE_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        P5ParticipantRow(
-            name = setup.engine.displayName,
-            detail = ui.engineStatus,
-            side = engineSide,
-            activeSide = runtime.position.sideToMove,
-            clock = ui.clock,
-            engine = true,
-            modifier = Modifier.testTag(PLAY_ENGINE_STATUS_TEST_TAG),
-        )
-
-        Box(
-            modifier = Modifier
+        val shellShape = RoundedCornerShape(10.dp)
+        Column(
+            Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
-                .border(1.dp, LumenColors.OutlineStrong, RoundedCornerShape(3.dp))
-                .testTag(PLAY_BOARD_STAGE_TEST_TAG),
+                .background(Brush.verticalGradient(listOf(LumenColors.SurfaceRaised, LumenColors.Surface)), shellShape)
+                .border(1.dp, LumenColors.OutlineStrong, shellShape)
+                .padding(6.dp)
+                .testTag("p5-live-shell"),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            LumenChessboard(
-                position = runtime.position,
-                onMove = viewModel::onBoardMove,
-                modifier = Modifier.fillMaxSize(),
-                orientation = orientation,
-                input = ChessboardInput(tapEnabled = inputEnabled, dragEnabled = inputEnabled),
-                highlights = ChessboardHighlights(
-                    lastMove = lastMove,
-                    premoveSquares = queuedPremove?.let { setOf(it.from, it.to) }.orEmpty(),
-                ),
+            P5ParticipantRow(
+                name = setup.engine.displayName,
+                detail = ui.engineStatus,
+                side = engineSide,
+                activeSide = runtime.position.sideToMove,
+                clock = ui.clock,
+                engine = true,
+                modifier = Modifier.testTag(PLAY_ENGINE_STATUS_TEST_TAG),
             )
-            if (premoveEnabled) {
-                P5PremoveOverlay(
-                    runtime = runtime,
-                    humanSide = humanSide,
-                    orientation = orientation,
-                    onPremove = viewModel::queuePremove,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
 
-        P5ParticipantRow(
-            name = "You",
-            detail = humanSide.name.lowercase().replaceFirstChar { it.uppercase() },
-            side = humanSide,
-            activeSide = runtime.position.sideToMove,
-            clock = ui.clock,
-            engine = false,
-        )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .border(1.dp, LumenColors.OutlineStrong)
+                    .testTag(PLAY_BOARD_STAGE_TEST_TAG),
+            ) {
+                LumenChessboard(
+                    position = runtime.position,
+                    onMove = viewModel::onBoardMove,
+                    modifier = Modifier.fillMaxSize(),
+                    orientation = orientation,
+                    input = ChessboardInput(tapEnabled = inputEnabled, dragEnabled = inputEnabled),
+                    highlights = ChessboardHighlights(
+                        lastMove = lastMove,
+                        premoveSquares = queuedPremove?.let { setOf(it.from, it.to) }.orEmpty(),
+                    ),
+                )
+                if (premoveEnabled) {
+                    P5PremoveOverlay(
+                        runtime = runtime,
+                        humanSide = humanSide,
+                        orientation = orientation,
+                        onPremove = viewModel::queuePremove,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+
+            P5ParticipantRow(
+                name = "You",
+                detail = humanSide.name.lowercase().replaceFirstChar { it.uppercase() },
+                side = humanSide,
+                activeSide = runtime.position.sideToMove,
+                clock = ui.clock,
+                engine = false,
+            )
+        }
 
         if (!status.isNullOrBlank()) {
             Text(
@@ -474,22 +542,19 @@ private fun P5LiveScreen(ui: PlayUiState, viewModel: PlayViewModel, modifier: Mo
             )
         }
 
-        Row(
-            Modifier.fillMaxWidth().height(52.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (queuedPremove != null) {
-                P5ActionButton("Cancel", P5ActionGlyph.CANCEL, onClick = viewModel::cancelPremove)
+        LumenPanel(Modifier.fillMaxWidth().testTag("p5-live-action-strip")) {
+            Row(Modifier.fillMaxWidth().height(48.dp)) {
+                if (queuedPremove != null) P5ActionButton("Cancel", P5ActionGlyph.CANCEL, onClick = viewModel::cancelPremove)
+                if (terminal == null) {
+                    P5ActionButton(
+                        if (runtime.paused) "Resume" else "Pause",
+                        if (runtime.paused) P5ActionGlyph.PLAY else P5ActionGlyph.PAUSE,
+                        onClick = if (runtime.paused) viewModel::resume else viewModel::pause,
+                    )
+                    P5ActionButton("Resign", P5ActionGlyph.FLAG, destructive = true, onClick = viewModel::resign)
+                }
+                P5ActionButton("More", P5ActionGlyph.MORE, onClick = viewModel::backToSetup)
             }
-            if (terminal == null) {
-                P5ActionButton(
-                    if (runtime.paused) "Resume" else "Pause",
-                    if (runtime.paused) P5ActionGlyph.PLAY else P5ActionGlyph.PAUSE,
-                    onClick = if (runtime.paused) viewModel::resume else viewModel::pause,
-                )
-                P5ActionButton("Resign", P5ActionGlyph.FLAG, destructive = true, onClick = viewModel::resign)
-            }
-            P5ActionButton("More", P5ActionGlyph.MORE, onClick = viewModel::backToSetup)
         }
     }
 }
@@ -506,14 +571,12 @@ private fun P5ParticipantRow(
 ) {
     val millis = if (side == Color.WHITE) clock?.whiteRemainingMillis else clock?.blackRemainingMillis
     val active = side == activeSide
-    val shape = RoundedCornerShape(9.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .background(if (active) LumenColors.SurfaceRaised else LumenColors.Surface, shape)
-            .border(1.dp, if (active) LumenColors.AccentBlue.copy(alpha = .42f) else LumenColors.Outline, shape)
-            .padding(horizontal = 9.dp, vertical = 6.dp),
+            .height(54.dp)
+            .background(if (active) LumenColors.SurfaceHighest else LumenColors.Surface)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp),
     ) {
@@ -521,9 +584,9 @@ private fun P5ParticipantRow(
             LumenEngineBadge(name)
         } else {
             Box(
-                Modifier.size(28.dp).background(LumenColors.SurfaceHighest, RoundedCornerShape(8.dp)),
+                Modifier.size(30.dp).background(LumenColors.AccentBlueSoft, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center,
-            ) { Text("Y", style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurfaceMuted) }
+            ) { Text("♟", style = MaterialTheme.typography.titleMedium, color = LumenColors.OnSurface) }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -532,6 +595,7 @@ private fun P5ParticipantRow(
         LumenClock(
             text = p5ClockText(millis),
             active = active,
+            light = !engine,
             modifier = Modifier.semantics { contentDescription = "$name clock ${p5ClockAccessibility(millis)}" },
         )
     }
@@ -546,32 +610,28 @@ private fun RowScope.P5ActionButton(
     destructive: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val modifier = Modifier.weight(1f).fillMaxSize()
-    if (destructive) {
-        LumenDangerButton(label, onClick, modifier)
-    } else {
-        Box(
-            modifier
-                .background(LumenColors.Surface, RoundedCornerShape(8.dp))
-                .border(1.dp, LumenColors.Outline, RoundedCornerShape(8.dp))
-                .clickable(role = Role.Button, onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                P5ActionIcon(glyph, LumenColors.OnSurfaceMuted)
-                Text(label, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurface)
-            }
+    val tint = if (destructive) LumenColors.Destructive else LumenColors.OnSurfaceMuted
+    Box(
+        Modifier
+            .weight(1f)
+            .fillMaxSize()
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            P5ActionIcon(glyph, tint)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = if (destructive) LumenColors.Destructive else LumenColors.OnSurface)
         }
     }
 }
 
 @Composable
 private fun P5ActionIcon(glyph: P5ActionGlyph, color: UiColor) {
-    Canvas(Modifier.size(16.dp)) {
+    Canvas(Modifier.size(17.dp)) {
         val stroke = size.minDimension * .10f
         when (glyph) {
             P5ActionGlyph.PLAY -> {
-                val path = androidx.compose.ui.graphics.Path().apply {
+                val path = Path().apply {
                     moveTo(size.width*.30f,size.height*.18f); lineTo(size.width*.78f,size.height*.50f); lineTo(size.width*.30f,size.height*.82f); close()
                 }
                 drawPath(path,color)
@@ -582,7 +642,7 @@ private fun P5ActionIcon(glyph: P5ActionGlyph, color: UiColor) {
             }
             P5ActionGlyph.FLAG -> {
                 drawLine(color,Offset(size.width*.30f,size.height*.14f),Offset(size.width*.30f,size.height*.86f),stroke,StrokeCap.Round)
-                val path = androidx.compose.ui.graphics.Path().apply {
+                val path = Path().apply {
                     moveTo(size.width*.32f,size.height*.2f); lineTo(size.width*.78f,size.height*.32f); lineTo(size.width*.32f,size.height*.48f); close()
                 }
                 drawPath(path,color)
