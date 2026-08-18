@@ -6,6 +6,7 @@ import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -15,7 +16,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.MainActivity
@@ -23,7 +26,7 @@ import dev.lumenchess.R
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -113,13 +116,16 @@ class P5PlayOverviewScreenshotQaTest {
     }
 
     private fun assertArenaSubtitleWraps() {
-        val bounds = composeRule
-            .onNodeWithText("Watch engines battle each other")
-            .fetchSemanticsNode()
-            .boundsInRoot
-        assertTrue(
-            "Engine Arena subtitle must occupy two lines in the reference composition; height=${bounds.height}",
-            bounds.height >= 80f,
+        val textLayoutResults = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText("Watch engines battle each other", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
+                action(textLayoutResults)
+            }
+        assertEquals(
+            "Engine Arena subtitle must render as exactly two lines in the reference composition",
+            2,
+            textLayoutResults.single().lineCount,
         )
     }
 
