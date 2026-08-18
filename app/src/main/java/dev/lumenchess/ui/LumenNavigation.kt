@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.lumenchess.design.LumenColors
@@ -78,7 +79,7 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                     label = "nav-tint-${tab.label}",
                 )
                 val scale by animateFloatAsState(
-                    if (pressed) LumenMotion.IconPressScale else if (selected) 1.025f else 1f,
+                    if (pressed) LumenMotion.IconPressScale else if (selected) 1.015f else 1f,
                     if (pressed) LumenMotion.pressTween() else LumenMotion.normalTween(),
                     label = "nav-scale-${tab.label}",
                 )
@@ -96,10 +97,17 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Box(
-                        Modifier.width(20.dp).height(2.dp).background(
-                            if (selected) LumenColors.AccentBlueBright else Color.Transparent,
-                            RoundedCornerShape(2.dp),
-                        ),
+                        Modifier.width(16.dp).height(2.dp).drawBehind {
+                            if (selected) {
+                                drawLine(
+                                    color = LumenColors.AccentBlueBright,
+                                    start = Offset(1.dp.toPx(), size.height / 2f),
+                                    end = Offset(size.width - 1.dp.toPx(), size.height / 2f),
+                                    strokeWidth = 1.dp.toPx(),
+                                    cap = StrokeCap.Round,
+                                )
+                            }
+                        },
                     )
                     Spacer(Modifier.height(3.dp))
                     Box(
@@ -109,12 +117,16 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        TabIcon(tab, tint, Modifier.fillMaxSize())
+                        TabIcon(tab, tint, Modifier.size(25.5.dp))
                     }
                     Spacer(Modifier.height(1.dp))
                     Text(
                         tab.label,
-                        style = LumenTypography.BottomNav.copy(fontSize = 11.sp, lineHeight = 12.sp),
+                        style = LumenTypography.BottomNav.copy(
+                            fontSize = 10.25.sp,
+                            lineHeight = 12.sp,
+                            fontWeight = FontWeight.Normal,
+                        ),
                         color = tint,
                         maxLines = 1,
                     )
@@ -157,7 +169,7 @@ private fun TabIcon(tab: MainTab,color: Color,modifier: Modifier=Modifier.size(1
     Canvas(modifier) {
         val w=size.width
         val h=size.height
-        val s=size.minDimension*.082f
+        val s=size.minDimension*.076f
         when(tab) {
             MainTab.Play -> {
                 val knight = Path().apply {
@@ -176,35 +188,35 @@ private fun TabIcon(tab: MainTab,color: Color,modifier: Modifier=Modifier.size(1
                 drawPath(
                     knight,
                     color,
-                    style=Stroke(width=s*1.08f,cap=StrokeCap.Round,join=StrokeJoin.Round),
+                    style=Stroke(width=s,cap=StrokeCap.Round,join=StrokeJoin.Round),
                 )
-                drawLine(color,Offset(w*.14f,h*.88f),Offset(w*.84f,h*.88f),s*1.06f,StrokeCap.Round)
-                drawCircle(color,s*.67f,Offset(w*.50f,h*.25f))
+                drawLine(color,Offset(w*.14f,h*.88f),Offset(w*.84f,h*.88f),s,StrokeCap.Round)
+                drawCircle(color,s*.62f,Offset(w*.50f,h*.25f))
                 val play = Path().apply {
                     moveTo(w*.56f,h*.48f)
                     lineTo(w*.75f,h*.58f)
                     lineTo(w*.56f,h*.68f)
                     close()
                 }
-                drawPath(play,color.copy(alpha=.94f))
+                drawPath(play,color.copy(alpha=.92f))
             }
             MainTab.Arena -> {
                 drawLine(color,Offset(w*.24f,h*.22f),Offset(w*.76f,h*.78f),s,StrokeCap.Round)
                 drawLine(color,Offset(w*.76f,h*.22f),Offset(w*.24f,h*.78f),s,StrokeCap.Round)
-                drawCircle(color,s*1.25f,Offset(w*.23f,h*.21f))
-                drawCircle(color,s*1.25f,Offset(w*.77f,h*.21f))
+                drawCircle(color,s*1.15f,Offset(w*.23f,h*.21f))
+                drawCircle(color,s*1.15f,Offset(w*.77f,h*.21f))
             }
             MainTab.Games -> {
                 drawRoundRect(color,Offset(w*.2f,h*.18f),Size(w*.6f,h*.64f),CornerRadius(w*.08f),style=Stroke(s))
                 repeat(3) { i ->
                     val y=h*(.34f+i*.16f)
-                    drawLine(color,Offset(w*.32f,y),Offset(w*.68f,y),s*.75f,StrokeCap.Round)
+                    drawLine(color,Offset(w*.32f,y),Offset(w*.68f,y),s*.74f,StrokeCap.Round)
                 }
             }
             MainTab.Insights -> {
-                drawLine(color,Offset(w*.22f,h*.76f),Offset(w*.22f,h*.52f),s*1.45f,StrokeCap.Round)
-                drawLine(color,Offset(w*.5f,h*.76f),Offset(w*.5f,h*.34f),s*1.45f,StrokeCap.Round)
-                drawLine(color,Offset(w*.78f,h*.76f),Offset(w*.78f,h*.2f),s*1.45f,StrokeCap.Round)
+                drawLine(color,Offset(w*.22f,h*.76f),Offset(w*.22f,h*.52f),s*1.24f,StrokeCap.Round)
+                drawLine(color,Offset(w*.5f,h*.76f),Offset(w*.5f,h*.34f),s*1.24f,StrokeCap.Round)
+                drawLine(color,Offset(w*.78f,h*.76f),Offset(w*.78f,h*.2f),s*1.24f,StrokeCap.Round)
             }
             MainTab.Settings -> {
                 drawCircle(color,w*.29f,Offset(w*.5f,h*.5f),style=Stroke(s))
