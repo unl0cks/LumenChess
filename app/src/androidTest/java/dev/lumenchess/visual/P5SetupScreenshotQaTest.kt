@@ -199,7 +199,13 @@ class P5SetupScreenshotQaTest {
         composeRule.waitForIdle()
         val pressed = node.captureToImage().asAndroidBitmap()
         val changedRatio = countDifferentPixels(rest, pressed).toFloat() / (rest.width * rest.height).toFloat()
-        assertTrue("REST/PRESSED depth change must be immediately perceptible; changedRatio=$changedRatio", changedRatio > 0.055f)
+        val visiblyChangedRatio = countVisiblyDifferentPixels(rest, pressed, threshold = 12).toFloat() /
+            (rest.width * rest.height).toFloat()
+        assertTrue("REST/PRESSED depth rendering must change broadly; changedRatio=$changedRatio", changedRatio > 0.055f)
+        assertTrue(
+            "REST/PRESSED depth change must be perceptible without pixel peeping; visiblyChangedRatio=$visiblyChangedRatio",
+            visiblyChangedRatio > 0.04f,
+        )
         node.performTouchInput { up() }
         composeRule.waitForIdle()
 
@@ -223,10 +229,26 @@ class P5SetupScreenshotQaTest {
     private fun countDifferentPixels(first: Bitmap, second: Bitmap): Int {
         if (first.width != second.width || first.height != second.height) return Int.MAX_VALUE
         val a = IntArray(first.width * first.height)
-        val b = IntArray(second.width * second.height)
+        val b = IntArray(first.width * first.height)
         first.getPixels(a, 0, first.width, 0, 0, first.width, first.height)
         second.getPixels(b, 0, second.width, 0, 0, second.width, second.height)
         return a.indices.count { a[it] != b[it] }
+    }
+
+    private fun countVisiblyDifferentPixels(first: Bitmap, second: Bitmap, threshold: Int): Int {
+        if (first.width != second.width || first.height != second.height) return Int.MAX_VALUE
+        val a = IntArray(first.width * first.height)
+        val b = IntArray(first.width * first.height)
+        first.getPixels(a, 0, first.width, 0, 0, first.width, first.height)
+        second.getPixels(b, 0, second.width, 0, 0, second.width, second.height)
+        return a.indices.count { index ->
+            val one = a[index]
+            val two = b[index]
+            val red = kotlin.math.abs(android.graphics.Color.red(one) - android.graphics.Color.red(two))
+            val green = kotlin.math.abs(android.graphics.Color.green(one) - android.graphics.Color.green(two))
+            val blue = kotlin.math.abs(android.graphics.Color.blue(one) - android.graphics.Color.blue(two))
+            maxOf(red, green, blue) >= threshold
+        }
     }
 
     private fun capture(name: String) {
