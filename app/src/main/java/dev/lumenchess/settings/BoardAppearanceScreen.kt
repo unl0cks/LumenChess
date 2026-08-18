@@ -71,7 +71,7 @@ fun BoardAppearanceScreen(
         Box(
             Modifier.fillMaxWidth().background(LumenColors.Surface,RoundedCornerShape(8.dp))
                 .border(1.dp,LumenColors.Outline,RoundedCornerShape(8.dp)).padding(6.dp),
-        ) { BoardPreview(settings,Modifier.fillMaxWidth().height(248.dp)) }
+        ) { BoardPreview(settings,Modifier.fillMaxWidth().height(326.dp)) }
 
         LumenTabs(CustomizationTab.entries.map{it.label},tab.ordinal,{ tab=CustomizationTab.entries[it] },testTagPrefix="customization-tab")
 
