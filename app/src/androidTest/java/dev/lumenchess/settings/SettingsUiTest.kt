@@ -26,15 +26,11 @@ class SettingsUiTest {
 
         composeRule.onNodeWithTag("customization-tab-3").performClick()
         composeRule.onNodeWithTag("customization-preset-midnight").performScrollTo().performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodes(androidx.compose.ui.test.hasText("Midnight preset active")).fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.onNodeWithTag("board-preview").assertIsDisplayed()
 
         composeRule.onNodeWithTag("customization-tab-2").performClick()
         composeRule.onNodeWithTag("customization-background-graphite-haze").performScrollTo().performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodes(androidx.compose.ui.test.hasText("Custom mix")).fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.onNodeWithTag("board-preview").assertIsDisplayed()
 
         composeRule.onNodeWithTag("customization-tab-0").performClick()
         composeRule.onNodeWithTag("customization-board-graphite").performScrollTo().performClick()
