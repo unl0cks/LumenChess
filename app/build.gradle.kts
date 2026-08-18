@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -39,7 +41,7 @@ val prepareLumenTypography by tasks.registering {
                 val url =
                     "https://raw.githubusercontent.com/googlefonts/inter-gf-tight/" +
                         "$interTightUpstreamCommit/fonts/ttf/$upstreamName"
-                uri(url).toURL().openStream().use { input ->
+                URI.create(url).toURL().openStream().use { input ->
                     temporary.outputStream().use { output -> input.copyTo(output) }
                 }
                 require(temporary.length() > 300_000L) {
