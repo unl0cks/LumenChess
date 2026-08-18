@@ -298,7 +298,7 @@ private fun ReferenceMovePanel(runtime: RuntimeState, setup: ResolvedPlaySetup, 
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             ReferenceGameFact("Opponent", setup.engine.displayName, Modifier.weight(1f))
-            ReferenceGameFact("You", setup.humanSide.name.lowercase().replaceFirstChar { it.uppercase() }, Modifier.weight(1f))
+            ReferenceGameFact("Side", setup.humanSide.name.lowercase().replaceFirstChar { it.uppercase() }, Modifier.weight(1f))
         }
     }
 }
