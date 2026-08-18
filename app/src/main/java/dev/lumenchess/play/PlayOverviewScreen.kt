@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
@@ -41,6 +42,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTypography
@@ -82,7 +84,11 @@ internal fun ReferencePlayOverviewScreen(
     Column(
         modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
+            .background(
+                Brush.verticalGradient(
+                    listOf(LumenColors.BackgroundLift, LumenColors.Background),
+                ),
+            )
             .padding(horizontal = 22.dp, vertical = 22.dp)
             .testTag("p5-play-overview"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -148,11 +154,13 @@ private fun PlayOverviewTopBar(title: String, onBack: () -> Unit) {
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseSpring(),
         label = "play-overview-back-scale",
     )
+    val backColor = LumenColors.OnSurfaceMuted
+
     Box(Modifier.fillMaxWidth().height(40.dp)) {
         Text(
             text = title,
             modifier = Modifier.align(Alignment.Center),
-            style = LumenTypography.PlayTitle,
+            style = LumenTypography.PlayTitle.copy(fontSize = 18.sp, lineHeight = 20.sp),
             color = LumenColors.OnSurface,
             fontWeight = FontWeight.SemiBold,
         )
@@ -175,17 +183,16 @@ private fun PlayOverviewTopBar(title: String, onBack: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Canvas(Modifier.size(16.dp)) {
-                val color = LumenColors.OnSurfaceMuted
                 val stroke = 1.4.dp.toPx()
                 drawLine(
-                    color,
+                    backColor,
                     Offset(size.width * .70f, size.height * .18f),
                     Offset(size.width * .34f, size.height * .50f),
                     stroke,
                     StrokeCap.Round,
                 )
                 drawLine(
-                    color,
+                    backColor,
                     Offset(size.width * .34f, size.height * .50f),
                     Offset(size.width * .70f, size.height * .82f),
                     stroke,
@@ -212,7 +219,11 @@ private fun PlayModeCard(
         label = "play-mode-card-scale",
     )
     val border by animateColorAsState(
-        targetValue = if (pressed) LumenColors.OutlineStrong else LumenColors.Outline.copy(alpha = .82f),
+        targetValue = if (pressed) {
+            LumenColors.OutlineStrong
+        } else {
+            LumenColors.Outline.copy(alpha = .82f)
+        },
         animationSpec = LumenMotion.pressTween(),
         label = "play-mode-card-border",
     )
@@ -266,13 +277,13 @@ private fun PlayModeCard(
         ) {
             Text(
                 title,
-                style = LumenTypography.ModeTitle,
+                style = LumenTypography.ModeTitle.copy(fontSize = 18.sp, lineHeight = 21.sp),
                 color = LumenColors.OnSurface,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 subtitle,
-                style = LumenTypography.ModeSubtitle,
+                style = LumenTypography.ModeSubtitle.copy(fontSize = 13.sp, lineHeight = 16.sp),
                 color = LumenColors.OnSurfaceMuted,
             )
         }
@@ -288,9 +299,11 @@ private fun PlayModeArtwork(
     val accent = if (pressed) LumenColors.AccentBlueBright else LumenColors.AccentBlue
     val bright = LumenColors.AccentBlueBright
     val deep = LumenColors.AccentBlueSoft
+
     Canvas(modifier) {
         val unit = size.minDimension
         val glowAlpha = if (pressed) .43f else .31f
+        val glowCenter = Offset(size.width * .46f, size.height * .51f)
 
         drawCircle(
             brush = Brush.radialGradient(
@@ -299,16 +312,16 @@ private fun PlayModeArtwork(
                     accent.copy(alpha = .15f),
                     Color.Transparent,
                 ),
-                center = Offset(size.width * .46f, size.height * .51f),
+                center = glowCenter,
                 radius = unit * .53f,
             ),
-            center = Offset(size.width * .46f, size.height * .51f),
+            center = glowCenter,
             radius = unit * .51f,
         )
 
         when (kind) {
             PlayOverviewArtwork.ENGINE -> {
-                val energyShield = Path().apply {
+                val shield = Path().apply {
                     moveTo(size.width * .18f, size.height * .24f)
                     lineTo(size.width * .38f, size.height * .12f)
                     lineTo(size.width * .67f, size.height * .18f)
@@ -320,7 +333,7 @@ private fun PlayModeArtwork(
                     close()
                 }
                 drawPath(
-                    path = energyShield,
+                    path = shield,
                     brush = Brush.linearGradient(
                         listOf(
                             bright.copy(alpha = .92f),
@@ -332,9 +345,9 @@ private fun PlayModeArtwork(
                     ),
                 )
                 drawPath(
-                    path = energyShield,
+                    path = shield,
                     color = Color(0xFFCDEBF2).copy(alpha = .36f),
-                    style = Stroke(width = 1.1.dp.toPx()),
+                    style = Stroke(width = 1.1.dp.toPx(), join = StrokeJoin.Round),
                 )
 
                 val rook = Path().apply {
@@ -373,10 +386,7 @@ private fun PlayModeArtwork(
                 drawPath(
                     bolt,
                     bright.copy(alpha = .64f),
-                    style = Stroke(
-                        width = 1.25.dp.toPx(),
-                        join = androidx.compose.ui.graphics.StrokeJoin.Round,
-                    ),
+                    style = Stroke(width = 1.25.dp.toPx(), join = StrokeJoin.Round),
                 )
 
                 drawLine(
@@ -438,9 +448,12 @@ private fun PlayModeArtwork(
                     lineTo(size.width * .66f, size.height * .71f)
                     lineTo(size.width * .62f, size.height * .63f)
                     cubicTo(
-                        size.width * .67f, size.height * .55f,
-                        size.width * .65f, size.height * .46f,
-                        size.width * .57f, size.height * .40f,
+                        size.width * .67f,
+                        size.height * .55f,
+                        size.width * .65f,
+                        size.height * .46f,
+                        size.width * .57f,
+                        size.height * .40f,
                     )
                     lineTo(size.width * .68f, size.height * .31f)
                     lineTo(size.width * .57f, size.height * .24f)
@@ -455,7 +468,7 @@ private fun PlayModeArtwork(
                 drawPath(
                     knight,
                     Color(0xFFBFD3DB).copy(alpha = .55f),
-                    style = Stroke(width = .9.dp.toPx()),
+                    style = Stroke(width = .9.dp.toPx(), join = StrokeJoin.Round),
                 )
                 drawCircle(
                     color = Color(0xFF16313A),
@@ -532,7 +545,11 @@ private fun QuickStartLine(
         QuickStartGlyph(glyph, Modifier.size(22.dp))
         Text(
             text,
-            style = if (emphasized) LumenTypography.QuickPrimary else LumenTypography.QuickSecondary,
+            style = if (emphasized) {
+                LumenTypography.QuickPrimary
+            } else {
+                LumenTypography.QuickSecondary
+            },
             color = if (emphasized) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
             fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Medium,
         )
@@ -549,7 +566,13 @@ private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
                 drawCircle(tint.copy(alpha = .13f), size.minDimension * .48f)
                 drawCircle(tint, size.minDimension * .35f, style = Stroke(stroke))
                 drawLine(tint, center, Offset(center.x, size.height * .27f), stroke, StrokeCap.Round)
-                drawLine(tint, center, Offset(size.width * .65f, size.height * .57f), stroke, StrokeCap.Round)
+                drawLine(
+                    tint,
+                    center,
+                    Offset(size.width * .65f, size.height * .57f),
+                    stroke,
+                    StrokeCap.Round,
+                )
             }
             QuickGlyph.ENGINE -> {
                 drawCircle(tint.copy(alpha = .13f), size.minDimension * .48f)
@@ -577,14 +600,22 @@ private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
 @Composable
 internal fun ReferenceArenaPreviewScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
+        modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(LumenColors.BackgroundLift, LumenColors.Background),
+                ),
+            )
             .padding(horizontal = 13.dp, vertical = 3.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         dev.lumenchess.design.LumenTopBar("Engine Arena", onBack = onBack)
         dev.lumenchess.design.LumenPanel(Modifier.fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                Modifier.fillMaxWidth().padding(vertical = 9.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Text(
                     "Engine Arena",
                     style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
