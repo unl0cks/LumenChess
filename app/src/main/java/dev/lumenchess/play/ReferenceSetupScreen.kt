@@ -612,17 +612,22 @@ private fun SetupTactileSurface(
         label = "setup-surface-scale-$mode",
     )
     val pressOffset by animateDpAsState(
-        targetValue = if (pressed) 1.15.dp else 0.dp,
+        targetValue = if (pressed) 1.6.dp else 0.dp,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "setup-surface-offset-$mode",
     )
+    val contentOffset by animateDpAsState(
+        targetValue = if (pressed) 1.15.dp else 0.dp,
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "setup-surface-content-offset-$mode",
+    )
     val elevation by animateDpAsState(
-        targetValue = if (pressed) .35.dp else if (primary) 4.dp else 3.dp,
+        targetValue = if (pressed) .1.dp else if (primary) 4.dp else 3.dp,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "setup-surface-shadow-$mode",
     )
     val lowerEdge by animateDpAsState(
-        targetValue = if (pressed) .3.dp else if (primary) 3.1.dp else 2.5.dp,
+        targetValue = if (pressed) 0.dp else if (primary) 3.2.dp else 3.dp,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "setup-surface-edge-$mode",
     )
@@ -665,8 +670,8 @@ private fun SetupTactileSurface(
                 elevation = elevation,
                 shape = shape,
                 clip = false,
-                ambientColor = Color.Black.copy(alpha = if (pressed) .16f else .38f),
-                spotColor = Color.Black.copy(alpha = if (pressed) .20f else .52f),
+                ambientColor = Color.Black.copy(alpha = if (pressed) .10f else .38f),
+                spotColor = Color.Black.copy(alpha = if (pressed) .12f else .52f),
             )
             .clip(shape)
             .background(Brush.horizontalGradient(listOf(baseLeft, baseRight)))
@@ -685,7 +690,7 @@ private fun SetupTactileSurface(
                     drawRect(
                         brush = Brush.radialGradient(
                             listOf(
-                                selectedGlow.copy(alpha = if (pressed) .13f else .085f),
+                                selectedGlow.copy(alpha = if (pressed) .15f else .085f),
                                 Color.Transparent,
                             ),
                             center = Offset(size.width * .28f, size.height * .38f),
@@ -694,23 +699,37 @@ private fun SetupTactileSurface(
                     )
                 }
                 if (pressed) {
-                    drawRect(Color.Black.copy(alpha = if (primary) .075f else .065f))
+                    drawRect(Color.Black.copy(alpha = if (primary) .18f else .23f))
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = .34f),
+                                Color.Black.copy(alpha = .10f),
+                                Color.Transparent,
+                            ),
+                            startY = 0f,
+                            endY = 9.dp.toPx(),
+                        ),
+                        size = Size(size.width, 9.dp.toPx()),
+                    )
                 }
                 val edge = lowerEdge.toPx()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = .06f),
-                            Color.Black.copy(alpha = if (primary) .34f else .28f),
+                if (edge > 0f) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = .06f),
+                                Color.Black.copy(alpha = if (primary) .36f else .31f),
+                            ),
+                            startY = size.height - edge,
+                            endY = size.height,
                         ),
-                        startY = size.height - edge,
-                        endY = size.height,
-                    ),
-                    topLeft = Offset(0f, size.height - edge),
-                    size = Size(size.width, edge),
-                )
+                        topLeft = Offset(0f, size.height - edge),
+                        size = Size(size.width, edge),
+                    )
+                }
                 drawLine(
-                    color = Color.White.copy(alpha = if (pressed) .13f else if (primary) .16f else .08f),
+                    color = Color.White.copy(alpha = if (pressed) .16f else if (primary) .16f else .08f),
                     start = Offset(9.dp.toPx(), 1.dp.toPx()),
                     end = Offset(size.width - 9.dp.toPx(), 1.dp.toPx()),
                     strokeWidth = .75.dp.toPx(),
@@ -718,7 +737,7 @@ private fun SetupTactileSurface(
                 )
                 val inset = 1.dp.toPx()
                 drawRoundRect(
-                    color = Color.White.copy(alpha = if (pressed) .075f else .04f),
+                    color = Color.White.copy(alpha = if (pressed) .095f else .04f),
                     topLeft = Offset(inset, inset),
                     size = Size(
                         (size.width - inset * 2f).coerceAtLeast(0f),
@@ -737,7 +756,13 @@ private fun SetupTactileSurface(
                 onClick = onClick,
             ),
     ) {
-        content()
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationY = contentOffset.toPx() },
+        ) {
+            content()
+        }
     }
 }
 
