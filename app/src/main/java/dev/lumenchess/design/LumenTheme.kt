@@ -12,10 +12,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.lumenchess.R
 import dev.lumenchess.customization.BackgroundCatalog
 import dev.lumenchess.settings.AppAppearance
 import dev.lumenchess.settings.AppearanceSettings
@@ -138,23 +140,81 @@ object LumenRadii {
     val Dialog = 14.dp
 }
 
-/** Central typographic identity. Metrics are intentionally denser than stock Material. */
+/**
+ * Lumen's UI type family. Inter Tight is generated into app resources from a pinned upstream OFL
+ * source during the build, so public builds stay reproducible without depending on platform Roboto.
+ */
 object LumenTypography {
-    private val family = FontFamily.SansSerif
+    private val family = FontFamily(
+        Font(R.font.inter_tight_regular, FontWeight.Normal),
+        Font(R.font.inter_tight_medium, FontWeight.Medium),
+        Font(R.font.inter_tight_semibold, FontWeight.SemiBold),
+        Font(R.font.inter_tight_bold, FontWeight.Bold),
+    )
 
     val Material = Typography(
         headlineLarge = TextStyle(fontFamily = family, fontSize = 20.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.25).sp),
         headlineMedium = TextStyle(fontFamily = family, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.18).sp),
-        titleLarge = TextStyle(fontFamily = family, fontSize = 18.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.12).sp),
+        titleLarge = TextStyle(fontFamily = family, fontSize = 19.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.16).sp),
         titleMedium = TextStyle(fontFamily = family, fontSize = 13.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.04).sp),
         bodyLarge = TextStyle(fontFamily = family, fontSize = 14.sp, lineHeight = 18.sp),
         bodyMedium = TextStyle(fontFamily = family, fontSize = 12.5.sp, lineHeight = 17.sp),
         bodySmall = TextStyle(fontFamily = family, fontSize = 11.sp, lineHeight = 14.sp),
         labelLarge = TextStyle(fontFamily = family, fontSize = 12.sp, lineHeight = 15.sp, fontWeight = FontWeight.SemiBold),
         labelMedium = TextStyle(fontFamily = family, fontSize = 10.5.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium),
-        labelSmall = TextStyle(fontFamily = family, fontSize = 9.5.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = .02.sp),
+        labelSmall = TextStyle(fontFamily = family, fontSize = 10.5.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, letterSpacing = .01.sp),
     )
 
+    val PlayTitle = TextStyle(
+        fontFamily = family,
+        fontSize = 19.sp,
+        lineHeight = 22.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = (-0.16).sp,
+    )
+    val ModeTitle = TextStyle(
+        fontFamily = family,
+        fontSize = 17.sp,
+        lineHeight = 20.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = (-0.08).sp,
+    )
+    val ModeSubtitle = TextStyle(
+        fontFamily = family,
+        fontSize = 12.5.sp,
+        lineHeight = 16.sp,
+        fontWeight = FontWeight.Normal,
+    )
+    val SectionTitle = TextStyle(
+        fontFamily = family,
+        fontSize = 14.sp,
+        lineHeight = 17.sp,
+        fontWeight = FontWeight.SemiBold,
+    )
+    val Meta = TextStyle(
+        fontFamily = family,
+        fontSize = 10.5.sp,
+        lineHeight = 13.sp,
+        fontWeight = FontWeight.Medium,
+    )
+    val QuickPrimary = TextStyle(
+        fontFamily = family,
+        fontSize = 13.sp,
+        lineHeight = 16.sp,
+        fontWeight = FontWeight.SemiBold,
+    )
+    val QuickSecondary = TextStyle(
+        fontFamily = family,
+        fontSize = 11.5.sp,
+        lineHeight = 15.sp,
+        fontWeight = FontWeight.Medium,
+    )
+    val BottomNav = TextStyle(
+        fontFamily = family,
+        fontSize = 10.5.sp,
+        lineHeight = 12.sp,
+        fontWeight = FontWeight.Medium,
+    )
     val Clock = TextStyle(
         fontFamily = family,
         fontSize = 24.sp,
