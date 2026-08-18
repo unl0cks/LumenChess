@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -81,11 +82,15 @@ internal fun ReferencePlayOverviewScreen(
         modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
-            .padding(horizontal = 18.dp, vertical = 4.dp)
+            .padding(horizontal = 22.dp, vertical = 22.dp)
             .testTag("p5-play-overview"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         LumenTopBar(title = "Play", onBack = onBack)
+
+        // The reference phone leaves deliberate breathing room between its compact header and the
+        // two large mode cards. This spacer is proportion-driven rather than a generic list gap.
+        Spacer(Modifier.height(34.dp))
 
         PlayModeCard(
             title = "Play vs Engine",
@@ -93,7 +98,7 @@ internal fun ReferencePlayOverviewScreen(
             artwork = PlayOverviewArtwork.ENGINE,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(174.dp)
+                .aspectRatio(1.85f)
                 .testTag("play-overview-vs-engine"),
             onClick = onPlayVsEngine,
         )
@@ -103,12 +108,12 @@ internal fun ReferencePlayOverviewScreen(
             artwork = PlayOverviewArtwork.ARENA,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(174.dp)
+                .aspectRatio(1.85f)
                 .testTag("play-overview-arena"),
             onClick = onArenaPreview,
         )
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(27.dp))
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 "Quick Start",
@@ -123,12 +128,13 @@ internal fun ReferencePlayOverviewScreen(
             )
         }
 
+        Spacer(Modifier.height(31.dp))
         QuickStartCard(
             primary = quickPrimary,
             secondary = quickSecondary,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(112.dp)
+                .aspectRatio(2.83f)
                 .testTag("play-overview-quick-start"),
         )
     }
@@ -190,7 +196,7 @@ private fun PlayModeCard(
         PlayModeArtwork(
             kind = artwork,
             pressed = pressed,
-            modifier = Modifier.size(72.dp),
+            modifier = Modifier.size(84.dp),
         )
         Column(
             Modifier.weight(1f),
