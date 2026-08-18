@@ -95,7 +95,6 @@ jobs:
           python3 - <<'PY'
           import glob
           import xml.etree.ElementTree as ET
-
           reports = glob.glob('app/build/outputs/androidTest-results/**/*.xml', recursive=True)
           failures = 0
           for report in reports:
@@ -111,11 +110,9 @@ jobs:
                   if failure is None:
                       continue
                   failures += 1
-                  class_name = case.get('classname', 'unknown class')
-                  name = case.get('name', 'unknown test')
                   detail = failure.get('message') or failure.text or 'Instrumentation test failed'
                   detail = ' '.join(detail.split())[:3000]
-                  print(f"::error title=Instrumentation failure::{class_name}.{name}: {detail}")
+                  print(f"::error title=Instrumentation failure::{case.get('classname', 'unknown')}.{case.get('name', 'unknown')}: {detail}")
           if not reports:
               print('::error title=Instrumentation diagnostics::No Android test XML reports were produced')
           elif failures == 0:
@@ -140,8 +137,8 @@ jobs:
             | tee "$RUNNER_TEMP/p5-screenshot-instrumentation.txt"
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
           COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$COUNT" != "11" ]; then
-            echo "::error title=P5 screenshot set::Expected 11 screenshots, found $COUNT"
+          if [ "$COUNT" != "13" ]; then
+            echo "::error title=P5 screenshot set::Expected 13 screenshots, found $COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
@@ -183,7 +180,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='API37 reference verification and 11-state screenshot capture passed' \
+            -f description='API37 reference verification and 13-state screenshot capture passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
