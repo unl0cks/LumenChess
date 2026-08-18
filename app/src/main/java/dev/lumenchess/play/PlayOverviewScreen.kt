@@ -1,43 +1,61 @@
 package dev.lumenchess.play
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.lumenchess.design.LumenColors
-import dev.lumenchess.design.LumenEngineBadge
-import dev.lumenchess.design.LumenListRow
-import dev.lumenchess.design.LumenPanel
+import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTopBar
+import dev.lumenchess.design.LumenTypography
 import dev.lumenchess.engine.api.EngineStrengthTarget
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
-private enum class PlayOverviewGlyph { PLAY, ARENA, CLOCK }
+private enum class PlayOverviewArtwork { ENGINE, ARENA }
+private enum class QuickGlyph { CLOCK, ENGINE }
 
 @Composable
 internal fun ReferencePlayOverviewScreen(
     ui: PlayUiState,
     onPlayVsEngine: () -> Unit,
     onArenaPreview: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val setup = ui.setup
@@ -49,7 +67,11 @@ internal fun ReferencePlayOverviewScreen(
         minutes <= 15L -> "Rapid"
         else -> "Classical"
     }
-    val quickPrimary = "$minutes min${if (increment > 0) " + $increment sec" else ""} · $timeLabel"
+    val quickPrimary = buildString {
+        append("$minutes min")
+        if (increment > 0L) append(" + $increment sec")
+        append(" · $timeLabel")
+    }
     val quickSecondary = buildString {
         append(setup.engine.displayName)
         if (elo != null) append(" · $elo Elo")
@@ -59,48 +81,322 @@ internal fun ReferencePlayOverviewScreen(
         modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
-            .padding(horizontal = 13.dp, vertical = 3.dp)
+            .padding(horizontal = 18.dp, vertical = 4.dp)
             .testTag("p5-play-overview"),
-        verticalArrangement = Arrangement.spacedBy(7.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        LumenTopBar("Play")
+        LumenTopBar(title = "Play", onBack = onBack)
 
-        LumenListRow(
+        PlayModeCard(
             title = "Play vs Engine",
             subtitle = "Challenge a chess engine",
-            modifier = Modifier.testTag("play-overview-vs-engine"),
+            artwork = PlayOverviewArtwork.ENGINE,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(174.dp)
+                .testTag("play-overview-vs-engine"),
             onClick = onPlayVsEngine,
-            leading = { OverviewGlyph(PlayOverviewGlyph.PLAY) },
         )
-        LumenListRow(
+        PlayModeCard(
             title = "Engine Arena",
             subtitle = "Watch engines battle each other",
-            modifier = Modifier.testTag("play-overview-arena"),
+            artwork = PlayOverviewArtwork.ARENA,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(174.dp)
+                .testTag("play-overview-arena"),
             onClick = onArenaPreview,
-            leading = { OverviewGlyph(PlayOverviewGlyph.ARENA) },
         )
 
-        Text(
-            "Quick Start",
-            style = MaterialTheme.typography.labelLarge,
-            color = LumenColors.OnSurface,
-            modifier = Modifier.padding(start = 2.dp, top = 4.dp),
+        Spacer(Modifier.height(4.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                "Quick Start",
+                style = LumenTypography.SectionTitle,
+                color = LumenColors.OnSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Last used",
+                style = LumenTypography.Meta,
+                color = LumenColors.OnSurfaceMuted,
+            )
+        }
+
+        QuickStartCard(
+            primary = quickPrimary,
+            secondary = quickSecondary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(112.dp)
+                .testTag("play-overview-quick-start"),
         )
-        LumenPanel(Modifier.fillMaxWidth().testTag("play-overview-quick-start")) {
-            Row(
-                Modifier.fillMaxWidth().height(43.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(9.dp),
-            ) {
-                Box(
-                    Modifier.size(29.dp).background(LumenColors.SurfaceHighest, RoundedCornerShape(6.dp)),
-                    contentAlignment = Alignment.Center,
-                ) { OverviewGlyph(PlayOverviewGlyph.CLOCK) }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text(quickPrimary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                    Text(quickSecondary, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceMuted)
+    }
+}
+
+@Composable
+private fun PlayModeCard(
+    title: String,
+    subtitle: String,
+    artwork: PlayOverviewArtwork,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) LumenMotion.PlayCardPressScale else 1f,
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseSpring(),
+        label = "play-mode-card-scale",
+    )
+    val border by animateColorAsState(
+        targetValue = if (pressed) LumenColors.OutlineStrong else LumenColors.Outline.copy(alpha = .78f),
+        animationSpec = LumenMotion.pressTween(),
+        label = "play-mode-card-border",
+    )
+    val shape = RoundedCornerShape(11.dp)
+    val fill = if (pressed) {
+        Brush.verticalGradient(listOf(LumenColors.SurfaceHighest, LumenColors.SurfaceRaised))
+    } else {
+        Brush.verticalGradient(listOf(LumenColors.SurfaceRaised, LumenColors.Surface))
+    }
+
+    Row(
+        modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .shadow(
+                elevation = 3.dp,
+                shape = shape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = .34f),
+                spotColor = Color.Black.copy(alpha = .46f),
+            )
+            .clip(shape)
+            .background(fill)
+            .border(1.dp, border, shape)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        PlayModeArtwork(
+            kind = artwork,
+            pressed = pressed,
+            modifier = Modifier.size(72.dp),
+        )
+        Column(
+            Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Text(
+                title,
+                style = LumenTypography.ModeTitle,
+                color = LumenColors.OnSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                subtitle,
+                style = LumenTypography.ModeSubtitle,
+                color = LumenColors.OnSurfaceMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayModeArtwork(
+    kind: PlayOverviewArtwork,
+    pressed: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val accent = if (pressed) LumenColors.AccentBlueBright else LumenColors.AccentBlue
+    val bright = LumenColors.AccentBlueBright
+    val surface = LumenColors.Surface
+    Canvas(modifier) {
+        val glowAlpha = if (pressed) .48f else .36f
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(bright.copy(alpha = glowAlpha), bright.copy(alpha = .09f), Color.Transparent),
+                center = center,
+                radius = size.minDimension * .56f,
+            ),
+            radius = size.minDimension * .50f,
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(
+                    bright.copy(alpha = .88f),
+                    accent.copy(alpha = .72f),
+                    surface.copy(alpha = .98f),
+                ),
+                center = Offset(size.width * .37f, size.height * .31f),
+                radius = size.minDimension * .54f,
+            ),
+            radius = size.minDimension * .37f,
+        )
+        drawCircle(
+            color = Color.White.copy(alpha = .18f),
+            radius = size.minDimension * .34f,
+            style = Stroke(width = 1.dp.toPx()),
+        )
+
+        when (kind) {
+            PlayOverviewArtwork.ENGINE -> {
+                val bolt = Path().apply {
+                    moveTo(size.width * .53f, size.height * .17f)
+                    lineTo(size.width * .31f, size.height * .48f)
+                    lineTo(size.width * .47f, size.height * .47f)
+                    lineTo(size.width * .37f, size.height * .81f)
+                    lineTo(size.width * .72f, size.height * .39f)
+                    lineTo(size.width * .54f, size.height * .39f)
+                    close()
                 }
-                LumenEngineBadge(setup.engine.displayName)
+                drawPath(bolt, Color(0xFFF4FBFC))
+                drawPath(
+                    bolt,
+                    bright.copy(alpha = .55f),
+                    style = Stroke(width = 1.2.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round),
+                )
+                val crownY = size.height * .72f
+                drawLine(
+                    color = Color.White.copy(alpha = .70f),
+                    start = Offset(size.width * .19f, crownY),
+                    end = Offset(size.width * .29f, crownY),
+                    strokeWidth = 1.2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+            PlayOverviewArtwork.ARENA -> {
+                val bladeColor = Color(0xFFCFE7EF)
+                val stroke = 2.dp.toPx()
+                drawLine(
+                    bladeColor.copy(alpha = .80f),
+                    Offset(size.width * .24f, size.height * .28f),
+                    Offset(size.width * .72f, size.height * .74f),
+                    stroke,
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    bladeColor.copy(alpha = .80f),
+                    Offset(size.width * .72f, size.height * .27f),
+                    Offset(size.width * .27f, size.height * .73f),
+                    stroke,
+                    StrokeCap.Round,
+                )
+                drawCircle(
+                    color = Color(0xFFD7A45A).copy(alpha = .88f),
+                    radius = 3.dp.toPx(),
+                    center = center,
+                )
+                val knight = Path().apply {
+                    moveTo(size.width * .42f, size.height * .68f)
+                    lineTo(size.width * .60f, size.height * .68f)
+                    cubicTo(
+                        size.width * .63f, size.height * .59f,
+                        size.width * .62f, size.height * .51f,
+                        size.width * .55f, size.height * .45f,
+                    )
+                    lineTo(size.width * .62f, size.height * .35f)
+                    lineTo(size.width * .51f, size.height * .30f)
+                    lineTo(size.width * .44f, size.height * .36f)
+                    lineTo(size.width * .36f, size.height * .52f)
+                    lineTo(size.width * .47f, size.height * .50f)
+                    lineTo(size.width * .39f, size.height * .61f)
+                    close()
+                }
+                drawPath(knight, Color(0xFFF0F5F6))
+                drawCircle(
+                    color = Color(0xFF16262B),
+                    radius = 1.3.dp.toPx(),
+                    center = Offset(size.width * .50f, size.height * .39f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickStartCard(
+    primary: String,
+    secondary: String,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(10.dp)
+    Column(
+        modifier
+            .shadow(
+                elevation = 2.dp,
+                shape = shape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = .28f),
+                spotColor = Color.Black.copy(alpha = .36f),
+            )
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(LumenColors.SurfaceRaised, LumenColors.Surface)))
+            .border(1.dp, LumenColors.Outline.copy(alpha = .76f), shape)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        QuickStartLine(QuickGlyph.CLOCK, primary, emphasized = true)
+        QuickStartLine(QuickGlyph.ENGINE, secondary, emphasized = false)
+    }
+}
+
+@Composable
+private fun QuickStartLine(
+    glyph: QuickGlyph,
+    text: String,
+    emphasized: Boolean,
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        QuickStartGlyph(glyph, Modifier.size(19.dp))
+        Text(
+            text,
+            style = if (emphasized) LumenTypography.QuickPrimary else LumenTypography.QuickSecondary,
+            color = if (emphasized) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
+            fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
+    val tint = LumenColors.AccentBlueBright
+    Canvas(modifier) {
+        val stroke = 1.5.dp.toPx()
+        when (kind) {
+            QuickGlyph.CLOCK -> {
+                drawCircle(tint.copy(alpha = .16f), size.minDimension * .49f)
+                drawCircle(tint, size.minDimension * .36f, style = Stroke(stroke))
+                drawLine(tint, center, Offset(center.x, size.height * .27f), stroke, StrokeCap.Round)
+                drawLine(tint, center, Offset(size.width * .66f, size.height * .57f), stroke, StrokeCap.Round)
+            }
+            QuickGlyph.ENGINE -> {
+                drawCircle(tint.copy(alpha = .15f), size.minDimension * .49f)
+                val path = Path()
+                val outer = size.minDimension * .34f
+                val inner = outer * .45f
+                repeat(10) { index ->
+                    val radius = if (index % 2 == 0) outer else inner
+                    val angle = -PI / 2 + index * PI / 5
+                    val x = center.x + cos(angle).toFloat() * radius
+                    val y = center.y + sin(angle).toFloat() * radius
+                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                path.close()
+                drawPath(path, tint)
             }
         }
     }
@@ -115,44 +411,14 @@ internal fun ReferenceArenaPreviewScreen(onBack: () -> Unit, modifier: Modifier 
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         LumenTopBar("Engine Arena", onBack = onBack)
-        LumenPanel(Modifier.fillMaxWidth()) {
+        dev.lumenchess.design.LumenPanel(Modifier.fillMaxWidth()) {
             Column(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Engine Arena", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Engine Arena", style = androidx.compose.material3.MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
                     "Arena setup will arrive with its engine-battle runtime. The Play shell is already reserved for it.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                     color = LumenColors.OnSurfaceMuted,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OverviewGlyph(kind: PlayOverviewGlyph) {
-    val tint = LumenColors.AccentBlueBright
-    Canvas(Modifier.size(18.dp)) {
-        val stroke = 1.55.dp.toPx()
-        when (kind) {
-            PlayOverviewGlyph.PLAY -> {
-                val path = Path().apply {
-                    moveTo(size.width * .30f, size.height * .18f)
-                    lineTo(size.width * .80f, size.height * .50f)
-                    lineTo(size.width * .30f, size.height * .82f)
-                    close()
-                }
-                drawPath(path, tint)
-            }
-            PlayOverviewGlyph.ARENA -> {
-                drawLine(tint, Offset(size.width * .20f, size.height * .18f), Offset(size.width * .76f, size.height * .80f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .80f, size.height * .18f), Offset(size.width * .24f, size.height * .80f), stroke, StrokeCap.Round)
-                drawCircle(tint, stroke * .9f, Offset(size.width * .20f, size.height * .18f))
-                drawCircle(tint, stroke * .9f, Offset(size.width * .80f, size.height * .18f))
-            }
-            PlayOverviewGlyph.CLOCK -> {
-                drawCircle(tint, size.minDimension * .38f, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
-                drawLine(tint, center, Offset(center.x, size.height * .28f), stroke, StrokeCap.Round)
-                drawLine(tint, center, Offset(size.width * .66f, size.height * .58f), stroke, StrokeCap.Round)
             }
         }
     }
