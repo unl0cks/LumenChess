@@ -511,7 +511,7 @@ private fun PlayModeCard(
                 Text(
                     subtitle,
                     modifier = if (artwork == PlayOverviewArtwork.ARENA) {
-                        Modifier.fillMaxWidth(.68f)
+                        Modifier.fillMaxWidth(.54f)
                     } else {
                         Modifier
                     },
