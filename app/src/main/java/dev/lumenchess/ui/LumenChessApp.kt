@@ -30,9 +30,9 @@ import dev.lumenchess.customization.BoardThemeCatalog
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTheme
-import dev.lumenchess.play.P5PlayRoute
 import dev.lumenchess.play.PlayScreenMode
 import dev.lumenchess.play.PlayViewModel
+import dev.lumenchess.play.ReferencePlayRoute
 import dev.lumenchess.settings.AppearanceSettings
 import dev.lumenchess.settings.BoardAppearanceScreen
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
@@ -40,98 +40,54 @@ import dev.lumenchess.settings.SettingsScreen
 import dev.lumenchess.settings.SoundsHapticsScreen
 import kotlinx.coroutines.launch
 
-internal enum class MainTab(val label: String, val previewCopy: String) {
-    Play("Play", "Play against Stockfish or Reckless"),
-    Arena("Arena", "Set up engine battles and take over positions"),
-    Games("Games", "Browse your local and imported chess library"),
-    Insights("Insights", "Explore performance trends and chess statistics"),
-    Settings("Settings", "Tune LumenChess to your board and feedback preferences"),
+internal enum class MainTab(val label:String,val previewCopy:String) {
+    Play("Play","Play against Stockfish or Reckless"),
+    Arena("Arena","Set up engine battles and take over positions"),
+    Games("Games","Browse your local and imported chess library"),
+    Insights("Insights","Explore performance trends and chess statistics"),
+    Settings("Settings","Tune LumenChess to your board and feedback preferences"),
 }
-
-private enum class SettingsDestination { ROOT, BOARD_APPEARANCE, SOUNDS_HAPTICS }
+private enum class SettingsDestination { ROOT,BOARD_APPEARANCE,SOUNDS_HAPTICS }
 
 @Composable
 fun LumenChessApp() {
     var currentTab by remember { mutableStateOf(MainTab.Play) }
     var settingsDestination by remember { mutableStateOf(SettingsDestination.ROOT) }
-    val playViewModel: PlayViewModel = viewModel()
+    val playViewModel:PlayViewModel=viewModel()
     val playUi by playViewModel.uiState
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val appearanceRepository = remember(context.applicationContext) {
-        DataStoreAppearanceSettingsRepository.from(context.applicationContext)
-    }
-    val persistedAppearanceSettings by appearanceRepository.settings.collectAsStateWithLifecycle(
-        initialValue = AppearanceSettings(),
-    )
+    val context=LocalContext.current
+    val scope=rememberCoroutineScope()
+    val appearanceRepository=remember(context.applicationContext){ DataStoreAppearanceSettingsRepository.from(context.applicationContext) }
+    val persistedAppearanceSettings by appearanceRepository.settings.collectAsStateWithLifecycle(initialValue=AppearanceSettings())
     var appearanceSettings by remember { mutableStateOf(persistedAppearanceSettings) }
-    val livePlay = currentTab == MainTab.Play && playUi.mode == PlayScreenMode.LIVE
-    val slideDistance = with(LocalDensity.current) { 10.dp.roundToPx() }
+    val livePlay=currentTab==MainTab.Play&&playUi.mode==PlayScreenMode.LIVE
+    val slideDistance=with(LocalDensity.current){10.dp.roundToPx()}
 
-    LaunchedEffect(persistedAppearanceSettings) {
-        appearanceSettings = persistedAppearanceSettings
-    }
-    LaunchedEffect(currentTab) {
-        if (currentTab != MainTab.Settings) settingsDestination = SettingsDestination.ROOT
-    }
+    LaunchedEffect(persistedAppearanceSettings){appearanceSettings=persistedAppearanceSettings}
+    LaunchedEffect(currentTab){if(currentTab!=MainTab.Settings)settingsDestination=SettingsDestination.ROOT}
+    fun persist(settings:AppearanceSettings){appearanceSettings=settings;scope.launch{appearanceRepository.update{settings}}}
 
-    fun persist(settings: AppearanceSettings) {
-        appearanceSettings = settings
-        scope.launch { appearanceRepository.update { settings } }
-    }
-
-    LumenTheme(settings = appearanceSettings) {
-        ProvideChessboardPresentationStyle(
-            style = ChessboardPresentationStyle(
-                palette = BoardThemeCatalog.palette(appearanceSettings),
-                pieceSet = PieceSetCatalog.definition(appearanceSettings.pieceSetId),
-            ),
-        ) {
-            Scaffold(
-                containerColor = LumenColors.Background,
-                bottomBar = {
-                    if (!livePlay) LumenBottomNavigation(currentTab) { currentTab = it }
-                },
-            ) { padding ->
+    LumenTheme(settings=appearanceSettings) {
+        ProvideChessboardPresentationStyle(ChessboardPresentationStyle(BoardThemeCatalog.palette(appearanceSettings),PieceSetCatalog.definition(appearanceSettings.pieceSetId))) {
+            Scaffold(containerColor=LumenColors.Background,bottomBar={if(!livePlay)LumenBottomNavigation(currentTab){currentTab=it}}) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     AnimatedContent(
-                        targetState = currentTab to settingsDestination,
-                        transitionSpec = {
-                            val tabDirection = targetState.first.ordinal.compareTo(initialState.first.ordinal)
-                            val subDirection = targetState.second.ordinal.compareTo(initialState.second.ordinal)
-                            val direction = if (tabDirection != 0) tabDirection else subDirection
-                            val sign = if (direction >= 0) 1 else -1
-                            (fadeIn(LumenMotion.normalTween()) +
-                                slideInHorizontally(LumenMotion.normalTween()) { sign * slideDistance })
-                                .togetherWith(
-                                    fadeOut(LumenMotion.fastTween()) +
-                                        slideOutHorizontally(LumenMotion.fastTween()) { -sign * slideDistance },
-                                )
-                        },
-                        label = "lumen-page-transition",
-                    ) { (tab, destination) ->
-                        when (tab) {
-                            MainTab.Play -> P5PlayRoute(viewModel = playViewModel, modifier = Modifier.fillMaxSize())
-                            MainTab.Settings -> when (destination) {
-                                SettingsDestination.ROOT -> SettingsScreen(
-                                    settings = appearanceSettings,
-                                    onSettingsChange = ::persist,
-                                    onOpenBoardAppearance = { settingsDestination = SettingsDestination.BOARD_APPEARANCE },
-                                    onOpenSoundsHaptics = { settingsDestination = SettingsDestination.SOUNDS_HAPTICS },
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                                SettingsDestination.BOARD_APPEARANCE -> BoardAppearanceScreen(
-                                    settings = appearanceSettings,
-                                    onSettingsChange = ::persist,
-                                    onBack = { settingsDestination = SettingsDestination.ROOT },
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                                SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(
-                                    settings = appearanceSettings,
-                                    onSettingsChange = ::persist,
-                                    onBack = { settingsDestination = SettingsDestination.ROOT },
-                                    modifier = Modifier.fillMaxSize(),
-                                )
+                        targetState=currentTab to settingsDestination,
+                        transitionSpec={
+                            val tabDirection=targetState.first.ordinal.compareTo(initialState.first.ordinal)
+                            val subDirection=targetState.second.ordinal.compareTo(initialState.second.ordinal)
+                            val direction=if(tabDirection!=0)tabDirection else subDirection
+                            val sign=if(direction>=0)1 else -1
+                            (fadeIn(LumenMotion.normalTween())+slideInHorizontally(LumenMotion.normalTween()){sign*slideDistance})
+                                .togetherWith(fadeOut(LumenMotion.fastTween())+slideOutHorizontally(LumenMotion.fastTween()){-sign*slideDistance})
+                        },label="lumen-page-transition",
+                    ) { (tab,destination) ->
+                        when(tab) {
+                            MainTab.Play -> ReferencePlayRoute(viewModel=playViewModel,modifier=Modifier.fillMaxSize())
+                            MainTab.Settings -> when(destination) {
+                                SettingsDestination.ROOT -> SettingsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.BOARD_APPEARANCE},{settingsDestination=SettingsDestination.SOUNDS_HAPTICS},Modifier.fillMaxSize())
+                                SettingsDestination.BOARD_APPEARANCE -> BoardAppearanceScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
                             }
                             else -> FutureSurfacePreview(tab)
                         }
