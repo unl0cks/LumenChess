@@ -1,6 +1,7 @@
 package dev.lumenchess.visual
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
@@ -41,6 +42,7 @@ class P5PlayOverviewScreenshotQaTest {
     @Test
     fun capturePlayOverviewOnly() {
         verifyInterTightRuntimeResource()
+        verifyApprovedHeroAssetsPackaged()
         waitForTag("p5-play-overview")
 
         // Screenshot QA uses the product's real appearance preference path. The emulator defaults to
@@ -67,6 +69,21 @@ class P5PlayOverviewScreenshotQaTest {
             "Inter Tight resolved to a platform default typeface"
         }
         println("P5 Play typography verified: inter_tight_regular loaded from app resources")
+    }
+
+    private fun verifyApprovedHeroAssetsPackaged() {
+        val assets = InstrumentationRegistry.getInstrumentation().targetContext.assets
+        listOf(
+            "play-overview/lumen_play_vs_engine_hero.png",
+            "play-overview/lumen_engine_arena_hero.png",
+        ).forEach { path ->
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            assets.open(path).use { input -> BitmapFactory.decodeStream(input, null, bounds) }
+            check(bounds.outWidth == 1254 && bounds.outHeight == 1254) {
+                "$path must package the approved 1254x1254 hero PNG exactly; got ${bounds.outWidth}x${bounds.outHeight}"
+            }
+        }
+        println("P5 Play hero assets verified: approved PNG resources packaged")
     }
 
     private fun waitForTag(tag: String, timeoutMillis: Long = 5_000L) {
