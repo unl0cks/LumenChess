@@ -37,11 +37,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
-import dev.lumenchess.design.LumenTopBar
 import dev.lumenchess.design.LumenTypography
 import dev.lumenchess.engine.api.EngineStrengthTarget
 import kotlin.math.PI
@@ -86,10 +87,8 @@ internal fun ReferencePlayOverviewScreen(
             .testTag("p5-play-overview"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        LumenTopBar(title = "Play", onBack = onBack)
+        PlayOverviewTopBar(title = "Play", onBack = onBack)
 
-        // The reference phone leaves deliberate breathing room between its compact header and the
-        // two large mode cards. This spacer is proportion-driven rather than a generic list gap.
         Spacer(Modifier.height(34.dp))
 
         PlayModeCard(
@@ -141,6 +140,63 @@ internal fun ReferencePlayOverviewScreen(
 }
 
 @Composable
+private fun PlayOverviewTopBar(title: String, onBack: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) LumenMotion.IconPressScale else 1f,
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseSpring(),
+        label = "play-overview-back-scale",
+    )
+    Box(Modifier.fillMaxWidth().height(40.dp)) {
+        Text(
+            text = title,
+            modifier = Modifier.align(Alignment.Center),
+            style = LumenTypography.PlayTitle,
+            color = LumenColors.OnSurface,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .size(40.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onBack,
+                )
+                .semantics { contentDescription = "Navigate back" },
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.size(16.dp)) {
+                val color = LumenColors.OnSurfaceMuted
+                val stroke = 1.4.dp.toPx()
+                drawLine(
+                    color,
+                    Offset(size.width * .70f, size.height * .18f),
+                    Offset(size.width * .34f, size.height * .50f),
+                    stroke,
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    color,
+                    Offset(size.width * .34f, size.height * .50f),
+                    Offset(size.width * .70f, size.height * .82f),
+                    stroke,
+                    StrokeCap.Round,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun PlayModeCard(
     title: String,
     subtitle: String,
@@ -156,7 +212,7 @@ private fun PlayModeCard(
         label = "play-mode-card-scale",
     )
     val border by animateColorAsState(
-        targetValue = if (pressed) LumenColors.OutlineStrong else LumenColors.Outline.copy(alpha = .78f),
+        targetValue = if (pressed) LumenColors.OutlineStrong else LumenColors.Outline.copy(alpha = .82f),
         animationSpec = LumenMotion.pressTween(),
         label = "play-mode-card-border",
     )
@@ -164,7 +220,13 @@ private fun PlayModeCard(
     val fill = if (pressed) {
         Brush.verticalGradient(listOf(LumenColors.SurfaceHighest, LumenColors.SurfaceRaised))
     } else {
-        Brush.verticalGradient(listOf(LumenColors.SurfaceRaised, LumenColors.Surface))
+        Brush.verticalGradient(
+            listOf(
+                LumenColors.SurfaceRaised.copy(alpha = .98f),
+                LumenColors.Surface.copy(alpha = .99f),
+                LumenColors.SurfaceRaised.copy(alpha = .90f),
+            ),
+        )
     }
 
     Row(
@@ -189,18 +251,18 @@ private fun PlayModeCard(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         PlayModeArtwork(
             kind = artwork,
             pressed = pressed,
-            modifier = Modifier.size(84.dp),
+            modifier = Modifier.size(104.dp),
         )
         Column(
             Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
                 title,
@@ -225,104 +287,196 @@ private fun PlayModeArtwork(
 ) {
     val accent = if (pressed) LumenColors.AccentBlueBright else LumenColors.AccentBlue
     val bright = LumenColors.AccentBlueBright
-    val surface = LumenColors.Surface
+    val deep = LumenColors.AccentBlueSoft
     Canvas(modifier) {
-        val glowAlpha = if (pressed) .48f else .36f
+        val unit = size.minDimension
+        val glowAlpha = if (pressed) .43f else .31f
+
         drawCircle(
             brush = Brush.radialGradient(
-                listOf(bright.copy(alpha = glowAlpha), bright.copy(alpha = .09f), Color.Transparent),
-                center = center,
-                radius = size.minDimension * .56f,
-            ),
-            radius = size.minDimension * .50f,
-        )
-        drawCircle(
-            brush = Brush.radialGradient(
-                listOf(
-                    bright.copy(alpha = .88f),
-                    accent.copy(alpha = .72f),
-                    surface.copy(alpha = .98f),
+                colors = listOf(
+                    bright.copy(alpha = glowAlpha),
+                    accent.copy(alpha = .15f),
+                    Color.Transparent,
                 ),
-                center = Offset(size.width * .37f, size.height * .31f),
-                radius = size.minDimension * .54f,
+                center = Offset(size.width * .46f, size.height * .51f),
+                radius = unit * .53f,
             ),
-            radius = size.minDimension * .37f,
-        )
-        drawCircle(
-            color = Color.White.copy(alpha = .18f),
-            radius = size.minDimension * .34f,
-            style = Stroke(width = 1.dp.toPx()),
+            center = Offset(size.width * .46f, size.height * .51f),
+            radius = unit * .51f,
         )
 
         when (kind) {
             PlayOverviewArtwork.ENGINE -> {
-                val bolt = Path().apply {
-                    moveTo(size.width * .53f, size.height * .17f)
-                    lineTo(size.width * .31f, size.height * .48f)
-                    lineTo(size.width * .47f, size.height * .47f)
-                    lineTo(size.width * .37f, size.height * .81f)
-                    lineTo(size.width * .72f, size.height * .39f)
-                    lineTo(size.width * .54f, size.height * .39f)
+                val energyShield = Path().apply {
+                    moveTo(size.width * .18f, size.height * .24f)
+                    lineTo(size.width * .38f, size.height * .12f)
+                    lineTo(size.width * .67f, size.height * .18f)
+                    lineTo(size.width * .83f, size.height * .39f)
+                    lineTo(size.width * .75f, size.height * .68f)
+                    lineTo(size.width * .51f, size.height * .87f)
+                    lineTo(size.width * .24f, size.height * .77f)
+                    lineTo(size.width * .10f, size.height * .51f)
                     close()
                 }
-                drawPath(bolt, Color(0xFFF4FBFC))
+                drawPath(
+                    path = energyShield,
+                    brush = Brush.linearGradient(
+                        listOf(
+                            bright.copy(alpha = .92f),
+                            accent.copy(alpha = .72f),
+                            deep.copy(alpha = .96f),
+                        ),
+                        start = Offset(size.width * .18f, size.height * .15f),
+                        end = Offset(size.width * .74f, size.height * .84f),
+                    ),
+                )
+                drawPath(
+                    path = energyShield,
+                    color = Color(0xFFCDEBF2).copy(alpha = .36f),
+                    style = Stroke(width = 1.1.dp.toPx()),
+                )
+
+                val rook = Path().apply {
+                    moveTo(size.width * .29f, size.height * .70f)
+                    lineTo(size.width * .61f, size.height * .70f)
+                    lineTo(size.width * .58f, size.height * .62f)
+                    lineTo(size.width * .55f, size.height * .38f)
+                    lineTo(size.width * .61f, size.height * .33f)
+                    lineTo(size.width * .61f, size.height * .26f)
+                    lineTo(size.width * .54f, size.height * .26f)
+                    lineTo(size.width * .54f, size.height * .32f)
+                    lineTo(size.width * .47f, size.height * .32f)
+                    lineTo(size.width * .47f, size.height * .25f)
+                    lineTo(size.width * .40f, size.height * .25f)
+                    lineTo(size.width * .40f, size.height * .32f)
+                    lineTo(size.width * .33f, size.height * .32f)
+                    lineTo(size.width * .33f, size.height * .26f)
+                    lineTo(size.width * .26f, size.height * .26f)
+                    lineTo(size.width * .26f, size.height * .34f)
+                    lineTo(size.width * .33f, size.height * .39f)
+                    lineTo(size.width * .34f, size.height * .61f)
+                    close()
+                }
+                drawPath(rook, Color(0xFF17323B).copy(alpha = .84f))
+
+                val bolt = Path().apply {
+                    moveTo(size.width * .59f, size.height * .17f)
+                    lineTo(size.width * .37f, size.height * .48f)
+                    lineTo(size.width * .52f, size.height * .48f)
+                    lineTo(size.width * .38f, size.height * .82f)
+                    lineTo(size.width * .75f, size.height * .39f)
+                    lineTo(size.width * .57f, size.height * .39f)
+                    close()
+                }
+                drawPath(bolt, Color(0xFFF5FCFD))
                 drawPath(
                     bolt,
-                    bright.copy(alpha = .55f),
-                    style = Stroke(width = 1.2.dp.toPx(), join = androidx.compose.ui.graphics.StrokeJoin.Round),
+                    bright.copy(alpha = .64f),
+                    style = Stroke(
+                        width = 1.25.dp.toPx(),
+                        join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                    ),
                 )
-                val crownY = size.height * .72f
+
                 drawLine(
-                    color = Color.White.copy(alpha = .70f),
-                    start = Offset(size.width * .19f, crownY),
-                    end = Offset(size.width * .29f, crownY),
-                    strokeWidth = 1.2.dp.toPx(),
-                    cap = StrokeCap.Round,
+                    bright.copy(alpha = .67f),
+                    Offset(size.width * .09f, size.height * .34f),
+                    Offset(size.width * .19f, size.height * .39f),
+                    1.2.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    bright.copy(alpha = .52f),
+                    Offset(size.width * .72f, size.height * .72f),
+                    Offset(size.width * .86f, size.height * .66f),
+                    1.1.dp.toPx(),
+                    StrokeCap.Round,
                 )
             }
+
             PlayOverviewArtwork.ARENA -> {
-                val bladeColor = Color(0xFFCFE7EF)
-                val stroke = 2.dp.toPx()
-                drawLine(
-                    bladeColor.copy(alpha = .80f),
-                    Offset(size.width * .24f, size.height * .28f),
-                    Offset(size.width * .72f, size.height * .74f),
-                    stroke,
-                    StrokeCap.Round,
-                )
-                drawLine(
-                    bladeColor.copy(alpha = .80f),
-                    Offset(size.width * .72f, size.height * .27f),
-                    Offset(size.width * .27f, size.height * .73f),
-                    stroke,
-                    StrokeCap.Round,
+                val globeCenter = Offset(size.width * .46f, size.height * .50f)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFF89A9FF).copy(alpha = .92f),
+                            Color(0xFF416BB7).copy(alpha = .94f),
+                            deep.copy(alpha = .98f),
+                        ),
+                        center = Offset(size.width * .36f, size.height * .31f),
+                        radius = unit * .46f,
+                    ),
+                    radius = unit * .34f,
+                    center = globeCenter,
                 )
                 drawCircle(
-                    color = Color(0xFFD7A45A).copy(alpha = .88f),
-                    radius = 3.dp.toPx(),
-                    center = center,
+                    color = Color(0xFFCAD7FF).copy(alpha = .42f),
+                    radius = unit * .34f,
+                    center = globeCenter,
+                    style = Stroke(width = 1.05.dp.toPx()),
                 )
+
+                val blade = Color(0xFFD7EAF0)
+                drawLine(
+                    blade.copy(alpha = .88f),
+                    Offset(size.width * .15f, size.height * .25f),
+                    Offset(size.width * .80f, size.height * .78f),
+                    2.6.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    blade.copy(alpha = .80f),
+                    Offset(size.width * .78f, size.height * .20f),
+                    Offset(size.width * .17f, size.height * .76f),
+                    2.25.dp.toPx(),
+                    StrokeCap.Round,
+                )
+
                 val knight = Path().apply {
-                    moveTo(size.width * .42f, size.height * .68f)
-                    lineTo(size.width * .60f, size.height * .68f)
+                    moveTo(size.width * .28f, size.height * .71f)
+                    lineTo(size.width * .66f, size.height * .71f)
+                    lineTo(size.width * .62f, size.height * .63f)
                     cubicTo(
-                        size.width * .63f, size.height * .59f,
-                        size.width * .62f, size.height * .51f,
-                        size.width * .55f, size.height * .45f,
+                        size.width * .67f, size.height * .55f,
+                        size.width * .65f, size.height * .46f,
+                        size.width * .57f, size.height * .40f,
                     )
-                    lineTo(size.width * .62f, size.height * .35f)
-                    lineTo(size.width * .51f, size.height * .30f)
-                    lineTo(size.width * .44f, size.height * .36f)
-                    lineTo(size.width * .36f, size.height * .52f)
-                    lineTo(size.width * .47f, size.height * .50f)
-                    lineTo(size.width * .39f, size.height * .61f)
+                    lineTo(size.width * .68f, size.height * .31f)
+                    lineTo(size.width * .57f, size.height * .24f)
+                    lineTo(size.width * .47f, size.height * .29f)
+                    lineTo(size.width * .39f, size.height * .39f)
+                    lineTo(size.width * .28f, size.height * .52f)
+                    lineTo(size.width * .44f, size.height * .50f)
+                    lineTo(size.width * .32f, size.height * .62f)
                     close()
                 }
-                drawPath(knight, Color(0xFFF0F5F6))
+                drawPath(knight, Color(0xFFF1F5F7))
+                drawPath(
+                    knight,
+                    Color(0xFFBFD3DB).copy(alpha = .55f),
+                    style = Stroke(width = .9.dp.toPx()),
+                )
                 drawCircle(
-                    color = Color(0xFF16262B),
-                    radius = 1.3.dp.toPx(),
-                    center = Offset(size.width * .50f, size.height * .39f),
+                    color = Color(0xFF16313A),
+                    radius = 1.55.dp.toPx(),
+                    center = Offset(size.width * .50f, size.height * .36f),
+                )
+
+                val spark = Color(0xFFE2B65C)
+                drawLine(
+                    spark,
+                    Offset(size.width * .57f, size.height * .13f),
+                    Offset(size.width * .59f, size.height * .32f),
+                    1.7.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    spark.copy(alpha = .80f),
+                    Offset(size.width * .52f, size.height * .20f),
+                    Offset(size.width * .65f, size.height * .24f),
+                    1.2.dp.toPx(),
+                    StrokeCap.Round,
                 )
             }
         }
@@ -346,12 +500,20 @@ private fun QuickStartCard(
                 spotColor = Color.Black.copy(alpha = .36f),
             )
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(LumenColors.SurfaceRaised, LumenColors.Surface)))
-            .border(1.dp, LumenColors.Outline.copy(alpha = .76f), shape)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.SpaceEvenly,
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        LumenColors.SurfaceRaised.copy(alpha = .97f),
+                        LumenColors.Surface.copy(alpha = .99f),
+                    ),
+                ),
+            )
+            .border(1.dp, LumenColors.Outline.copy(alpha = .80f), shape)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
         QuickStartLine(QuickGlyph.CLOCK, primary, emphasized = true)
+        Spacer(Modifier.height(7.dp))
         QuickStartLine(QuickGlyph.ENGINE, secondary, emphasized = false)
     }
 }
@@ -365,9 +527,9 @@ private fun QuickStartLine(
     Row(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        QuickStartGlyph(glyph, Modifier.size(19.dp))
+        QuickStartGlyph(glyph, Modifier.size(22.dp))
         Text(
             text,
             style = if (emphasized) LumenTypography.QuickPrimary else LumenTypography.QuickSecondary,
@@ -381,28 +543,32 @@ private fun QuickStartLine(
 private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
     val tint = LumenColors.AccentBlueBright
     Canvas(modifier) {
-        val stroke = 1.5.dp.toPx()
+        val stroke = 1.45.dp.toPx()
         when (kind) {
             QuickGlyph.CLOCK -> {
-                drawCircle(tint.copy(alpha = .16f), size.minDimension * .49f)
-                drawCircle(tint, size.minDimension * .36f, style = Stroke(stroke))
+                drawCircle(tint.copy(alpha = .13f), size.minDimension * .48f)
+                drawCircle(tint, size.minDimension * .35f, style = Stroke(stroke))
                 drawLine(tint, center, Offset(center.x, size.height * .27f), stroke, StrokeCap.Round)
-                drawLine(tint, center, Offset(size.width * .66f, size.height * .57f), stroke, StrokeCap.Round)
+                drawLine(tint, center, Offset(size.width * .65f, size.height * .57f), stroke, StrokeCap.Round)
             }
             QuickGlyph.ENGINE -> {
-                drawCircle(tint.copy(alpha = .15f), size.minDimension * .49f)
-                val path = Path()
-                val outer = size.minDimension * .34f
-                val inner = outer * .45f
-                repeat(10) { index ->
-                    val radius = if (index % 2 == 0) outer else inner
-                    val angle = -PI / 2 + index * PI / 5
-                    val x = center.x + cos(angle).toFloat() * radius
-                    val y = center.y + sin(angle).toFloat() * radius
-                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                drawCircle(tint.copy(alpha = .13f), size.minDimension * .48f)
+                drawCircle(tint, size.minDimension * .25f, style = Stroke(stroke))
+                repeat(6) { index ->
+                    val angle = index * PI / 3
+                    val inner = size.minDimension * .29f
+                    val outer = size.minDimension * .39f
+                    val start = Offset(
+                        center.x + cos(angle).toFloat() * inner,
+                        center.y + sin(angle).toFloat() * inner,
+                    )
+                    val end = Offset(
+                        center.x + cos(angle).toFloat() * outer,
+                        center.y + sin(angle).toFloat() * outer,
+                    )
+                    drawLine(tint, start, end, stroke * 1.25f, StrokeCap.Round)
                 }
-                path.close()
-                drawPath(path, tint)
+                drawCircle(tint, size.minDimension * .07f)
             }
         }
     }
@@ -416,10 +582,14 @@ internal fun ReferenceArenaPreviewScreen(onBack: () -> Unit, modifier: Modifier 
             .padding(horizontal = 13.dp, vertical = 3.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        LumenTopBar("Engine Arena", onBack = onBack)
+        dev.lumenchess.design.LumenTopBar("Engine Arena", onBack = onBack)
         dev.lumenchess.design.LumenPanel(Modifier.fillMaxWidth()) {
             Column(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Engine Arena", style = androidx.compose.material3.MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Engine Arena",
+                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 Text(
                     "Arena setup will arrive with its engine-battle runtime. The Play shell is already reserved for it.",
                     style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
