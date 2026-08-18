@@ -101,6 +101,12 @@ class P5ReferenceStructureTest {
 
         composeRule.onNodeWithTag("p5-feedback-master-panel").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-feedback-event-list").performScrollTo().assertIsDisplayed()
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val moveCard = composeRule.onNodeWithTag("p5-feedback-event-move").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Feedback event groups should stay compact rather than becoming giant Material-style cards",
+            moveCard.height < root.height * 0.13f,
+        )
     }
 
     @Test
