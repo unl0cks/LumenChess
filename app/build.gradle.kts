@@ -39,7 +39,7 @@ val prepareLumenTypography by tasks.registering {
                 val url =
                     "https://raw.githubusercontent.com/googlefonts/inter-gf-tight/" +
                         "$interTightUpstreamCommit/fonts/ttf/$upstreamName"
-                java.net.URI.create(url).toURL().openStream().use { input ->
+                uri(url).toURL().openStream().use { input ->
                     temporary.outputStream().use { output -> input.copyTo(output) }
                 }
                 require(temporary.length() > 300_000L) {
