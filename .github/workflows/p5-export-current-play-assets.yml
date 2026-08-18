@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   export:
@@ -24,3 +25,15 @@ jobs:
             app/src/main/assets/play-overview/lumen_engine_arena_hero.png
           if-no-files-found: error
           retention-days: 1
+      - name: Publish export run status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          STATE=success
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$STATE" \
+            -f context='P5 asset export' \
+            -f description='Current Play assets exported for bounded recovery' \
+            -f target_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
