@@ -22,35 +22,31 @@ if (personalAssetsDirectory != null) {
 val personalAssetsEnabled = personalAssetsDirectory != null
 
 // Inter Tight is OFL-1.1. Pin the exact upstream source so public builds never float with HEAD.
+// Keep generated font bytes outside Git history; deleting .gradle also invalidates configuration cache,
+// so the next configuration recreates this resource directory deterministically.
 val interTightUpstreamCommit = "c194f94c60b569b47876811321f5ef1f0c2614a2"
-val generatedTypographyResDir = layout.buildDirectory.dir("generated/lumenTypography/res")
-val prepareLumenTypography by tasks.registering {
-    outputs.dir(generatedTypographyResDir)
-    doLast {
-        val fontDirectory = generatedTypographyResDir.get().dir("font").asFile.apply { mkdirs() }
-        val files = mapOf(
-            "inter_tight_regular.ttf" to "InterTight-Regular.ttf",
-            "inter_tight_medium.ttf" to "InterTight-Medium.ttf",
-            "inter_tight_semibold.ttf" to "InterTight-SemiBold.ttf",
-            "inter_tight_bold.ttf" to "InterTight-Bold.ttf",
-        )
-        files.forEach { (localName, upstreamName) ->
-            val destination = File(fontDirectory, localName)
-            if (!destination.isFile) {
-                val temporary = File(fontDirectory, "$localName.download")
-                val url =
-                    "https://raw.githubusercontent.com/googlefonts/inter-gf-tight/" +
-                        "$interTightUpstreamCommit/fonts/ttf/$upstreamName"
-                URI.create(url).toURL().openStream().use { input ->
-                    temporary.outputStream().use { output -> input.copyTo(output) }
-                }
-                require(temporary.length() > 300_000L) {
-                    "Downloaded Inter Tight resource is unexpectedly small: $upstreamName"
-                }
-                require(temporary.renameTo(destination)) {
-                    "Could not install generated Inter Tight resource: ${destination.absolutePath}"
-                }
-            }
+val generatedTypographyResDir = layout.projectDirectory.dir(".gradle/lumenTypography/res")
+val generatedTypographyFontDir = generatedTypographyResDir.dir("font").asFile.apply { mkdirs() }
+mapOf(
+    "inter_tight_regular.ttf" to "InterTight-Regular.ttf",
+    "inter_tight_medium.ttf" to "InterTight-Medium.ttf",
+    "inter_tight_semibold.ttf" to "InterTight-SemiBold.ttf",
+    "inter_tight_bold.ttf" to "InterTight-Bold.ttf",
+).forEach { (localName, upstreamName) ->
+    val destination = File(generatedTypographyFontDir, localName)
+    if (!destination.isFile) {
+        val temporary = File(generatedTypographyFontDir, "$localName.download")
+        val url =
+            "https://raw.githubusercontent.com/googlefonts/inter-gf-tight/" +
+                "$interTightUpstreamCommit/fonts/ttf/$upstreamName"
+        URI.create(url).toURL().openStream().use { input ->
+            temporary.outputStream().use { output -> input.copyTo(output) }
+        }
+        require(temporary.length() > 300_000L) {
+            "Downloaded Inter Tight resource is unexpectedly small: $upstreamName"
+        }
+        require(temporary.renameTo(destination)) {
+            "Could not install generated Inter Tight resource: ${destination.absolutePath}"
         }
     }
 }
@@ -86,7 +82,7 @@ android {
         buildConfig = true
     }
 
-    sourceSets.getByName("main").res.srcDir(generatedTypographyResDir.get().asFile)
+    sourceSets.getByName("main").res.srcDir(generatedTypographyResDir.asFile)
 
     if (personalAssetsDirectory != null) {
         sourceSets.getByName("main").assets.srcDir(personalAssetsDirectory)
@@ -95,14 +91,6 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
-}
-
-tasks.matching {
-    it.name == "preBuild" ||
-        (it.name.startsWith("merge") && it.name.endsWith("Resources")) ||
-        (it.name.startsWith("generate") && it.name.endsWith("Resources"))
-}.configureEach {
-    dependsOn(prepareLumenTypography)
 }
 
 dependencies {
