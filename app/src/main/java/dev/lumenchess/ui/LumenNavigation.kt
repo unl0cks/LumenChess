@@ -34,7 +34,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
@@ -152,9 +154,33 @@ private fun TabIcon(tab: MainTab,color: Color,modifier: Modifier=Modifier.size(1
         val s=size.minDimension*.082f
         when(tab) {
             MainTab.Play -> {
-                drawCircle(color,w*.34f,Offset(w*.5f,h*.5f),style=Stroke(s))
-                drawLine(color,Offset(w*.5f,h*.2f),Offset(w*.5f,h*.8f),s,StrokeCap.Round)
-                drawLine(color,Offset(w*.2f,h*.5f),Offset(w*.8f,h*.5f),s,StrokeCap.Round)
+                val knight = Path().apply {
+                    moveTo(w*.28f,h*.76f)
+                    lineTo(w*.70f,h*.76f)
+                    lineTo(w*.66f,h*.67f)
+                    cubicTo(w*.70f,h*.58f,w*.68f,h*.46f,w*.58f,h*.39f)
+                    lineTo(w*.69f,h*.28f)
+                    lineTo(w*.57f,h*.20f)
+                    lineTo(w*.46f,h*.26f)
+                    lineTo(w*.38f,h*.36f)
+                    lineTo(w*.27f,h*.51f)
+                    lineTo(w*.44f,h*.48f)
+                    lineTo(w*.31f,h*.63f)
+                }
+                drawPath(
+                    knight,
+                    color,
+                    style=Stroke(width=s*1.04f,cap=StrokeCap.Round,join=StrokeJoin.Round),
+                )
+                drawLine(color,Offset(w*.25f,h*.81f),Offset(w*.73f,h*.81f),s,StrokeCap.Round)
+                drawCircle(color,s*.62f,Offset(w*.50f,h*.33f))
+                val play = Path().apply {
+                    moveTo(w*.59f,h*.51f)
+                    lineTo(w*.71f,h*.57f)
+                    lineTo(w*.59f,h*.63f)
+                    close()
+                }
+                drawPath(play,color.copy(alpha=.92f))
             }
             MainTab.Arena -> {
                 drawLine(color,Offset(w*.24f,h*.22f),Offset(w*.76f,h*.78f),s,StrokeCap.Round)
