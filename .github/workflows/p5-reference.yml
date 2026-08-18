@@ -84,7 +84,10 @@ jobs:
       - name: Run P5 app instrumentation
         id: verify
         continue-on-error: true
-        run: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:connectedDebugAndroidTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/p5-gradle-instrumentation.txt"
       - name: Surface instrumentation failure details
         if: steps.verify.outcome != 'success'
         shell: bash
@@ -162,6 +165,7 @@ jobs:
           name: p5-reference-diagnostics-${{ github.sha }}
           path: |
             ${{ runner.temp }}/p5-emulator.log
+            ${{ runner.temp }}/p5-gradle-instrumentation.txt
             ${{ runner.temp }}/p5-screenshot-instrumentation.txt
             p5-screenshots/
             docs/references/LumenChess_UI_Concept_Blue.png
