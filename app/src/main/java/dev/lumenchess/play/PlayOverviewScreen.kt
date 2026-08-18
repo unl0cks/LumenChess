@@ -122,13 +122,16 @@ internal fun ReferencePlayOverviewScreen(
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 "Quick Start",
-                style = LumenTypography.SectionTitle,
+                style = LumenTypography.SectionTitle.copy(
+                    fontSize = 15.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
                 color = LumenColors.OnSurface,
-                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 "Last used",
-                style = LumenTypography.Meta,
+                style = LumenTypography.Meta.copy(fontSize = 11.5.sp, lineHeight = 14.sp),
                 color = LumenColors.OnSurfaceMuted,
             )
         }
@@ -160,7 +163,7 @@ private fun PlayOverviewTopBar(title: String, onBack: () -> Unit) {
         Text(
             text = title,
             modifier = Modifier.align(Alignment.Center),
-            style = LumenTypography.PlayTitle.copy(fontSize = 18.sp, lineHeight = 20.sp),
+            style = LumenTypography.PlayTitle.copy(fontSize = 19.sp, lineHeight = 21.sp),
             color = LumenColors.OnSurface,
             fontWeight = FontWeight.SemiBold,
         )
@@ -264,12 +267,12 @@ private fun PlayModeCard(
             )
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         PlayModeArtwork(
             kind = artwork,
             pressed = pressed,
-            modifier = Modifier.size(104.dp),
+            modifier = Modifier.size(116.dp),
         )
         Column(
             Modifier.weight(1f),
@@ -277,13 +280,25 @@ private fun PlayModeCard(
         ) {
             Text(
                 title,
-                style = LumenTypography.ModeTitle.copy(fontSize = 18.sp, lineHeight = 21.sp),
+                style = LumenTypography.ModeTitle.copy(
+                    fontSize = 19.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
                 color = LumenColors.OnSurface,
-                fontWeight = FontWeight.SemiBold,
             )
             Text(
                 subtitle,
-                style = LumenTypography.ModeSubtitle.copy(fontSize = 13.sp, lineHeight = 16.sp),
+                modifier = if (artwork == PlayOverviewArtwork.ARENA) {
+                    Modifier.fillMaxWidth(.86f)
+                } else {
+                    Modifier
+                },
+                style = LumenTypography.ModeSubtitle.copy(
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
                 color = LumenColors.OnSurfaceMuted,
             )
         }
@@ -313,93 +328,93 @@ private fun PlayModeArtwork(
                     Color.Transparent,
                 ),
                 center = glowCenter,
-                radius = unit * .53f,
+                radius = unit * .54f,
             ),
             center = glowCenter,
-            radius = unit * .51f,
+            radius = unit * .52f,
         )
 
         when (kind) {
             PlayOverviewArtwork.ENGINE -> {
                 val shield = Path().apply {
-                    moveTo(size.width * .18f, size.height * .24f)
-                    lineTo(size.width * .38f, size.height * .12f)
-                    lineTo(size.width * .67f, size.height * .18f)
-                    lineTo(size.width * .83f, size.height * .39f)
-                    lineTo(size.width * .75f, size.height * .68f)
-                    lineTo(size.width * .51f, size.height * .87f)
-                    lineTo(size.width * .24f, size.height * .77f)
-                    lineTo(size.width * .10f, size.height * .51f)
+                    moveTo(size.width * .12f, size.height * .22f)
+                    lineTo(size.width * .37f, size.height * .08f)
+                    lineTo(size.width * .72f, size.height * .15f)
+                    lineTo(size.width * .90f, size.height * .39f)
+                    lineTo(size.width * .80f, size.height * .73f)
+                    lineTo(size.width * .51f, size.height * .94f)
+                    lineTo(size.width * .18f, size.height * .82f)
+                    lineTo(size.width * .02f, size.height * .51f)
                     close()
                 }
                 drawPath(
                     path = shield,
                     brush = Brush.linearGradient(
                         listOf(
-                            bright.copy(alpha = .92f),
-                            accent.copy(alpha = .72f),
-                            deep.copy(alpha = .96f),
+                            bright.copy(alpha = .94f),
+                            accent.copy(alpha = .76f),
+                            deep.copy(alpha = .98f),
                         ),
-                        start = Offset(size.width * .18f, size.height * .15f),
-                        end = Offset(size.width * .74f, size.height * .84f),
+                        start = Offset(size.width * .12f, size.height * .11f),
+                        end = Offset(size.width * .80f, size.height * .90f),
                     ),
                 )
                 drawPath(
                     path = shield,
-                    color = Color(0xFFCDEBF2).copy(alpha = .36f),
+                    color = Color(0xFFCDEBF2).copy(alpha = .38f),
                     style = Stroke(width = 1.1.dp.toPx(), join = StrokeJoin.Round),
                 )
 
                 val rook = Path().apply {
-                    moveTo(size.width * .29f, size.height * .70f)
-                    lineTo(size.width * .61f, size.height * .70f)
-                    lineTo(size.width * .58f, size.height * .62f)
-                    lineTo(size.width * .55f, size.height * .38f)
-                    lineTo(size.width * .61f, size.height * .33f)
-                    lineTo(size.width * .61f, size.height * .26f)
-                    lineTo(size.width * .54f, size.height * .26f)
-                    lineTo(size.width * .54f, size.height * .32f)
-                    lineTo(size.width * .47f, size.height * .32f)
-                    lineTo(size.width * .47f, size.height * .25f)
-                    lineTo(size.width * .40f, size.height * .25f)
-                    lineTo(size.width * .40f, size.height * .32f)
-                    lineTo(size.width * .33f, size.height * .32f)
-                    lineTo(size.width * .33f, size.height * .26f)
-                    lineTo(size.width * .26f, size.height * .26f)
-                    lineTo(size.width * .26f, size.height * .34f)
-                    lineTo(size.width * .33f, size.height * .39f)
-                    lineTo(size.width * .34f, size.height * .61f)
+                    moveTo(size.width * .24f, size.height * .74f)
+                    lineTo(size.width * .62f, size.height * .74f)
+                    lineTo(size.width * .59f, size.height * .64f)
+                    lineTo(size.width * .56f, size.height * .36f)
+                    lineTo(size.width * .63f, size.height * .31f)
+                    lineTo(size.width * .63f, size.height * .23f)
+                    lineTo(size.width * .55f, size.height * .23f)
+                    lineTo(size.width * .55f, size.height * .30f)
+                    lineTo(size.width * .47f, size.height * .30f)
+                    lineTo(size.width * .47f, size.height * .22f)
+                    lineTo(size.width * .38f, size.height * .22f)
+                    lineTo(size.width * .38f, size.height * .30f)
+                    lineTo(size.width * .30f, size.height * .30f)
+                    lineTo(size.width * .30f, size.height * .23f)
+                    lineTo(size.width * .22f, size.height * .23f)
+                    lineTo(size.width * .22f, size.height * .32f)
+                    lineTo(size.width * .30f, size.height * .38f)
+                    lineTo(size.width * .31f, size.height * .63f)
                     close()
                 }
-                drawPath(rook, Color(0xFF17323B).copy(alpha = .84f))
+                drawPath(rook, Color(0xFF17323B).copy(alpha = .86f))
 
                 val bolt = Path().apply {
-                    moveTo(size.width * .59f, size.height * .17f)
-                    lineTo(size.width * .37f, size.height * .48f)
+                    moveTo(size.width * .60f, size.height * .12f)
+                    lineTo(size.width * .35f, size.height * .48f)
                     lineTo(size.width * .52f, size.height * .48f)
-                    lineTo(size.width * .38f, size.height * .82f)
-                    lineTo(size.width * .75f, size.height * .39f)
-                    lineTo(size.width * .57f, size.height * .39f)
+                    lineTo(size.width * .36f, size.height * .87f)
+                    lineTo(size.width * .79f, size.height * .37f)
+                    lineTo(size.width * .58f, size.height * .37f)
                     close()
                 }
                 drawPath(bolt, Color(0xFFF5FCFD))
                 drawPath(
                     bolt,
-                    bright.copy(alpha = .64f),
+                    bright.copy(alpha = .66f),
                     style = Stroke(width = 1.25.dp.toPx(), join = StrokeJoin.Round),
                 )
 
                 drawLine(
-                    bright.copy(alpha = .67f),
-                    Offset(size.width * .09f, size.height * .34f),
-                    Offset(size.width * .19f, size.height * .39f),
+                    bright.copy(alpha = .69f),
+                    Offset(size.width * .01f, size.height * .31f),
+                    Offset(size.width * .15f, size.height * .38f),
                     1.2.dp.toPx(),
                     StrokeCap.Round,
                 )
                 drawLine(
-                    bright.copy(alpha = .52f),
-                    Offset(size.width * .72f, size.height * .72f),
-                    Offset(size.width * .86f, size.height * .66f),
+                    bright.copy(alpha = .54f),
+                    Offset(size.width * .75f, size.height * .77f),
+                    Offset(size.width * .95f, size.height * .68f),
                     1.1.dp.toPx(),
                     StrokeCap.Round,
                 )
@@ -410,85 +425,85 @@ private fun PlayModeArtwork(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFF89A9FF).copy(alpha = .92f),
-                            Color(0xFF416BB7).copy(alpha = .94f),
-                            deep.copy(alpha = .98f),
+                            Color(0xFF89A9FF).copy(alpha = .94f),
+                            Color(0xFF416BB7).copy(alpha = .95f),
+                            deep.copy(alpha = .99f),
                         ),
-                        center = Offset(size.width * .36f, size.height * .31f),
-                        radius = unit * .46f,
+                        center = Offset(size.width * .34f, size.height * .29f),
+                        radius = unit * .50f,
                     ),
-                    radius = unit * .34f,
+                    radius = unit * .39f,
                     center = globeCenter,
                 )
                 drawCircle(
-                    color = Color(0xFFCAD7FF).copy(alpha = .42f),
-                    radius = unit * .34f,
+                    color = Color(0xFFCAD7FF).copy(alpha = .44f),
+                    radius = unit * .39f,
                     center = globeCenter,
                     style = Stroke(width = 1.05.dp.toPx()),
                 )
 
                 val blade = Color(0xFFD7EAF0)
                 drawLine(
-                    blade.copy(alpha = .88f),
-                    Offset(size.width * .15f, size.height * .25f),
-                    Offset(size.width * .80f, size.height * .78f),
-                    2.6.dp.toPx(),
+                    blade.copy(alpha = .90f),
+                    Offset(size.width * .07f, size.height * .18f),
+                    Offset(size.width * .88f, size.height * .84f),
+                    2.7.dp.toPx(),
                     StrokeCap.Round,
                 )
                 drawLine(
-                    blade.copy(alpha = .80f),
-                    Offset(size.width * .78f, size.height * .20f),
-                    Offset(size.width * .17f, size.height * .76f),
-                    2.25.dp.toPx(),
+                    blade.copy(alpha = .84f),
+                    Offset(size.width * .87f, size.height * .14f),
+                    Offset(size.width * .08f, size.height * .83f),
+                    2.35.dp.toPx(),
                     StrokeCap.Round,
                 )
 
                 val knight = Path().apply {
-                    moveTo(size.width * .28f, size.height * .71f)
-                    lineTo(size.width * .66f, size.height * .71f)
-                    lineTo(size.width * .62f, size.height * .63f)
+                    moveTo(size.width * .24f, size.height * .76f)
+                    lineTo(size.width * .69f, size.height * .76f)
+                    lineTo(size.width * .65f, size.height * .66f)
                     cubicTo(
-                        size.width * .67f,
-                        size.height * .55f,
-                        size.width * .65f,
-                        size.height * .46f,
+                        size.width * .71f,
+                        size.height * .56f,
+                        size.width * .68f,
+                        size.height * .44f,
                         size.width * .57f,
-                        size.height * .40f,
+                        size.height * .36f,
                     )
-                    lineTo(size.width * .68f, size.height * .31f)
-                    lineTo(size.width * .57f, size.height * .24f)
-                    lineTo(size.width * .47f, size.height * .29f)
-                    lineTo(size.width * .39f, size.height * .39f)
-                    lineTo(size.width * .28f, size.height * .52f)
-                    lineTo(size.width * .44f, size.height * .50f)
-                    lineTo(size.width * .32f, size.height * .62f)
+                    lineTo(size.width * .70f, size.height * .25f)
+                    lineTo(size.width * .57f, size.height * .17f)
+                    lineTo(size.width * .45f, size.height * .23f)
+                    lineTo(size.width * .35f, size.height * .35f)
+                    lineTo(size.width * .22f, size.height * .52f)
+                    lineTo(size.width * .42f, size.height * .49f)
+                    lineTo(size.width * .27f, size.height * .64f)
                     close()
                 }
                 drawPath(knight, Color(0xFFF1F5F7))
                 drawPath(
                     knight,
-                    Color(0xFFBFD3DB).copy(alpha = .55f),
+                    Color(0xFFBFD3DB).copy(alpha = .58f),
                     style = Stroke(width = .9.dp.toPx(), join = StrokeJoin.Round),
                 )
                 drawCircle(
                     color = Color(0xFF16313A),
-                    radius = 1.55.dp.toPx(),
-                    center = Offset(size.width * .50f, size.height * .36f),
+                    radius = 1.65.dp.toPx(),
+                    center = Offset(size.width * .49f, size.height * .31f),
                 )
 
                 val spark = Color(0xFFE2B65C)
                 drawLine(
                     spark,
-                    Offset(size.width * .57f, size.height * .13f),
-                    Offset(size.width * .59f, size.height * .32f),
-                    1.7.dp.toPx(),
+                    Offset(size.width * .58f, size.height * .06f),
+                    Offset(size.width * .60f, size.height * .29f),
+                    1.75.dp.toPx(),
                     StrokeCap.Round,
                 )
                 drawLine(
-                    spark.copy(alpha = .80f),
-                    Offset(size.width * .52f, size.height * .20f),
-                    Offset(size.width * .65f, size.height * .24f),
-                    1.2.dp.toPx(),
+                    spark.copy(alpha = .82f),
+                    Offset(size.width * .51f, size.height * .15f),
+                    Offset(size.width * .68f, size.height * .20f),
+                    1.25.dp.toPx(),
                     StrokeCap.Round,
                 )
             }
@@ -526,7 +541,7 @@ private fun QuickStartCard(
         verticalArrangement = Arrangement.Center,
     ) {
         QuickStartLine(QuickGlyph.CLOCK, primary, emphasized = true)
-        Spacer(Modifier.height(7.dp))
+        Spacer(Modifier.height(6.dp))
         QuickStartLine(QuickGlyph.ENGINE, secondary, emphasized = false)
     }
 }
@@ -542,16 +557,16 @@ private fun QuickStartLine(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        QuickStartGlyph(glyph, Modifier.size(22.dp))
+        QuickStartGlyph(glyph, Modifier.size(26.dp))
         Text(
             text,
             style = if (emphasized) {
-                LumenTypography.QuickPrimary
+                LumenTypography.QuickPrimary.copy(fontSize = 14.sp, lineHeight = 17.sp)
             } else {
-                LumenTypography.QuickSecondary
+                LumenTypography.QuickSecondary.copy(fontSize = 12.5.sp, lineHeight = 16.sp)
             },
             color = if (emphasized) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
-            fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Medium,
+            fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
         )
     }
 }
