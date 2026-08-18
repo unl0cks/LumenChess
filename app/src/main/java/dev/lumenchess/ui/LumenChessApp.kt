@@ -69,7 +69,14 @@ fun LumenChessApp() {
     fun persist(settings:AppearanceSettings){appearanceSettings=settings;scope.launch{appearanceRepository.update{settings}}}
 
     LumenTheme(settings=appearanceSettings) {
-        ProvideChessboardPresentationStyle(ChessboardPresentationStyle(BoardThemeCatalog.palette(appearanceSettings),PieceSetCatalog.definition(appearanceSettings.pieceSetId))) {
+        val boardDefinition=BoardThemeCatalog.definition(appearanceSettings.boardThemeId)
+        ProvideChessboardPresentationStyle(
+            ChessboardPresentationStyle(
+                palette=BoardThemeCatalog.palette(appearanceSettings),
+                pieceSet=PieceSetCatalog.definition(appearanceSettings.pieceSetId),
+                boardAssetPath=boardDefinition.assetPath,
+            ),
+        ) {
             Scaffold(containerColor=LumenColors.Background,bottomBar={if(!livePlay)LumenBottomNavigation(currentTab){currentTab=it}}) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     AnimatedContent(

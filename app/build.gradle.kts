@@ -7,6 +7,18 @@ val physicalArm64Only = providers.gradleProperty("lumenPhysicalArm64Only")
     .map(String::toBoolean)
     .orElse(false)
 
+val personalAssetsProperty = providers.gradleProperty("lumen.personalAssetsDir").orNull
+val personalAssetsDirectory = personalAssetsProperty?.let(::file)
+if (personalAssetsDirectory != null) {
+    require(personalAssetsDirectory.isDirectory) {
+        "lumen.personalAssetsDir must point to an existing directory: ${personalAssetsDirectory.absolutePath}"
+    }
+    require(File(personalAssetsDirectory, "boards").isDirectory && File(personalAssetsDirectory, "pieces").isDirectory) {
+        "lumen.personalAssetsDir must contain boards/ and pieces/ directories"
+    }
+}
+val personalAssetsEnabled = personalAssetsDirectory != null
+
 android {
     namespace = "dev.lumenchess"
     compileSdk = 37
@@ -19,6 +31,7 @@ android {
         versionCode = 1
         versionName = "0.1.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "LUMEN_PERSONAL_ASSETS", personalAssetsEnabled.toString())
 
         if (physicalArm64Only.get()) {
             ndk {
@@ -34,6 +47,11 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    if (personalAssetsDirectory != null) {
+        sourceSets.getByName("main").assets.srcDir(personalAssetsDirectory)
     }
 
     packaging {

@@ -11,34 +11,31 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import dev.lumenchess.board.ChessboardInput
-import dev.lumenchess.board.LumenChessboard
 import dev.lumenchess.board.PieceSetCatalog
+import dev.lumenchess.board.ThemedLumenChessboard
 import dev.lumenchess.core.chess.Position
 import dev.lumenchess.customization.BoardThemeCatalog
 import dev.lumenchess.design.LumenColors
 
 @Composable
-fun BoardPreview(
-    settings: AppearanceSettings,
-    modifier: Modifier = Modifier,
-) {
+fun BoardPreview(settings: AppearanceSettings, modifier: Modifier = Modifier) {
+    val boardDefinition = BoardThemeCatalog.definition(settings.boardThemeId)
     BoxWithConstraints(
-        modifier = modifier
-            .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
-            .testTag("board-preview")
-            .padding(6.dp),
+        modifier = modifier.background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
+            .testTag("board-preview").padding(6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        val widthTarget = maxWidth * 0.97f
+        val widthTarget = maxWidth * .97f
         val heightTarget = maxHeight - 4.dp
         val boardSize = if (widthTarget <= heightTarget) widthTarget else heightTarget
-        LumenChessboard(
+        ThemedLumenChessboard(
             position = Position.initial(),
             onMove = {},
             modifier = Modifier.size(boardSize).testTag("board-preview-board"),
             input = ChessboardInput(tapEnabled = false, dragEnabled = false),
             palette = BoardThemeCatalog.palette(settings),
             pieceSet = PieceSetCatalog.definition(settings.pieceSetId),
+            boardAssetPath = boardDefinition.assetPath,
         )
     }
 }

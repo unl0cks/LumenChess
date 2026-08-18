@@ -6,3 +6,6 @@ local.properties
 .DS_Store
 .externalNativeBuild/
 .cxx/
+
+# Optional private board/piece overrides. Never commit third-party personal assets.
+local-assets/
