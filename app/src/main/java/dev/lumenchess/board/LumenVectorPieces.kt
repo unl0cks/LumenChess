@@ -144,7 +144,11 @@ private fun DrawScope.drawLumenPiece(type: PieceType, side: ChessColor, tint: Co
     }
 
     fun tinyFinial(cx: Float, cy: Float, radius: Float) {
-        drawCircle(if (outlined) fill else bodyBrush, art * radius, p(cx, cy))
+        if (outlined) {
+            drawCircle(fill, art * radius, p(cx, cy))
+        } else {
+            drawCircle(bodyBrush, art * radius, p(cx, cy))
+        }
         drawCircle(line, art * radius, p(cx, cy), style = Stroke(stroke))
     }
 
