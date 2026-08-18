@@ -54,6 +54,7 @@ private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HA
 fun LumenChessApp() {
     var currentTab by remember { mutableStateOf(MainTab.Play) }
     var settingsDestination by remember { mutableStateOf(SettingsDestination.ROOT) }
+    var playFocusedSubpage by remember { mutableStateOf(false) }
     val playViewModel:PlayViewModel=viewModel()
     val playUi by playViewModel.uiState
     val context=LocalContext.current
@@ -62,6 +63,7 @@ fun LumenChessApp() {
     val persistedAppearanceSettings by appearanceRepository.settings.collectAsStateWithLifecycle(initialValue=AppearanceSettings())
     var appearanceSettings by remember { mutableStateOf(persistedAppearanceSettings) }
     val livePlay=currentTab==MainTab.Play&&playUi.mode==PlayScreenMode.LIVE
+    val focusedPlaySubpage=currentTab==MainTab.Play&&playFocusedSubpage
     val slideDistance=with(LocalDensity.current){10.dp.roundToPx()}
 
     LaunchedEffect(persistedAppearanceSettings){appearanceSettings=persistedAppearanceSettings}
@@ -77,7 +79,14 @@ fun LumenChessApp() {
                 boardAssetPath=boardDefinition.assetPath,
             ),
         ) {
-            Scaffold(containerColor=LumenColors.Background,bottomBar={if(!livePlay)LumenBottomNavigation(currentTab){currentTab=it}}) { padding ->
+            Scaffold(
+                containerColor=LumenColors.Background,
+                bottomBar={
+                    if(!livePlay&&!focusedPlaySubpage) {
+                        LumenBottomNavigation(currentTab){currentTab=it}
+                    }
+                },
+            ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
                     AnimatedContent(
                         targetState=currentTab to settingsDestination,
@@ -91,7 +100,11 @@ fun LumenChessApp() {
                         },label="lumen-page-transition",
                     ) { (tab,destination) ->
                         when(tab) {
-                            MainTab.Play -> ReferencePlayRoute(viewModel=playViewModel,modifier=Modifier.fillMaxSize())
+                            MainTab.Play -> ReferencePlayRoute(
+                                viewModel=playViewModel,
+                                modifier=Modifier.fillMaxSize(),
+                                onFocusedSubpageChanged={playFocusedSubpage=it},
+                            )
                             MainTab.Settings -> when(destination) {
                                 SettingsDestination.ROOT -> SettingsScreen(
                                     settings=appearanceSettings,
