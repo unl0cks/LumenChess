@@ -64,7 +64,9 @@ class P5PlayOverviewScreenshotQaTest {
 
         composeRule.onNodeWithTag("main-tab-play").performClick()
         waitForTag("p5-play-overview")
-        waitForTag("play-overview-vs-engine-depth-surface")
+        // The depth tag is intentionally inside the pressable card; inspect the unmerged tree so
+        // the parent Button semantics do not hide the internal surface marker.
+        waitForTag("play-overview-vs-engine-depth-surface", useUnmergedTree = true)
         capture("00-play-overview.png")
         capturePressState("play-overview-vs-engine")
     }
@@ -107,11 +109,20 @@ class P5PlayOverviewScreenshotQaTest {
         println("P5 Play hero assets verified: exact approved PNG bytes packaged")
     }
 
-    private fun waitForTag(tag: String, timeoutMillis: Long = 5_000L) {
+    private fun waitForTag(
+        tag: String,
+        timeoutMillis: Long = 5_000L,
+        useUnmergedTree: Boolean = false,
+    ) {
         composeRule.waitUntil(timeoutMillis = timeoutMillis) {
-            composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+            composeRule
+                .onAllNodesWithTag(tag, useUnmergedTree = useUnmergedTree)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
-        composeRule.onNodeWithTag(tag).assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(tag, useUnmergedTree = useUnmergedTree)
+            .assertIsDisplayed()
         composeRule.waitForIdle()
     }
 
