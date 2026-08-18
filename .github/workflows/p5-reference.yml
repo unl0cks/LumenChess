@@ -1,4 +1,4 @@
-name: P5 Play overview reference
+name: P5 New Game reference
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Mark P5 Play overview verification pending
+      - name: Mark P5 New Game verification pending
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -30,7 +30,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='Play overview build, tactile capture and comparison are running' \
+            -f description='New Game build, tactile capture and comparison are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -81,7 +81,7 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-      - name: Build Play overview screenshot APKs
+      - name: Build New Game screenshot APKs
         id: verify
         continue-on-error: true
         shell: bash
@@ -89,13 +89,13 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace \
             2>&1 | tee "$RUNNER_TEMP/p5-gradle-build.txt"
-      - name: Surface Play overview build failure
+      - name: Surface New Game build failure
         if: steps.verify.outcome != 'success'
         shell: bash
         run: |
-          echo "::error title=P5 Play overview build::Screenshot APK build failed"
+          echo "::error title=P5 New Game build::Screenshot APK build failed"
           tail -n 180 "$RUNNER_TEMP/p5-gradle-build.txt" || true
-      - name: Capture Play overview, tactile press state and comparison only
+      - name: Capture New Game, tactile press state and comparison only
         id: screenshots
         if: steps.verify.outcome == 'success'
         continue-on-error: true
@@ -108,19 +108,19 @@ jobs:
           rm -rf p5-screenshots
           mkdir -p p5-screenshots
           adb shell am instrument -w -r \
-            -e p5PlayOverviewQa true \
-            -e class dev.lumenchess.visual.P5PlayOverviewScreenshotQaTest \
+            -e p5SetupQa true \
+            -e class dev.lumenchess.visual.P5SetupScreenshotQaTest \
             dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
             | tee "$RUNNER_TEMP/p5-screenshot-instrumentation.txt"
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
           COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
           if [ "$COUNT" != "2" ]; then
-            echo "::error title=P5 Play overview screenshot::Expected exactly 2 device screenshots, found $COUNT"
+            echo "::error title=P5 New Game screenshot::Expected exactly 2 device screenshots, found $COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
-          test -f p5-screenshots/00-play-overview.png
-          test -f p5-screenshots/00-play-overview-press-state.png
+          test -f p5-screenshots/01-setup.png
+          test -f p5-screenshots/01-setup-press-state.png
 
           python3 -m pip install --quiet --disable-pip-version-check pillow
           python3 - <<'PY'
@@ -129,18 +129,18 @@ jobs:
 
           root = Path('.')
           reference_path = root / 'docs/references/LumenChess_UI_Concept_Blue.png'
-          candidate_path = root / 'p5-screenshots/00-play-overview.png'
-          comparison_path = root / 'p5-screenshots/00-play-overview-comparison.png'
+          candidate_path = root / 'p5-screenshots/01-setup.png'
+          comparison_path = root / 'p5-screenshots/01-setup-comparison.png'
 
-          # Tight measured crop of the first phone under "1. APP OVERVIEW".
-          reference = Image.open(reference_path).convert('RGB').crop((203, 16, 350, 368))
+          # Tight measured crop of the phone under "2. PLAY SETUP (VS ENGINE)".
+          reference = Image.open(reference_path).convert('RGB').crop((17, 451, 276, 1110))
           candidate = Image.open(candidate_path).convert('RGB')
 
           target_width = reference.width
           target_height = round(candidate.height * target_width / candidate.width)
           candidate = candidate.resize((target_width, target_height), Image.Resampling.LANCZOS)
 
-          gap = 6
+          gap = 8
           canvas = Image.new(
               'RGB',
               (reference.width + gap + candidate.width, max(reference.height, candidate.height)),
@@ -150,26 +150,26 @@ jobs:
           canvas.paste(candidate, (reference.width + gap, 0))
           canvas.save(comparison_path, optimize=True)
 
-          assert reference.size == (147, 352), reference.size
+          assert reference.size == (259, 659), reference.size
           assert candidate.width == reference.width
           PY
-          test -f p5-screenshots/00-play-overview-comparison.png
+          test -f p5-screenshots/01-setup-comparison.png
           FINAL_COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
           if [ "$FINAL_COUNT" != "3" ]; then
-            echo "::error title=P5 Play overview artifact::Expected exactly 3 final PNGs, found $FINAL_COUNT"
+            echo "::error title=P5 New Game artifact::Expected exactly 3 final PNGs, found $FINAL_COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
-          printf 'Captured Play overview, deterministic REST/PRESSED state and normalized reference comparison\n'
-      - name: Upload Play overview screenshot artifact
+          printf 'Captured New Game, deterministic REST/PRESSED state and normalized reference comparison\n'
+      - name: Upload New Game screenshot artifact
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: p5-play-overview-${{ github.sha }}
+          name: p5-setup-${{ github.sha }}
           path: |
-            p5-screenshots/00-play-overview.png
-            p5-screenshots/00-play-overview-comparison.png
-            p5-screenshots/00-play-overview-press-state.png
+            p5-screenshots/01-setup.png
+            p5-screenshots/01-setup-comparison.png
+            p5-screenshots/01-setup-press-state.png
           if-no-files-found: error
           retention-days: 14
       - name: Upload P5 diagnostics on failure
@@ -185,7 +185,7 @@ jobs:
             docs/references/LumenChess_UI_Concept_Blue.png
           if-no-files-found: warn
           retention-days: 7
-      - name: Publish P5 Play overview verification success
+      - name: Publish P5 New Game verification success
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -194,7 +194,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='Play overview normal, tactile press-state and comparison passed' \
+            -f description='New Game normal, tactile press-state and comparison passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
@@ -205,7 +205,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='Play overview build, capture or comparison failed' \
+            -f description='New Game build, capture or comparison failed' \
             -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
