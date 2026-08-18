@@ -1,7 +1,6 @@
 package dev.lumenchess.design
 
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -70,7 +69,7 @@ class P5ReferenceStructureTest {
         composeRule.onAllNodesWithText("Chess rules", substring = true).assertCountEquals(0)
         composeRule.onNodeWithTag("settings-category-list").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-board-pieces").assertIsDisplayed()
-        composeRule.onNodeWithTag("appearance-dark").assertDoesNotExist()
+        composeRule.onAllNodesWithTag("appearance-dark").assertCountEquals(0)
     }
 
     @Test
