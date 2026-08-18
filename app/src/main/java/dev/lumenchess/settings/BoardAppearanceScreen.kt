@@ -64,7 +64,7 @@ fun BoardAppearanceScreen(
     ) {
         LumenTopBar("Board & Pieces",onBack=onBack,backTestTag="customization-back")
         Text(
-            settings.presetId?.let { id -> LumenPresetCatalog.definition(id)?.let { "${it.displayName} preset" } } ?: "Custom mix",
+            settings.presetId?.let { id -> LumenPresetCatalog.definition(id)?.let { "${it.displayName} preset active" } } ?: "Custom mix",
             style=MaterialTheme.typography.labelSmall,color=LumenColors.OnSurfaceMuted,
             modifier=Modifier.padding(start=2.dp).testTag("customization-status"),
         )
