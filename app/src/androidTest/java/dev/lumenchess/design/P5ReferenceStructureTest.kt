@@ -23,13 +23,15 @@ class P5ReferenceStructureTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun playSetupUsesReferenceStackInsteadOfOneOversizedContainer() {
+    fun playSetupUsesCompactFramedReferenceHierarchy() {
         composeRule.onNodeWithTag("main-tab-play").assertIsDisplayed()
-
         composeRule.onAllNodesWithText("Human vs Engine").assertCountEquals(0)
         composeRule.onAllNodesWithText("LUMEN PLAY").assertCountEquals(0)
         composeRule.onAllNodesWithText("Configure a clean offline match.").assertCountEquals(0)
-        composeRule.onAllNodesWithTag("p5-setup-shell").assertCountEquals(0)
+
+        val frame = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot
+        val title = composeRule.onNodeWithTag("lumen-topbar-title").fetchSemanticsNode().boundsInRoot
+        assertTrue("New Game header must live inside the reference setup frame", title.top >= frame.top && title.bottom <= frame.bottom)
         composeRule.onNodeWithTag("p5-setup-content").assertIsDisplayed()
     }
 
@@ -42,7 +44,7 @@ class P5ReferenceStructureTest {
         val nav = composeRule.onNodeWithTag("main-tab-play").fetchSemanticsNode().boundsInRoot
         assertTrue(
             "Reference game-mode tiles should be more compact than the bottom-navigation item",
-            choice.height < nav.height * 0.96f,
+            choice.height < nav.height * 0.92f,
         )
     }
 
@@ -57,7 +59,7 @@ class P5ReferenceStructureTest {
         composeRule.onNodeWithTag("p5-live-action-strip").assertIsDisplayed()
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         val shell = composeRule.onNodeWithTag("p5-live-shell").fetchSemanticsNode().boundsInRoot
-        assertTrue("Live frame should occupy the visual center instead of becoming a huge full-height card", shell.height < root.height * 0.72f)
+        assertTrue("Live frame should remain dense instead of becoming a huge full-height card", shell.height < root.height * 0.72f)
     }
 
     @Test
@@ -82,7 +84,7 @@ class P5ReferenceStructureTest {
         val nav = composeRule.onNodeWithTag("main-tab-settings").fetchSemanticsNode().boundsInRoot
 
         assertTrue("Reference top bar title should be horizontally centered", abs(title.center.x - root.center.x) < root.width * 0.03f)
-        assertTrue("Reference settings rows should stay near compact navigation scale", row.height < nav.height * 1.18f)
+        assertTrue("Reference settings rows should stay close to compact navigation scale", row.height < nav.height * 1.12f)
     }
 
     @Test
@@ -104,10 +106,10 @@ class P5ReferenceStructureTest {
         val preview = composeRule.onNodeWithTag("board-preview").fetchSemanticsNode().boundsInRoot
         val first = composeRule.onNodeWithTag("customization-board-lumen-blue").fetchSemanticsNode().boundsInRoot
         val second = composeRule.onNodeWithTag("customization-board-midnight-oled").fetchSemanticsNode().boundsInRoot
-        assertTrue("Board preview should not consume almost half the screen", preview.height < root.height * 0.34f)
+        assertTrue("Board preview should not consume almost half the screen", preview.height < root.height * 0.31f)
         assertTrue("First two board choices should share a grid row", abs(first.top - second.top) < 2f)
         assertTrue("Grid choices should not be full-width list rows", first.width < root.width * 0.60f)
-        assertTrue("Reference thumbnail cards should stay compact", first.height < root.height * 0.125f)
+        assertTrue("Reference thumbnail cards should stay compact", first.height < root.height * 0.115f)
     }
 
     @Test
@@ -121,7 +123,7 @@ class P5ReferenceStructureTest {
         val moveCard = composeRule.onNodeWithTag("p5-feedback-event-move").fetchSemanticsNode().boundsInRoot
         assertTrue(
             "Feedback event groups should stay compact rather than becoming giant Material-style cards",
-            moveCard.height < root.height * 0.13f,
+            moveCard.height < root.height * 0.12f,
         )
     }
 
