@@ -80,9 +80,9 @@ class P5PlayOverviewScreenshotQaTest {
         val assets = InstrumentationRegistry.getInstrumentation().targetContext.assets
         val approved = mapOf(
             "play-overview/lumen_play_vs_engine_hero.png" to
-                "abdb0d1211553d329b8f7c48297ea484e254b68de0c296986a6fa0a113cecc3b",
+                "43a6accd71c5f9f1bfba552e0c409f5a95f25b1567b617c5c8851b5186d40e00",
             "play-overview/lumen_engine_arena_hero.png" to
-                "dfca04d2355f84c1f94eb905a07ffc8169a02841287e58f53ac20ee6b9af9180",
+                "2554fb301501a9f667652ab0631147bd7b38d868812b2dfecc0ea5bfa0aa12f2",
         )
         approved.forEach { (path, expectedSha256) ->
             val bytes = assets.open(path).use { input -> input.readBytes() }
