@@ -18,6 +18,7 @@ import dev.lumenchess.MainActivity
 import dev.lumenchess.R
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -77,17 +78,28 @@ class P5PlayOverviewScreenshotQaTest {
 
     private fun verifyApprovedHeroAssetsPackaged() {
         val assets = InstrumentationRegistry.getInstrumentation().targetContext.assets
-        listOf(
-            "play-overview/lumen_play_vs_engine_hero.png",
-            "play-overview/lumen_engine_arena_hero.png",
-        ).forEach { path ->
+        val approved = mapOf(
+            "play-overview/lumen_play_vs_engine_hero.png" to
+                "abdb0d1211553d329b8f7c48297ea484e254b68de0c296986a6fa0a113cecc3b",
+            "play-overview/lumen_engine_arena_hero.png" to
+                "dfca04d2355f84c1f94eb905a07ffc8169a02841287e58f53ac20ee6b9af9180",
+        )
+        approved.forEach { (path, expectedSha256) ->
+            val bytes = assets.open(path).use { input -> input.readBytes() }
+            val actualSha256 = MessageDigest.getInstance("SHA-256")
+                .digest(bytes)
+                .joinToString("") { byte -> "%02x".format(byte) }
+            check(actualSha256 == expectedSha256) {
+                "$path does not match the exact approved PNG bytes: $actualSha256"
+            }
+
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            assets.open(path).use { input -> BitmapFactory.decodeStream(input, null, bounds) }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             check(bounds.outWidth == 1254 && bounds.outHeight == 1254) {
                 "$path must package the approved 1254x1254 hero PNG exactly; got ${bounds.outWidth}x${bounds.outHeight}"
             }
         }
-        println("P5 Play hero assets verified: approved PNG resources packaged")
+        println("P5 Play hero assets verified: exact approved PNG bytes packaged")
     }
 
     private fun waitForTag(tag: String, timeoutMillis: Long = 5_000L) {
