@@ -127,10 +127,15 @@ class P5SetupScreenshotQaTest {
     }
 
     private fun assertReferenceWidthRelationships() {
-        val screenWidth = composeRule.activity.resources.displayMetrics.widthPixels.toFloat()
-        val shellWidth = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot.width
+        val metrics = composeRule.activity.resources.displayMetrics
+        val screenWidth = metrics.widthPixels.toFloat()
+        val shellInner = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot
+        // The shell tag intentionally sits on the inner content box after 11dp horizontal padding.
+        // Add that known padding back to measure the actual rendered outer frame without moving the
+        // production semantics modifier and risking a visual/layout change.
+        val shellOuterWidth = shellInner.width + 22f * metrics.density
         val opponentWidth = composeRule.onNodeWithTag("p5-setup-opponent").fetchSemanticsNode().boundsInRoot.width
-        val shellRatio = shellWidth / screenWidth
+        val shellRatio = shellOuterWidth / screenWidth
         val opponentRatio = opponentWidth / screenWidth
         assertTrue(
             "Setup shell should occupy roughly the reference phone width; ratio=$shellRatio",
@@ -143,8 +148,18 @@ class P5SetupScreenshotQaTest {
     }
 
     private fun logReferenceMetrics() {
+        val metrics = composeRule.activity.resources.displayMetrics
+        val shellInner = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot
+        val horizontalPadding = 11f * metrics.density
+        val verticalPadding = 7f * metrics.density
+        println(
+            "P5_SETUP_METRIC p5-setup-shell " +
+                "x=${shellInner.left - horizontalPadding} " +
+                "y=${shellInner.top - verticalPadding} " +
+                "w=${shellInner.width + horizontalPadding * 2f} " +
+                "h=${shellInner.height + verticalPadding * 2f}",
+        )
         listOf(
-            "p5-setup-shell",
             "p5-setup-header",
             "p5-setup-game-mode",
             "p5-setup-opponent",
