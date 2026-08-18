@@ -897,6 +897,7 @@ private fun SetupSegment(
         lerp(LumenColors.Surface, LumenColors.SurfaceRaised, .25f)
     }
     val face = if (pressed) lerp(baseFace, Color.Black, .10f) else baseFace
+    val segmentAccent = LumenColors.AccentBlueBright
     Box(
         modifier
             .fillMaxSize()
@@ -915,7 +916,7 @@ private fun SetupSegment(
                     drawRect(
                         brush = Brush.radialGradient(
                             listOf(
-                                LumenColors.AccentBlueBright.copy(alpha = if (pressed) .11f else .07f),
+                                segmentAccent.copy(alpha = if (pressed) .11f else .07f),
                                 Color.Transparent,
                             ),
                             center = Offset(size.width * .45f, size.height * .35f),
@@ -931,7 +932,7 @@ private fun SetupSegment(
             }
             .border(
                 1.dp,
-                if (selected) LumenColors.AccentBlueBright.copy(alpha = if (pressed) 1f else .90f)
+                if (selected) segmentAccent.copy(alpha = if (pressed) 1f else .90f)
                 else LumenColors.Outline.copy(alpha = .72f),
                 shape,
             )
