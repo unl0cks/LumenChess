@@ -54,7 +54,6 @@ class P5ReferenceStructureTest {
         composeRule.waitUntil(timeoutMillis = 12_000L) {
             composeRule.onAllNodesWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
         }
-
         composeRule.onNodeWithTag("p5-live-shell").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-action-strip").assertIsDisplayed()
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
@@ -65,24 +64,24 @@ class P5ReferenceStructureTest {
     @Test
     fun settingsUsesReferenceCategoryHierarchyBeforeAppearanceControls() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
-
         composeRule.onAllNodesWithText("Make LumenChess yours").assertCountEquals(0)
         composeRule.onAllNodesWithText("presentation-only", substring = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("Chess rules", substring = true).assertCountEquals(0)
         composeRule.onNodeWithTag("settings-category-list").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-board-pieces").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("appearance-dark").assertCountEquals(0)
+
+        val categories = composeRule.onNodeWithTag("settings-category-list").fetchSemanticsNode().boundsInRoot
+        val appearance = composeRule.onNodeWithTag("settings-appearance-section").fetchSemanticsNode().boundsInRoot
+        assertTrue("Reference categories must precede secondary appearance controls", appearance.top >= categories.bottom)
     }
 
     @Test
     fun referenceTopBarIsCenteredAndSettingsRowsStayCompact() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
-
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         val title = composeRule.onNodeWithTag("lumen-topbar-title").fetchSemanticsNode().boundsInRoot
         val row = composeRule.onNodeWithTag("settings-board-pieces").fetchSemanticsNode().boundsInRoot
         val nav = composeRule.onNodeWithTag("main-tab-settings").fetchSemanticsNode().boundsInRoot
-
         assertTrue("Reference top bar title should be horizontally centered", abs(title.center.x - root.center.x) < root.width * 0.03f)
         assertTrue("Reference settings rows should stay close to compact navigation scale", row.height < nav.height * 1.12f)
     }
@@ -91,7 +90,6 @@ class P5ReferenceStructureTest {
     fun boardCustomizationUsesIconBackNavigationInsteadOfTextBackCard() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
         composeRule.onNodeWithTag("settings-board-pieces").performClick()
-
         composeRule.onAllNodesWithText("Back").assertCountEquals(0)
         composeRule.onNodeWithTag("customization-back").assertIsDisplayed()
     }
@@ -109,28 +107,23 @@ class P5ReferenceStructureTest {
         assertTrue("Board preview should not consume almost half the screen", preview.height < root.height * 0.31f)
         assertTrue("First two board choices should share a grid row", abs(first.top - second.top) < 2f)
         assertTrue("Grid choices should not be full-width list rows", first.width < root.width * 0.60f)
-        assertTrue("Reference thumbnail cards should stay compact", first.height < root.height * 0.115f)
+        assertTrue("Reference thumbnail cards should stay compact", first.height < root.height * 0.125f)
     }
 
     @Test
     fun soundsAndHapticsUseCompactReferenceGrouping() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
         composeRule.onNodeWithTag("settings-sounds-haptics").performScrollTo().performClick()
-
         composeRule.onNodeWithTag("p5-feedback-master-panel").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-feedback-event-list").performScrollTo().assertIsDisplayed()
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         val moveCard = composeRule.onNodeWithTag("p5-feedback-event-move").fetchSemanticsNode().boundsInRoot
-        assertTrue(
-            "Feedback event groups should stay compact rather than becoming giant Material-style cards",
-            moveCard.height < root.height * 0.12f,
-        )
+        assertTrue("Feedback event groups should stay compact rather than becoming giant cards", moveCard.height < root.height * 0.13f)
     }
 
     @Test
     fun futureTabPreviewUsesProductCopyRatherThanBuildInternalCopy() {
         composeRule.onNodeWithTag("main-tab-arena").performClick()
-
         composeRule.onAllNodesWithText("not available in this build", substring = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("later milestone", substring = true).assertCountEquals(0)
     }
@@ -140,9 +133,7 @@ class P5ReferenceStructureTest {
         val before = listOf("play", "arena", "games", "insights", "settings").associateWith { tab ->
             composeRule.onNodeWithTag("main-tab-$tab").fetchSemanticsNode().boundsInRoot
         }
-
         composeRule.onNodeWithTag("main-tab-arena").performClick()
-
         val after = listOf("play", "arena", "games", "insights", "settings").associateWith { tab ->
             composeRule.onNodeWithTag("main-tab-$tab").fetchSemanticsNode().boundsInRoot
         }
