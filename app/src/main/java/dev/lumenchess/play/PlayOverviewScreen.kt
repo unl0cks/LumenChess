@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -163,9 +164,12 @@ private fun PlayOverviewTopBar(title: String, onBack: () -> Unit) {
         Text(
             text = title,
             modifier = Modifier.align(Alignment.Center),
-            style = LumenTypography.PlayTitle.copy(fontSize = 19.sp, lineHeight = 21.sp),
+            style = LumenTypography.PlayTitle.copy(
+                fontSize = 18.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+            ),
             color = LumenColors.OnSurface,
-            fontWeight = FontWeight.SemiBold,
         )
         Box(
             Modifier
@@ -231,14 +235,22 @@ private fun PlayModeCard(
         label = "play-mode-card-border",
     )
     val shape = RoundedCornerShape(11.dp)
+    val illumination = LumenColors.AccentBlueBright
+    val edgeHighlight = LumenColors.OnSurface
     val fill = if (pressed) {
-        Brush.verticalGradient(listOf(LumenColors.SurfaceHighest, LumenColors.SurfaceRaised))
-    } else {
-        Brush.verticalGradient(
+        Brush.horizontalGradient(
             listOf(
-                LumenColors.SurfaceRaised.copy(alpha = .98f),
+                LumenColors.SurfaceHighest,
+                LumenColors.SurfaceRaised,
+                LumenColors.SurfaceRaised,
+            ),
+        )
+    } else {
+        Brush.horizontalGradient(
+            listOf(
+                LumenColors.SurfaceHighest.copy(alpha = .82f),
+                LumenColors.SurfaceRaised.copy(alpha = .97f),
                 LumenColors.Surface.copy(alpha = .99f),
-                LumenColors.SurfaceRaised.copy(alpha = .90f),
             ),
         )
     }
@@ -258,6 +270,30 @@ private fun PlayModeCard(
             )
             .clip(shape)
             .background(fill)
+            .drawBehind {
+                val glowCenter = Offset(size.width * .18f, size.height * .50f)
+                val glowRadius = size.height * .74f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            illumination.copy(alpha = if (pressed) .20f else .145f),
+                            illumination.copy(alpha = .055f),
+                            Color.Transparent,
+                        ),
+                        center = glowCenter,
+                        radius = glowRadius,
+                    ),
+                    center = glowCenter,
+                    radius = glowRadius,
+                )
+                drawLine(
+                    color = edgeHighlight.copy(alpha = .055f),
+                    start = Offset(13.dp.toPx(), 1.dp.toPx()),
+                    end = Offset(size.width - 13.dp.toPx(), 1.dp.toPx()),
+                    strokeWidth = .65.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
             .border(1.dp, border, shape)
             .clickable(
                 interactionSource = interaction,
@@ -281,9 +317,9 @@ private fun PlayModeCard(
             Text(
                 title,
                 style = LumenTypography.ModeTitle.copy(
-                    fontSize = 23.sp,
-                    lineHeight = 26.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    lineHeight = 25.sp,
+                    fontWeight = FontWeight.SemiBold,
                 ),
                 color = LumenColors.OnSurface,
             )
@@ -295,11 +331,11 @@ private fun PlayModeCard(
                     Modifier
                 },
                 style = LumenTypography.ModeSubtitle.copy(
-                    fontSize = 16.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontSize = 15.sp,
+                    lineHeight = 19.sp,
+                    fontWeight = FontWeight.Normal,
                 ),
-                color = LumenColors.OnSurfaceMuted,
+                color = LumenColors.OnSurfaceMuted.copy(alpha = .94f),
             )
         }
     }
@@ -317,21 +353,22 @@ private fun PlayModeArtwork(
 
     Canvas(modifier) {
         val unit = size.minDimension
-        val glowAlpha = if (pressed) .43f else .31f
+        val glowAlpha = if (pressed) .46f else .34f
         val glowCenter = Offset(size.width * .46f, size.height * .51f)
 
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
                     bright.copy(alpha = glowAlpha),
-                    accent.copy(alpha = .15f),
+                    accent.copy(alpha = .17f),
+                    accent.copy(alpha = .045f),
                     Color.Transparent,
                 ),
                 center = glowCenter,
-                radius = unit * .54f,
+                radius = unit * .58f,
             ),
             center = glowCenter,
-            radius = unit * .52f,
+            radius = unit * .56f,
         )
 
         when (kind) {
@@ -349,20 +386,53 @@ private fun PlayModeArtwork(
                 }
                 drawPath(
                     path = shield,
+                    color = Color.Black.copy(alpha = .27f),
+                    style = Stroke(width = 5.dp.toPx(), join = StrokeJoin.Round),
+                )
+                drawPath(
+                    path = shield,
                     brush = Brush.linearGradient(
                         listOf(
-                            bright.copy(alpha = .94f),
-                            accent.copy(alpha = .76f),
-                            deep.copy(alpha = .98f),
+                            Color(0xFF79B3C4).copy(alpha = .96f),
+                            bright.copy(alpha = .88f),
+                            accent.copy(alpha = .77f),
+                            Color(0xFF294A56).copy(alpha = .98f),
                         ),
-                        start = Offset(size.width * .12f, size.height * .11f),
-                        end = Offset(size.width * .80f, size.height * .90f),
+                        start = Offset(size.width * .13f, size.height * .09f),
+                        end = Offset(size.width * .80f, size.height * .91f),
+                    ),
+                )
+                val facet = Path().apply {
+                    moveTo(size.width * .13f, size.height * .23f)
+                    lineTo(size.width * .37f, size.height * .09f)
+                    lineTo(size.width * .49f, size.height * .12f)
+                    lineTo(size.width * .37f, size.height * .44f)
+                    lineTo(size.width * .15f, size.height * .52f)
+                    close()
+                }
+                drawPath(
+                    facet,
+                    Brush.linearGradient(
+                        listOf(
+                            Color.White.copy(alpha = .13f),
+                            bright.copy(alpha = .07f),
+                            Color.Transparent,
+                        ),
+                        start = Offset(size.width * .15f, size.height * .12f),
+                        end = Offset(size.width * .47f, size.height * .52f),
                     ),
                 )
                 drawPath(
                     path = shield,
-                    color = Color(0xFFCDEBF2).copy(alpha = .38f),
-                    style = Stroke(width = 1.1.dp.toPx(), join = StrokeJoin.Round),
+                    color = Color(0xFFD4F4FA).copy(alpha = .43f),
+                    style = Stroke(width = 1.05.dp.toPx(), join = StrokeJoin.Round),
+                )
+                drawLine(
+                    Color.White.copy(alpha = .24f),
+                    Offset(size.width * .18f, size.height * .20f),
+                    Offset(size.width * .40f, size.height * .09f),
+                    .85.dp.toPx(),
+                    StrokeCap.Round,
                 )
 
                 val rook = Path().apply {
@@ -386,7 +456,23 @@ private fun PlayModeArtwork(
                     lineTo(size.width * .31f, size.height * .63f)
                     close()
                 }
-                drawPath(rook, Color(0xFF17323B).copy(alpha = .86f))
+                drawPath(
+                    rook,
+                    brush = Brush.linearGradient(
+                        listOf(
+                            Color(0xFF234651).copy(alpha = .96f),
+                            Color(0xFF112B34).copy(alpha = .94f),
+                            Color(0xFF0B2027).copy(alpha = .97f),
+                        ),
+                        start = Offset(size.width * .25f, size.height * .23f),
+                        end = Offset(size.width * .61f, size.height * .75f),
+                    ),
+                )
+                drawPath(
+                    rook,
+                    bright.copy(alpha = .19f),
+                    style = Stroke(width = .8.dp.toPx(), join = StrokeJoin.Round),
+                )
 
                 val bolt = Path().apply {
                     moveTo(size.width * .60f, size.height * .12f)
@@ -397,65 +483,143 @@ private fun PlayModeArtwork(
                     lineTo(size.width * .58f, size.height * .37f)
                     close()
                 }
-                drawPath(bolt, Color(0xFFF5FCFD))
                 drawPath(
                     bolt,
-                    bright.copy(alpha = .66f),
-                    style = Stroke(width = 1.25.dp.toPx(), join = StrokeJoin.Round),
+                    bright.copy(alpha = .27f),
+                    style = Stroke(width = 5.5.dp.toPx(), join = StrokeJoin.Round),
+                )
+                drawPath(
+                    bolt,
+                    Brush.linearGradient(
+                        listOf(
+                            Color.White,
+                            Color(0xFFEAFBFF),
+                            Color(0xFFC9F3FA),
+                        ),
+                        start = Offset(size.width * .58f, size.height * .12f),
+                        end = Offset(size.width * .39f, size.height * .87f),
+                    ),
+                )
+                drawPath(
+                    bolt,
+                    bright.copy(alpha = .58f),
+                    style = Stroke(width = 1.15.dp.toPx(), join = StrokeJoin.Round),
+                )
+                drawLine(
+                    Color.White.copy(alpha = .55f),
+                    Offset(size.width * .58f, size.height * .19f),
+                    Offset(size.width * .41f, size.height * .46f),
+                    .75.dp.toPx(),
+                    StrokeCap.Round,
                 )
 
                 drawLine(
-                    bright.copy(alpha = .69f),
+                    bright.copy(alpha = .73f),
                     Offset(size.width * .01f, size.height * .31f),
                     Offset(size.width * .15f, size.height * .38f),
                     1.2.dp.toPx(),
                     StrokeCap.Round,
                 )
                 drawLine(
-                    bright.copy(alpha = .54f),
+                    bright.copy(alpha = .58f),
                     Offset(size.width * .75f, size.height * .77f),
                     Offset(size.width * .95f, size.height * .68f),
                     1.1.dp.toPx(),
                     StrokeCap.Round,
                 )
+                drawCircle(
+                    bright.copy(alpha = .55f),
+                    radius = 1.1.dp.toPx(),
+                    center = Offset(size.width * .86f, size.height * .24f),
+                )
             }
 
             PlayOverviewArtwork.ARENA -> {
                 val globeCenter = Offset(size.width * .46f, size.height * .50f)
+                val blade = Color(0xFFD7EAF0)
+                val bladeShadow = Color(0xFF10242C)
+
+                drawLine(
+                    bladeShadow.copy(alpha = .72f),
+                    Offset(size.width * .07f, size.height * .18f),
+                    Offset(size.width * .88f, size.height * .84f),
+                    5.4.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    blade.copy(alpha = .85f),
+                    Offset(size.width * .07f, size.height * .18f),
+                    Offset(size.width * .88f, size.height * .84f),
+                    2.35.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    bladeShadow.copy(alpha = .72f),
+                    Offset(size.width * .87f, size.height * .14f),
+                    Offset(size.width * .08f, size.height * .83f),
+                    5.0.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    blade.copy(alpha = .80f),
+                    Offset(size.width * .87f, size.height * .14f),
+                    Offset(size.width * .08f, size.height * .83f),
+                    2.15.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    Color(0xFF9BC8D4).copy(alpha = .76f),
+                    Offset(size.width * .10f, size.height * .24f),
+                    Offset(size.width * .17f, size.height * .17f),
+                    1.7.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    Color(0xFF9BC8D4).copy(alpha = .68f),
+                    Offset(size.width * .81f, size.height * .19f),
+                    Offset(size.width * .88f, size.height * .26f),
+                    1.7.dp.toPx(),
+                    StrokeCap.Round,
+                )
+
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFF89A9FF).copy(alpha = .94f),
-                            Color(0xFF416BB7).copy(alpha = .95f),
+                            Color(0xFFA3BDFF).copy(alpha = .96f),
+                            Color(0xFF5479C7).copy(alpha = .97f),
+                            Color(0xFF2A477B).copy(alpha = .99f),
                             deep.copy(alpha = .99f),
                         ),
                         center = Offset(size.width * .34f, size.height * .29f),
-                        radius = unit * .50f,
+                        radius = unit * .51f,
                     ),
                     radius = unit * .39f,
                     center = globeCenter,
                 )
                 drawCircle(
-                    color = Color(0xFFCAD7FF).copy(alpha = .44f),
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = .12f),
+                            bright.copy(alpha = .05f),
+                            Color.Transparent,
+                        ),
+                        center = Offset(size.width * .33f, size.height * .29f),
+                        radius = unit * .31f,
+                    ),
+                    radius = unit * .34f,
+                    center = globeCenter,
+                )
+                drawCircle(
+                    color = Color(0xFFD8E4FF).copy(alpha = .42f),
                     radius = unit * .39f,
                     center = globeCenter,
-                    style = Stroke(width = 1.05.dp.toPx()),
+                    style = Stroke(width = 1.0.dp.toPx()),
                 )
-
-                val blade = Color(0xFFD7EAF0)
-                drawLine(
-                    blade.copy(alpha = .90f),
-                    Offset(size.width * .07f, size.height * .18f),
-                    Offset(size.width * .88f, size.height * .84f),
-                    2.7.dp.toPx(),
-                    StrokeCap.Round,
-                )
-                drawLine(
-                    blade.copy(alpha = .84f),
-                    Offset(size.width * .87f, size.height * .14f),
-                    Offset(size.width * .08f, size.height * .83f),
-                    2.35.dp.toPx(),
-                    StrokeCap.Round,
+                drawCircle(
+                    color = Color(0xFF10263A).copy(alpha = .42f),
+                    radius = unit * .315f,
+                    center = globeCenter,
+                    style = Stroke(width = .75.dp.toPx()),
                 )
 
                 val knight = Path().apply {
@@ -479,11 +643,34 @@ private fun PlayModeArtwork(
                     lineTo(size.width * .27f, size.height * .64f)
                     close()
                 }
-                drawPath(knight, Color(0xFFF1F5F7))
                 drawPath(
                     knight,
-                    Color(0xFFBFD3DB).copy(alpha = .58f),
-                    style = Stroke(width = .9.dp.toPx(), join = StrokeJoin.Round),
+                    Color(0xFF0B1B24).copy(alpha = .33f),
+                    style = Stroke(width = 3.7.dp.toPx(), join = StrokeJoin.Round),
+                )
+                drawPath(
+                    knight,
+                    brush = Brush.linearGradient(
+                        listOf(
+                            Color.White,
+                            Color(0xFFEAF4F7),
+                            Color(0xFFBFD4DC),
+                        ),
+                        start = Offset(size.width * .31f, size.height * .20f),
+                        end = Offset(size.width * .65f, size.height * .77f),
+                    ),
+                )
+                drawPath(
+                    knight,
+                    Color(0xFFFFFFFF).copy(alpha = .36f),
+                    style = Stroke(width = .8.dp.toPx(), join = StrokeJoin.Round),
+                )
+                drawLine(
+                    Color.White.copy(alpha = .42f),
+                    Offset(size.width * .46f, size.height * .24f),
+                    Offset(size.width * .61f, size.height * .33f),
+                    .85.dp.toPx(),
+                    StrokeCap.Round,
                 )
                 drawCircle(
                     color = Color(0xFF16313A),
@@ -505,6 +692,11 @@ private fun PlayModeArtwork(
                     Offset(size.width * .68f, size.height * .20f),
                     1.25.dp.toPx(),
                     StrokeCap.Round,
+                )
+                drawCircle(
+                    spark.copy(alpha = .64f),
+                    radius = .95.dp.toPx(),
+                    center = Offset(size.width * .72f, size.height * .12f),
                 )
             }
         }
@@ -578,35 +770,80 @@ private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
         val stroke = 1.45.dp.toPx()
         when (kind) {
             QuickGlyph.CLOCK -> {
-                drawCircle(tint.copy(alpha = .13f), size.minDimension * .48f)
-                drawCircle(tint, size.minDimension * .35f, style = Stroke(stroke))
-                drawLine(tint, center, Offset(center.x, size.height * .27f), stroke, StrokeCap.Round)
+                drawCircle(tint.copy(alpha = .15f), size.minDimension * .48f)
+                drawCircle(
+                    tint.copy(alpha = .98f),
+                    size.minDimension * .35f,
+                    style = Stroke(stroke * 1.20f),
+                )
+                drawCircle(
+                    Color.White.copy(alpha = .12f),
+                    size.minDimension * .28f,
+                    style = Stroke(stroke * .52f),
+                )
+                drawLine(
+                    tint,
+                    center,
+                    Offset(center.x, size.height * .27f),
+                    stroke * 1.12f,
+                    StrokeCap.Round,
+                )
                 drawLine(
                     tint,
                     center,
                     Offset(size.width * .65f, size.height * .57f),
-                    stroke,
+                    stroke * 1.12f,
                     StrokeCap.Round,
                 )
             }
             QuickGlyph.ENGINE -> {
-                drawCircle(tint.copy(alpha = .13f), size.minDimension * .48f)
-                drawCircle(tint, size.minDimension * .25f, style = Stroke(stroke))
+                drawCircle(tint.copy(alpha = .12f), size.minDimension * .48f)
+                val badge = Path()
                 repeat(6) { index ->
-                    val angle = index * PI / 3
-                    val inner = size.minDimension * .29f
-                    val outer = size.minDimension * .39f
-                    val start = Offset(
-                        center.x + cos(angle).toFloat() * inner,
-                        center.y + sin(angle).toFloat() * inner,
+                    val angle = (-PI / 2) + index * PI / 3
+                    val point = Offset(
+                        center.x + cos(angle).toFloat() * size.minDimension * .34f,
+                        center.y + sin(angle).toFloat() * size.minDimension * .34f,
                     )
-                    val end = Offset(
-                        center.x + cos(angle).toFloat() * outer,
-                        center.y + sin(angle).toFloat() * outer,
-                    )
-                    drawLine(tint, start, end, stroke * 1.25f, StrokeCap.Round)
+                    if (index == 0) badge.moveTo(point.x, point.y) else badge.lineTo(point.x, point.y)
                 }
-                drawCircle(tint, size.minDimension * .07f)
+                badge.close()
+                drawPath(
+                    badge,
+                    brush = Brush.radialGradient(
+                        listOf(
+                            tint.copy(alpha = .26f),
+                            tint.copy(alpha = .10f),
+                        ),
+                        center = Offset(size.width * .40f, size.height * .35f),
+                        radius = size.minDimension * .40f,
+                    ),
+                )
+                drawPath(
+                    badge,
+                    tint.copy(alpha = .96f),
+                    style = Stroke(width = stroke * 1.05f, join = StrokeJoin.Round),
+                )
+                drawCircle(tint.copy(alpha = .94f), size.minDimension * .115f)
+                repeat(4) { index ->
+                    val angle = index * PI / 2
+                    val inner = size.minDimension * .17f
+                    val outer = size.minDimension * .25f
+                    drawLine(
+                        tint.copy(alpha = .88f),
+                        Offset(
+                            center.x + cos(angle).toFloat() * inner,
+                            center.y + sin(angle).toFloat() * inner,
+                        ),
+                        Offset(
+                            center.x + cos(angle).toFloat() * outer,
+                            center.y + sin(angle).toFloat() * outer,
+                        ),
+                        stroke * .95f,
+                        StrokeCap.Round,
+                    )
+                }
+                drawCircle(Color.White.copy(alpha = .36f), size.minDimension * .035f)
             }
         }
     }
