@@ -8,6 +8,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.MainActivity
@@ -36,12 +38,28 @@ class P5PlayOverviewScreenshotQaTest {
 
     @Test
     fun capturePlayOverviewOnly() {
-        composeRule.waitUntil(timeoutMillis = 5_000L) {
-            composeRule.onAllNodesWithTag("p5-play-overview").fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithTag("p5-play-overview").assertIsDisplayed()
+        waitForTag("p5-play-overview")
+
+        // Screenshot QA uses the product's real appearance preference path. The emulator defaults to
+        // a light system theme, while the approved Play reference is the dark graphite Lumen theme.
+        composeRule.onNodeWithTag("main-tab-settings").performClick()
+        waitForTag("settings-category-list")
+        composeRule.onNodeWithTag("settings-play").performClick()
+        waitForTag("play-settings-root")
+        composeRule.onNodeWithTag("appearance-dark").performScrollTo().performClick()
         composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("main-tab-play").performClick()
+        waitForTag("p5-play-overview")
         capture("00-play-overview.png")
+    }
+
+    private fun waitForTag(tag: String, timeoutMillis: Long = 5_000L) {
+        composeRule.waitUntil(timeoutMillis = timeoutMillis) {
+            composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(tag).assertIsDisplayed()
+        composeRule.waitForIdle()
     }
 
     private fun capture(name: String) {
