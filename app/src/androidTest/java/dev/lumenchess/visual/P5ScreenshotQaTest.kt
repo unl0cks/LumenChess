@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.MainActivity
+import dev.lumenchess.play.PLAY_ENGINE_STATUS_TEST_TAG
 import dev.lumenchess.play.PLAY_LIVE_TEST_TAG
 import dev.lumenchess.play.PLAY_SETUP_TEST_TAG
 import dev.lumenchess.play.PLAY_START_TEST_TAG
@@ -55,7 +56,7 @@ class P5ScreenshotQaTest {
         composeRule.onNodeWithText("Reckless 0.9.0").performClick()
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
         waitForTag(PLAY_LIVE_TEST_TAG, timeoutMillis = 12_000L)
-        composeRule.onNodeWithText("Reckless 0.9.0").assertIsDisplayed()
+        composeRule.onNodeWithTag(PLAY_ENGINE_STATUS_TEST_TAG).assertIsDisplayed()
         capture("03-reckless-live.png")
 
         backToSetup()
