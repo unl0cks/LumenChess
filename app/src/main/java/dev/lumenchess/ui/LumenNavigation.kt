@@ -54,6 +54,7 @@ import dev.lumenchess.design.LumenTypography
 @Composable
 internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit) {
     val divider = LumenColors.Outline.copy(alpha = .72f)
+    val selectedIndicator = LumenColors.AccentBlueBright
     Box(
         Modifier.fillMaxWidth().height(66.dp).background(LumenColors.Surface.copy(alpha = .99f))
             .drawBehind {
@@ -100,7 +101,7 @@ internal fun LumenBottomNavigation(current: MainTab, onSelect: (MainTab) -> Unit
                         Modifier.width(16.dp).height(2.dp).drawBehind {
                             if (selected) {
                                 drawLine(
-                                    color = LumenColors.AccentBlueBright,
+                                    color = selectedIndicator,
                                     start = Offset(1.dp.toPx(), size.height / 2f),
                                     end = Offset(size.width - 1.dp.toPx(), size.height / 2f),
                                     strokeWidth = 1.dp.toPx(),
