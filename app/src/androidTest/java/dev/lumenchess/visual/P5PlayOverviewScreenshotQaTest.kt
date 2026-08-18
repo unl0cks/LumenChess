@@ -11,6 +11,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -22,6 +23,7 @@ import dev.lumenchess.R
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -67,6 +69,7 @@ class P5PlayOverviewScreenshotQaTest {
         // The depth tag is intentionally inside the pressable card; inspect the unmerged tree so
         // the parent Button semantics do not hide the internal surface marker.
         waitForTag("play-overview-vs-engine-depth-surface", useUnmergedTree = true)
+        assertArenaSubtitleWraps()
         capture("00-play-overview.png")
         capturePressState("play-overview-vs-engine")
     }
@@ -107,6 +110,17 @@ class P5PlayOverviewScreenshotQaTest {
             }
         }
         println("P5 Play hero assets verified: exact approved PNG bytes packaged")
+    }
+
+    private fun assertArenaSubtitleWraps() {
+        val bounds = composeRule
+            .onNodeWithText("Watch engines battle each other")
+            .fetchSemanticsNode()
+            .boundsInRoot
+        assertTrue(
+            "Engine Arena subtitle must occupy two lines in the reference composition; height=${bounds.height}",
+            bounds.height >= 80f,
+        )
     }
 
     private fun waitForTag(
