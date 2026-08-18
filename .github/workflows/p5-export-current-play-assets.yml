@@ -1,0 +1,26 @@
+name: P5 export current Play assets
+
+on:
+  push:
+    branches:
+      - p5-reference-fidelity-visual-identity
+    paths:
+      - .github/workflows/p5-export-current-play-assets.yml
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload current committed Play assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: p5-current-play-assets-${{ github.sha }}
+          path: |
+            app/src/main/assets/play-overview/lumen_play_vs_engine_hero.png
+            app/src/main/assets/play-overview/lumen_engine_arena_hero.png
+          if-no-files-found: error
+          retention-days: 1
