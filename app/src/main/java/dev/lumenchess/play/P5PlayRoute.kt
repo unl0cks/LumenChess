@@ -367,7 +367,7 @@ private fun P5SetupIcon(glyph: P5SetupGlyph, color: UiColor) {
                 drawLine(color, Offset(w*.18f,h*.70f), Offset(w*.32f,h*.56f), s, StrokeCap.Round)
             }
             P5SetupGlyph.WHITE, P5SetupGlyph.BLACK -> {
-                val fill = if (glyph == P5SetupGlyph.WHITE) Color.WHITE else UiColor(0xFF34393C)
+                val fill = if (glyph == P5SetupGlyph.WHITE) UiColor.White else UiColor(0xFF34393C)
                 drawCircle(fill, w*.17f, Offset(w*.5f,h*.27f))
                 val pawn = Path().apply {
                     moveTo(w*.38f,h*.42f); lineTo(w*.62f,h*.42f); lineTo(w*.69f,h*.68f); lineTo(w*.78f,h*.80f); lineTo(w*.22f,h*.80f); lineTo(w*.31f,h*.68f); close()
