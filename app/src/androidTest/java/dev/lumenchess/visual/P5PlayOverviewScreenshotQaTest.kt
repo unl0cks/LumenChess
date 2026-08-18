@@ -1,6 +1,7 @@
 package dev.lumenchess.visual
 
 import android.graphics.Bitmap
+import android.graphics.Typeface
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.MainActivity
+import dev.lumenchess.R
 import java.io.File
 import java.io.FileOutputStream
 import org.junit.Assume.assumeTrue
@@ -38,6 +40,7 @@ class P5PlayOverviewScreenshotQaTest {
 
     @Test
     fun capturePlayOverviewOnly() {
+        verifyInterTightRuntimeResource()
         waitForTag("p5-play-overview")
 
         // Screenshot QA uses the product's real appearance preference path. The emulator defaults to
@@ -52,6 +55,18 @@ class P5PlayOverviewScreenshotQaTest {
         composeRule.onNodeWithTag("main-tab-play").performClick()
         waitForTag("p5-play-overview")
         capture("00-play-overview.png")
+    }
+
+    private fun verifyInterTightRuntimeResource() {
+        val resources = composeRule.activity.resources
+        check(resources.getResourceEntryName(R.font.inter_tight_regular) == "inter_tight_regular") {
+            "Play overview typography resource did not resolve to Inter Tight"
+        }
+        val typeface = resources.getFont(R.font.inter_tight_regular)
+        check(typeface != Typeface.DEFAULT && typeface != Typeface.DEFAULT_BOLD) {
+            "Inter Tight resolved to a platform default typeface"
+        }
+        println("P5 Play typography verified: inter_tight_regular loaded from app resources")
     }
 
     private fun waitForTag(tag: String, timeoutMillis: Long = 5_000L) {
