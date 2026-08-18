@@ -44,6 +44,8 @@ class P5PlayOverviewScreenshotQaTest {
         verifyInterTightRuntimeResource()
         verifyApprovedHeroAssetsPackaged()
         waitForTag("p5-play-overview")
+        waitForTag("play-overview-vs-engine-hero")
+        waitForTag("play-overview-arena-hero")
 
         // Screenshot QA uses the product's real appearance preference path. The emulator defaults to
         // a light system theme, while the approved Play reference is the dark graphite Lumen theme.
