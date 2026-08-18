@@ -138,31 +138,33 @@ fun SoundsHapticsScreen(
         }
 
         LumenPanel(Modifier.fillMaxWidth()) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Sound pack", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        if (settings.soundPackId == AppearanceSettings.DEFAULT_SOUND_PACK_ID) "Lumen Default" else settings.soundPackId,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = LumenColors.OnSurfaceMuted,
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Sound pack", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (settings.soundPackId == AppearanceSettings.DEFAULT_SOUND_PACK_ID) "Lumen Default" else settings.soundPackId,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LumenColors.OnSurfaceMuted,
+                        )
+                    }
+                    LumenSecondaryButton(
+                        label = "Import ZIP",
+                        onClick = { packLauncher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
+                        modifier = Modifier.testTag("feedback-import-pack"),
                     )
                 }
-                LumenSecondaryButton(
-                    label = "Import ZIP",
-                    onClick = { packLauncher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
-                    modifier = Modifier.testTag("feedback-import-pack"),
-                )
-            }
-            if (settings.soundPackId != AppearanceSettings.DEFAULT_SOUND_PACK_ID) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    LumenSecondaryButton("Use Lumen", { onSettingsChange(settings.copy(soundPackId = AppearanceSettings.DEFAULT_SOUND_PACK_ID)) })
+                if (settings.soundPackId != AppearanceSettings.DEFAULT_SOUND_PACK_ID) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        LumenSecondaryButton("Use Lumen", { onSettingsChange(settings.copy(soundPackId = AppearanceSettings.DEFAULT_SOUND_PACK_ID)) })
+                    }
                 }
+                importStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = LumenColors.OnSurfaceMuted) }
             }
-            importStatus?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = LumenColors.OnSurfaceMuted) }
         }
 
         Text("Event feedback", style = MaterialTheme.typography.labelLarge, color = LumenColors.OnSurface)
