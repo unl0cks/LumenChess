@@ -157,6 +157,7 @@ fun LumenTopBar(
     backTestTag: String? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
+    val backIconColor = LumenColors.OnSurfaceMuted
     Box(modifier.fillMaxWidth().height(46.dp)) {
         Text(
             title,
@@ -181,8 +182,8 @@ fun LumenTopBar(
             Box(back, contentAlignment = Alignment.Center) {
                 Canvas(Modifier.size(18.dp)) {
                     val stroke = 1.6.dp.toPx()
-                    drawLine(LumenColors.OnSurfaceMuted, Offset(size.width*.72f,size.height*.18f), Offset(size.width*.35f,size.height*.5f), stroke, StrokeCap.Round)
-                    drawLine(LumenColors.OnSurfaceMuted, Offset(size.width*.35f,size.height*.5f), Offset(size.width*.72f,size.height*.82f), stroke, StrokeCap.Round)
+                    drawLine(backIconColor, Offset(size.width*.72f,size.height*.18f), Offset(size.width*.35f,size.height*.5f), stroke, StrokeCap.Round)
+                    drawLine(backIconColor, Offset(size.width*.35f,size.height*.5f), Offset(size.width*.72f,size.height*.82f), stroke, StrokeCap.Round)
                 }
             }
         }
