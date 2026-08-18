@@ -60,7 +60,7 @@ class P5ScreenshotQaTest {
 
         backToSetup()
         composeRule.onNodeWithTag("main-tab-settings").performClick()
-        composeRule.onNodeWithTag("appearance-dark").assertIsDisplayed()
+        scrollSettingsTop()
         capture("04-settings.png")
 
         composeRule.onNodeWithTag("settings-board-pieces").performClick()
@@ -85,18 +85,27 @@ class P5ScreenshotQaTest {
         capture("09-sounds-haptics.png")
 
         composeRule.onNodeWithTag("sounds-haptics-back").performClick()
-        composeRule.onNodeWithTag("appearance-light").performClick()
-        composeRule.onNodeWithTag("appearance-light").assertIsDisplayed()
+        selectAppearanceFromSettings("light")
+        scrollSettingsTop()
         capture("10-light.png")
 
-        composeRule.onNodeWithTag("appearance-oled_dark").performClick()
-        composeRule.onNodeWithTag("appearance-oled_dark").assertIsDisplayed()
+        selectAppearanceFromSettings("oled_dark")
+        scrollSettingsTop()
         capture("11-oled.png")
     }
 
     private fun selectAppearance(id: String) {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
-        composeRule.onNodeWithTag("appearance-$id").performClick()
+        selectAppearanceFromSettings(id)
+    }
+
+    private fun selectAppearanceFromSettings(id: String) {
+        composeRule.onNodeWithTag("appearance-$id").performScrollTo().performClick()
+        composeRule.waitForIdle()
+    }
+
+    private fun scrollSettingsTop() {
+        composeRule.onNodeWithTag("lumen-topbar-title").performScrollTo().assertIsDisplayed()
         composeRule.waitForIdle()
     }
 
@@ -122,9 +131,7 @@ class P5ScreenshotQaTest {
         val directory = File(root, "p5-screenshots").apply { mkdirs() }
         val screenshot = composeRule.onRoot().captureToImage().asAndroidBitmap()
         FileOutputStream(File(directory, name)).use { output ->
-            check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                "Failed to encode $name"
-            }
+            check(screenshot.compress(Bitmap.CompressFormat.PNG, 100, output)) { "Failed to encode $name" }
         }
     }
 }
