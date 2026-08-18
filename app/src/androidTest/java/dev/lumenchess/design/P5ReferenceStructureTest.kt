@@ -23,20 +23,27 @@ class P5ReferenceStructureTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun playSetupUsesCompactApplicationHierarchyInsteadOfMarketingHero() {
+    fun playSetupUsesReferenceStackInsteadOfOneOversizedContainer() {
         composeRule.onNodeWithTag("main-tab-play").assertIsDisplayed()
 
         composeRule.onAllNodesWithText("Human vs Engine").assertCountEquals(0)
         composeRule.onAllNodesWithText("LUMEN PLAY").assertCountEquals(0)
         composeRule.onAllNodesWithText("Configure a clean offline match.").assertCountEquals(0)
-        composeRule.onNodeWithTag("p5-setup-shell").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("p5-setup-shell").assertCountEquals(0)
+        composeRule.onNodeWithTag("p5-setup-content").assertIsDisplayed()
     }
 
     @Test
-    fun setupPrimaryChoiceUsesReferenceControlScale() {
+    fun setupContainsReferenceControlsAndCompactModeTiles() {
+        composeRule.onNodeWithTag("p5-match-my-elo").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-inc-delay").performScrollTo().assertIsDisplayed()
+
         val choice = composeRule.onNodeWithTag("p5-setup-standard").fetchSemanticsNode().boundsInRoot
         val nav = composeRule.onNodeWithTag("main-tab-play").fetchSemanticsNode().boundsInRoot
-        assertTrue("Reference setup choice should be at least as tall as the compact navigation item", choice.height >= nav.height)
+        assertTrue(
+            "Reference game-mode tiles should be more compact than the bottom-navigation item",
+            choice.height < nav.height * 0.96f,
+        )
     }
 
     @Test
@@ -48,20 +55,25 @@ class P5ReferenceStructureTest {
 
         composeRule.onNodeWithTag("p5-live-shell").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-action-strip").assertIsDisplayed()
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val shell = composeRule.onNodeWithTag("p5-live-shell").fetchSemanticsNode().boundsInRoot
+        assertTrue("Live frame should occupy the visual center instead of becoming a huge full-height card", shell.height < root.height * 0.72f)
     }
 
     @Test
-    fun settingsDoesNotExposeArchitectureOrMarketingCopy() {
+    fun settingsUsesReferenceCategoryHierarchyBeforeAppearanceControls() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
 
         composeRule.onAllNodesWithText("Make LumenChess yours").assertCountEquals(0)
         composeRule.onAllNodesWithText("presentation-only", substring = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("Chess rules", substring = true).assertCountEquals(0)
         composeRule.onNodeWithTag("settings-category-list").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings-board-pieces").assertIsDisplayed()
+        composeRule.onNodeWithTag("appearance-dark").assertDoesNotExist()
     }
 
     @Test
-    fun referenceTopBarIsCenteredAndSettingsRowsCarryClientScale() {
+    fun referenceTopBarIsCenteredAndSettingsRowsStayCompact() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
 
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
@@ -70,7 +82,7 @@ class P5ReferenceStructureTest {
         val nav = composeRule.onNodeWithTag("main-tab-settings").fetchSemanticsNode().boundsInRoot
 
         assertTrue("Reference top bar title should be horizontally centered", abs(title.center.x - root.center.x) < root.width * 0.03f)
-        assertTrue("Reference settings rows should be visibly taller than the compact bottom navigation", row.height > nav.height * 1.06f)
+        assertTrue("Reference settings rows should stay near compact navigation scale", row.height < nav.height * 1.18f)
     }
 
     @Test
@@ -83,15 +95,19 @@ class P5ReferenceStructureTest {
     }
 
     @Test
-    fun boardCustomizationUsesReferenceStyleVisualGridInsteadOfFullWidthList() {
+    fun boardCustomizationKeepsPreviewAndCardsReferenceSized() {
         composeRule.onNodeWithTag("main-tab-settings").performClick()
         composeRule.onNodeWithTag("settings-board-pieces").performClick()
         composeRule.onNodeWithTag("customization-options-grid").assertIsDisplayed()
 
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val preview = composeRule.onNodeWithTag("board-preview").fetchSemanticsNode().boundsInRoot
         val first = composeRule.onNodeWithTag("customization-board-lumen-blue").fetchSemanticsNode().boundsInRoot
         val second = composeRule.onNodeWithTag("customization-board-midnight-oled").fetchSemanticsNode().boundsInRoot
+        assertTrue("Board preview should not consume almost half the screen", preview.height < root.height * 0.34f)
         assertTrue("First two board choices should share a grid row", abs(first.top - second.top) < 2f)
-        assertTrue("Grid choices should not be full-width list rows", first.width < composeRule.onRoot().fetchSemanticsNode().boundsInRoot.width * 0.60f)
+        assertTrue("Grid choices should not be full-width list rows", first.width < root.width * 0.60f)
+        assertTrue("Reference thumbnail cards should stay compact", first.height < root.height * 0.125f)
     }
 
     @Test
