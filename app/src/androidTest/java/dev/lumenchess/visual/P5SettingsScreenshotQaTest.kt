@@ -246,14 +246,27 @@ class P5SettingsScreenshotQaTest {
         val rootBounds = bounds("settings-root")
         val rootNode = composeRule.onNodeWithTag("settings-root")
         val restRoot = rootNode.captureToImage().asAndroidBitmap()
-
         val node = composeRule.onNodeWithTag(tag)
-        // Clickable deliberately delays PressInteraction inside the scrollable Settings root.
-        // Hold through that native tap-disambiguation window so this frame represents PRESSED,
-        // then keep the same pixel-difference threshold to verify the material response itself.
-        node.performTouchInput { down(center); advanceEventTime(220L) }
-        composeRule.waitForIdle()
-        val pressedRoot = rootNode.captureToImage().asAndroidBitmap()
+
+        val previousAutoAdvance = composeRule.mainClock.autoAdvance
+        composeRule.mainClock.autoAdvance = false
+        var pointerDown = false
+        val pressedRoot = try {
+            node.performTouchInput { down(center) }
+            pointerDown = true
+            // PressInteraction delay, recomposition and the 70 ms press tween are driven by
+            // Compose's MainTestClock, not by TouchInjectionScope event timestamps.
+            composeRule.mainClock.advanceTimeBy(240L)
+            composeRule.waitForIdle()
+            rootNode.captureToImage().asAndroidBitmap()
+        } finally {
+            if (pointerDown) {
+                node.performTouchInput { up() }
+                composeRule.mainClock.advanceTimeBy(160L)
+                composeRule.waitForIdle()
+            }
+            composeRule.mainClock.autoAdvance = previousAutoAdvance
+        }
 
         val density = composeRule.activity.resources.displayMetrics.density
         val rest = cropAroundTarget(restRoot, rootBounds, targetBounds, paddingPx = (8f * density).toInt())
@@ -264,8 +277,6 @@ class P5SettingsScreenshotQaTest {
             "Settings row REST/PRESSED material must visibly settle; visiblyChangedRatio=$visiblyChangedRatio",
             visiblyChangedRatio > 0.018f,
         )
-        node.performTouchInput { up() }
-        composeRule.waitForIdle()
 
         val labelHeight = 34
         val gap = 10
@@ -311,7 +322,7 @@ class P5SettingsScreenshotQaTest {
         val a = IntArray(first.width * first.height)
         val b = IntArray(first.width * first.height)
         first.getPixels(a, 0, first.width, 0, 0, first.width, first.height)
-        second.getPixels(b, 0, second.width, 0, 0, second.width, second.height)
+        second.getPixels(b, 0, first.width, 0, 0, first.width, first.height)
         return a.indices.count { index ->
             val one = a[index]
             val two = b[index]
