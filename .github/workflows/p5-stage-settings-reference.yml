@@ -20,6 +20,7 @@ jobs:
           ref: p5-reference-fidelity-visual-identity
           fetch-depth: 0
 
+      # This workflow is intentionally one-shot staging infrastructure for the frozen Iteration 3 proof.
       - name: Reconstruct and verify approved Iteration 3 Settings reference
         shell: bash
         run: |
