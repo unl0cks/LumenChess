@@ -278,6 +278,7 @@ private fun ReferenceParticipantRow(
 private fun ReferenceHumanBadge() {
     val shape = RoundedCornerShape(7.dp)
     val tint = LumenColors.OnSurface.copy(alpha = .94f)
+    val accent = LumenColors.AccentBlueBright.copy(alpha = .72f)
     Box(
         Modifier.size(32.dp)
             .clip(shape)
@@ -299,7 +300,7 @@ private fun ReferenceHumanBadge() {
             }
             drawPath(body, tint)
             drawLine(
-                LumenColors.AccentBlueBright.copy(alpha = .72f),
+                accent,
                 Offset(size.width * .26f, size.height * .82f),
                 Offset(size.width * .74f, size.height * .82f),
                 1.1.dp.toPx(),
