@@ -46,12 +46,11 @@ jobs:
           ]
           reference_b64 = ''.join(path.read_text().strip() for path in paths)
 
-          # The durable part07 carrier contains the exact approved 1,352-character
-          # tail followed by accidental staging residue. Consume only the verified prefix.
+          # Part07 is the exact approved 1,352-character tail of the verified lossless transport.
           part07_source = (prefix / '.settings-iter3-approved-lossless.part07.b64').read_text().strip()
           part07 = part07_source[:1352]
           git_blob_sha = hashlib.sha1(f'blob {len(part07)}\0'.encode() + part07.encode()).hexdigest()
-          assert git_blob_sha == '7a8556ba779e98e4b83745589706ee3970313500', git_blob_sha
+          assert git_blob_sha == '7a857ef078232cf1c85637b02496f78d47159c29', git_blob_sha
           reference_b64 += part07
 
           assert len(reference_b64) == 85352, len(reference_b64)

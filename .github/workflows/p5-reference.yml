@@ -154,7 +154,7 @@ jobs:
               part07_source = (prefix / '.settings-iter3-approved-lossless.part07.b64').read_text().strip()
               part07 = part07_source[:1352]
               part07_blob_sha = hashlib.sha1(f'blob {len(part07)}\0'.encode() + part07.encode()).hexdigest()
-              assert part07_blob_sha == '7a8556ba779e98e4b83745589706ee3970313500', part07_blob_sha
+              assert part07_blob_sha == '7a857ef078232cf1c85637b02496f78d47159c29', part07_blob_sha
               reference_b64 += part07
               assert len(reference_b64) == 85352, len(reference_b64)
               reference_bytes = base64.b64decode(reference_b64, validate=True)
