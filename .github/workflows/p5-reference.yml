@@ -6,7 +6,6 @@ on:
       - p5-reference-fidelity-visual-identity
     paths:
       - 'app/**'
-      - 'docs/references/p5/settings-iter3-approved.png'
       - 'docs/references/p5/.settings-iter3-approved-lossless*.b64'
       - '.github/workflows/p5-reference.yml'
   workflow_dispatch:
@@ -133,34 +132,27 @@ jobs:
           from PIL import Image
 
           root = Path('.')
-          reference_path = root / 'docs/references/p5/settings-iter3-approved.png'
+          prefix = root / 'docs/references/p5'
           candidate_path = root / 'p5-screenshots/04-settings.png'
           comparison_path = root / 'p5-screenshots/04-settings-approved-comparison.png'
 
-          if reference_path.exists():
-              reference = Image.open(reference_path).convert('RGB')
-          else:
-              prefix = root / 'docs/references/p5'
-              paths = [
-                  prefix / '.settings-iter3-approved-lossless.part00.b64',
-                  prefix / '.settings-iter3-approved-lossless.part01.b64',
-                  prefix / '.settings-iter3-approved-lossless.part02.b64',
-                  prefix / '.settings-iter3-approved-lossless.part03.b64',
-                  *[prefix / f'.settings-iter3-approved-lossless.part04.{i:02d}.b64' for i in range(6)],
-                  *[prefix / f'.settings-iter3-approved-lossless.part05.{i:02d}.b64' for i in range(6)],
-                  prefix / '.settings-iter3-approved-lossless.part06.b64',
-              ]
-              reference_b64 = ''.join(path.read_text().strip() for path in paths)
-              part07_source = (prefix / '.settings-iter3-approved-lossless.part07.b64').read_text().strip()
-              part07 = part07_source[:1352]
-              part07_blob_sha = hashlib.sha1(f'blob {len(part07)}\0'.encode() + part07.encode()).hexdigest()
-              assert part07_blob_sha == '7a857ef078232cf1c85637b02496f78d47159c29', part07_blob_sha
-              reference_b64 += part07
-              assert len(reference_b64) == 85352, len(reference_b64)
-              reference_bytes = base64.b64decode(reference_b64, validate=True)
-              assert hashlib.sha256(reference_bytes).hexdigest() == '9fcfa2a94fbcf635c7d5b0dec3c1ae3af955a87377272350f18367c2d2842fca'
-              reference = Image.open(io.BytesIO(reference_bytes)).convert('RGB')
-
+          # Frozen Iteration 3 reference. Keep this canonical list in sync with
+          # docs/references/p5/README.md; decoded RGB is the visual authority.
+          paths = [
+              prefix / '.settings-iter3-approved-lossless.part00.b64',
+              prefix / '.settings-iter3-approved-lossless.part01.b64',
+              prefix / '.settings-iter3-approved-lossless.part02.b64',
+              prefix / '.settings-iter3-approved-lossless.part03.b64',
+              *[prefix / f'.settings-iter3-approved-lossless.part04.{i:02d}.b64' for i in range(6)],
+              *[prefix / f'.settings-iter3-approved-lossless.part05.{i:02d}.b64' for i in range(6)],
+              prefix / '.settings-iter3-approved-lossless.part06.b64',
+              prefix / '.settings-iter3-approved-lossless.part07.b64',
+          ]
+          reference_b64 = ''.join(path.read_text().strip() for path in paths)
+          assert len(reference_b64) == 85352, len(reference_b64)
+          reference_bytes = base64.b64decode(reference_b64, validate=True)
+          assert hashlib.sha256(reference_bytes).hexdigest() == '9fcfa2a94fbcf635c7d5b0dec3c1ae3af955a87377272350f18367c2d2842fca'
+          reference = Image.open(io.BytesIO(reference_bytes)).convert('RGB')
           assert reference.size == (390, 844), reference.size
           assert hashlib.sha256(reference.tobytes()).hexdigest() == '791a5d6cac599e83a3083d369b42e2c39b09099cc59033255d6360b0ad906452'
           candidate = Image.open(candidate_path).convert('RGB')
@@ -215,7 +207,6 @@ jobs:
             ${{ runner.temp }}/p5-gradle-build.txt
             ${{ runner.temp }}/p5-screenshot-instrumentation.txt
             p5-screenshots/
-            docs/references/p5/settings-iter3-approved.png
           if-no-files-found: warn
           retention-days: 7
       - name: Publish P5 Settings verification success

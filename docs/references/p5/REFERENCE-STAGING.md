@@ -1,1 +1,0 @@
-Temporary transport note: the approved Iteration 3 Settings reference is reconstructed losslessly by `.github/workflows/p5-stage-settings-reference.yml`, verified by transport SHA-256 and raw RGB SHA-256, then committed as `docs/references/p5/settings-iter3-approved.png`. Remove this note and the temporary transport fragments after the approved reference PNG is durable.
