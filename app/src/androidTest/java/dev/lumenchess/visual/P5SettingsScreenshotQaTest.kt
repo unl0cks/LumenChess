@@ -248,7 +248,10 @@ class P5SettingsScreenshotQaTest {
         val restRoot = rootNode.captureToImage().asAndroidBitmap()
 
         val node = composeRule.onNodeWithTag(tag)
-        node.performTouchInput { down(center); advanceEventTime(80L) }
+        // Clickable deliberately delays PressInteraction inside the scrollable Settings root.
+        // Hold through that native tap-disambiguation window so this frame represents PRESSED,
+        // then keep the same pixel-difference threshold to verify the material response itself.
+        node.performTouchInput { down(center); advanceEventTime(220L) }
         composeRule.waitForIdle()
         val pressedRoot = rootNode.captureToImage().asAndroidBitmap()
 
