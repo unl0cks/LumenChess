@@ -7,6 +7,7 @@ on:
     paths:
       - 'app/**'
       - 'docs/references/p5/settings-iter3-approved.png'
+      - 'docs/references/p5/.settings-iter3-approved-lossless*.b64'
       - '.github/workflows/p5-reference.yml'
   workflow_dispatch:
 
@@ -125,6 +126,9 @@ jobs:
 
           python3 -m pip install --quiet --disable-pip-version-check pillow
           python3 - <<'PY'
+          import base64
+          import hashlib
+          import io
           from pathlib import Path
           from PIL import Image
 
@@ -133,9 +137,33 @@ jobs:
           candidate_path = root / 'p5-screenshots/04-settings.png'
           comparison_path = root / 'p5-screenshots/04-settings-approved-comparison.png'
 
-          reference = Image.open(reference_path).convert('RGB')
-          candidate = Image.open(candidate_path).convert('RGB')
+          if reference_path.exists():
+              reference = Image.open(reference_path).convert('RGB')
+          else:
+              prefix = root / 'docs/references/p5'
+              paths = [
+                  prefix / '.settings-iter3-approved-lossless.part00.b64',
+                  prefix / '.settings-iter3-approved-lossless.part01.b64',
+                  prefix / '.settings-iter3-approved-lossless.part02.b64',
+                  prefix / '.settings-iter3-approved-lossless.part03.b64',
+                  *[prefix / f'.settings-iter3-approved-lossless.part04.{i:02d}.b64' for i in range(6)],
+                  *[prefix / f'.settings-iter3-approved-lossless.part05.{i:02d}.b64' for i in range(6)],
+                  prefix / '.settings-iter3-approved-lossless.part06.b64',
+              ]
+              reference_b64 = ''.join(path.read_text().strip() for path in paths)
+              part07_source = (prefix / '.settings-iter3-approved-lossless.part07.b64').read_text().strip()
+              part07 = part07_source[:1352]
+              part07_blob_sha = hashlib.sha1(f'blob {len(part07)}\0'.encode() + part07.encode()).hexdigest()
+              assert part07_blob_sha == '7a8556ba779e98e4b83745589706ee3970313500', part07_blob_sha
+              reference_b64 += part07
+              assert len(reference_b64) == 85352, len(reference_b64)
+              reference_bytes = base64.b64decode(reference_b64, validate=True)
+              assert hashlib.sha256(reference_bytes).hexdigest() == '9fcfa2a94fbcf635c7d5b0dec3c1ae3af955a87377272350f18367c2d2842fca'
+              reference = Image.open(io.BytesIO(reference_bytes)).convert('RGB')
+
           assert reference.size == (390, 844), reference.size
+          assert hashlib.sha256(reference.tobytes()).hexdigest() == '791a5d6cac599e83a3083d369b42e2c39b09099cc59033255d6360b0ad906452'
+          candidate = Image.open(candidate_path).convert('RGB')
 
           # The emulator capture is slightly taller in aspect ratio than the approved 390x844
           # design canvas because it includes the physical top system-inset band. Normalize by
