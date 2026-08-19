@@ -81,7 +81,7 @@ class P5SettingsScreenshotQaTest {
         verifyInterTightRuntimeResource()
         selectDarkAppearanceAndReturnToSettingsRoot()
         assertSettingsRootStructure()
-        assertSettingsGeometry()
+        assertSettingsApprovedGeometry()
         logSettingsMetrics()
 
         capture("04-settings.png")
@@ -115,6 +115,16 @@ class P5SettingsScreenshotQaTest {
 
         val categoryRows = composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes()
         assertEquals("Settings root must expose exactly six category rows", 6, categoryRows.size)
+        assertEquals(
+            "approved Settings translation must expose exactly six canonical icon wells",
+            6,
+            composeRule.onAllNodesWithTag("settings-icon-well").fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            "approved Settings translation must expose exactly six canonical icon glyphs",
+            6,
+            composeRule.onAllNodesWithTag("settings-icon-glyph").fetchSemanticsNodes().size,
+        )
 
         composeRule.onNodeWithText("Make LumenChess yours").assertDoesNotExist()
         composeRule.onNodeWithTag("appearance-system").assertDoesNotExist()
@@ -125,13 +135,20 @@ class P5SettingsScreenshotQaTest {
         composeRule.onNodeWithTag("settings-sounds-haptics").assertDoesNotExist()
         composeRule.onNodeWithTag("board-preview").assertDoesNotExist()
 
+        composeRule.onNodeWithTag("main-bottom-nav").assertIsDisplayed()
+        assertEquals(
+            "approved root navigation must expose five normalized icon glyphs",
+            5,
+            composeRule.onAllNodesWithTag("main-tab-icon").fetchSemanticsNodes().size,
+        )
         listOf("play", "arena", "games", "insights", "settings").forEach { tab ->
             composeRule.onNodeWithTag("main-tab-$tab").assertIsDisplayed()
         }
+        composeRule.onNodeWithTag("main-tab-settings-well").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-root").assertIsDisplayed()
     }
 
-    private fun assertSettingsGeometry() {
+    private fun assertSettingsApprovedGeometry() {
         val density = composeRule.activity.resources.displayMetrics.density
         val screenWidth = composeRule.activity.resources.displayMetrics.widthPixels.toFloat()
         val rows = composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes()
@@ -141,28 +158,61 @@ class P5SettingsScreenshotQaTest {
 
         rows.forEachIndexed { index, row ->
             val heightDp = row.height / density
-            assertTrue("row $index height=${heightDp}dp expected 66..74", heightDp in 66f..74f)
-            assertTrue("row $index width ratio=${row.width / screenWidth}", row.width / screenWidth in 0.91f..0.96f)
+            assertTrue("row $index height=${heightDp}dp expected approved 90..96", heightDp in 90f..96f)
+            assertTrue("row $index width ratio=${row.width / screenWidth}", row.width / screenWidth in 0.912f..0.928f)
             val leftDp = row.left / density
-            assertTrue("row $index left=${leftDp}dp", leftDp in 10f..18f)
+            assertTrue("row $index left=${leftDp}dp expected approved 16..20", leftDp in 16f..20f)
         }
 
         val heights = rows.map { it.height / density }
         assertTrue("category row heights must be stable: $heights", (heights.max() - heights.min()) <= 1.2f)
         rows.zipWithNext().forEachIndexed { index, (first, second) ->
             val gapDp = (second.top - first.bottom) / density
-            assertTrue("row gap $index=${gapDp}dp expected 5..10", gapDp in 5f..10f)
+            assertTrue("row gap $index=${gapDp}dp expected approved 8..12", gapDp in 8f..12f)
         }
 
+        val root = bounds("settings-root")
         val title = bounds("lumen-topbar-title")
+        val titleTopDp = (title.top - root.top) / density
         val titleHeightDp = title.height / density
-        assertTrue("Settings title height=${titleHeightDp}dp", titleHeightDp in 20f..34f)
-        assertTrue("first row must begin close beneath compact title", rows.first().top >= title.bottom - density * 4f)
+        assertTrue("Settings title top=${titleTopDp}dp expected approved 39..52", titleTopDp in 39f..52f)
+        assertTrue("Settings title height=${titleHeightDp}dp", titleHeightDp in 25f..34f)
 
-        val nav = bounds("main-tab-settings")
-        assertTrue("last category must remain above root nav", rows.last().bottom <= nav.top - density * 3f)
-        val bodyUse = rows.last().bottom / nav.top
-        assertTrue("six-row Settings list must substantially occupy the root body; ratio=$bodyUse", bodyUse in 0.53f..0.72f)
+        val firstRowTopDp = (rows.first().top - root.top) / density
+        assertTrue("first approved row top=${firstRowTopDp}dp expected 124..138", firstRowTopDp in 124f..138f)
+
+        val wells = composeRule.onAllNodesWithTag("settings-icon-well").fetchSemanticsNodes().map { it.boundsInRoot }
+        wells.forEachIndexed { index, well ->
+            val widthDp = well.width / density
+            val heightDp = well.height / density
+            assertTrue("icon well $index width=${widthDp}dp expected 45..50", widthDp in 45f..50f)
+            assertTrue("icon well $index height=${heightDp}dp expected 45..50", heightDp in 45f..50f)
+        }
+        val glyphs = composeRule.onAllNodesWithTag("settings-icon-glyph").fetchSemanticsNodes().map { it.boundsInRoot }
+        glyphs.forEachIndexed { index, glyph ->
+            val widthDp = glyph.width / density
+            val heightDp = glyph.height / density
+            assertTrue("settings glyph $index width=${widthDp}dp expected 23..27", widthDp in 23f..27f)
+            assertTrue("settings glyph $index height=${heightDp}dp expected 23..27", heightDp in 23f..27f)
+        }
+
+        val nav = bounds("main-bottom-nav")
+        val navHeightDp = nav.height / density
+        assertTrue("approved nav height=${navHeightDp}dp expected 78..84", navHeightDp in 78f..84f)
+        val navIcons = composeRule.onAllNodesWithTag("main-tab-icon").fetchSemanticsNodes().map { it.boundsInRoot }
+        navIcons.forEachIndexed { index, icon ->
+            val widthDp = icon.width / density
+            val heightDp = icon.height / density
+            assertTrue("nav icon $index width=${widthDp}dp expected 23..27", widthDp in 23f..27f)
+            assertTrue("nav icon $index height=${heightDp}dp expected 23..27", heightDp in 23f..27f)
+        }
+
+        assertTrue("last category must remain above root nav", rows.last().bottom <= nav.top)
+        val approvedNegativeSpaceDp = (nav.top - rows.last().bottom) / density
+        assertTrue(
+            "approved negative space=${approvedNegativeSpaceDp}dp expected 120..150",
+            approvedNegativeSpaceDp in 120f..150f,
+        )
     }
 
     private fun verifyInterTightRuntimeResource() {
@@ -175,26 +225,35 @@ class P5SettingsScreenshotQaTest {
     private fun logSettingsMetrics() {
         val metrics = composeRule.activity.resources.displayMetrics
         println("P5_SETTINGS_METRIC viewport w=${metrics.widthPixels} h=${metrics.heightPixels}")
+        println("P5_SETTINGS_METRIC root=${bounds("settings-root")}")
         println("P5_SETTINGS_METRIC title=${bounds("lumen-topbar-title")}")
         composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes()
             .map { it.boundsInRoot }
             .sortedBy { it.top }
             .forEachIndexed { index, bounds -> println("P5_SETTINGS_METRIC row[$index]=$bounds") }
-        println("P5_SETTINGS_METRIC nav=${bounds("main-tab-settings")}")
+        println("P5_SETTINGS_METRIC nav=${bounds("main-bottom-nav")}")
     }
 
     private fun capturePressState(tag: String) {
         composeRule.waitForIdle()
+        val targetBounds = bounds(tag)
+        val rootBounds = bounds("settings-root")
+        val rootNode = composeRule.onNodeWithTag("settings-root")
+        val restRoot = rootNode.captureToImage().asAndroidBitmap()
+
         val node = composeRule.onNodeWithTag(tag)
-        val rest = node.captureToImage().asAndroidBitmap()
         node.performTouchInput { down(center); advanceEventTime(80L) }
         composeRule.waitForIdle()
-        val pressed = node.captureToImage().asAndroidBitmap()
-        val visiblyChangedRatio = countVisiblyDifferentPixels(rest, pressed, threshold = 10).toFloat() /
+        val pressedRoot = rootNode.captureToImage().asAndroidBitmap()
+
+        val density = composeRule.activity.resources.displayMetrics.density
+        val rest = cropAroundTarget(restRoot, rootBounds, targetBounds, paddingPx = (8f * density).toInt())
+        val pressed = cropAroundTarget(pressedRoot, rootBounds, targetBounds, paddingPx = (8f * density).toInt())
+        val visiblyChangedRatio = countVisiblyDifferentPixels(rest, pressed, threshold = 8).toFloat() /
             (rest.width * rest.height).toFloat()
         assertTrue(
-            "Settings row REST/PRESSED state must visibly compress; visiblyChangedRatio=$visiblyChangedRatio",
-            visiblyChangedRatio > 0.025f,
+            "Settings row REST/PRESSED material must visibly settle; visiblyChangedRatio=$visiblyChangedRatio",
+            visiblyChangedRatio > 0.018f,
         )
         node.performTouchInput { up() }
         composeRule.waitForIdle()
@@ -218,6 +277,24 @@ class P5SettingsScreenshotQaTest {
         canvas.drawBitmap(rest, 0f, labelHeight.toFloat(), null)
         canvas.drawBitmap(pressed, (rest.width + gap).toFloat(), labelHeight.toFloat(), null)
         writeBitmap("04-settings-press-state.png", comparison)
+    }
+
+    private fun cropAroundTarget(bitmap: Bitmap, rootBounds: Rect, targetBounds: Rect, paddingPx: Int): Bitmap {
+        val left = (targetBounds.left - rootBounds.left).toInt() - paddingPx
+        val top = (targetBounds.top - rootBounds.top).toInt() - paddingPx
+        val right = (targetBounds.right - rootBounds.left).toInt() + paddingPx
+        val bottom = (targetBounds.bottom - rootBounds.top).toInt() + paddingPx
+        val clampedLeft = left.coerceIn(0, bitmap.width - 1)
+        val clampedTop = top.coerceIn(0, bitmap.height - 1)
+        val clampedRight = right.coerceIn(clampedLeft + 1, bitmap.width)
+        val clampedBottom = bottom.coerceIn(clampedTop + 1, bitmap.height)
+        return Bitmap.createBitmap(
+            bitmap,
+            clampedLeft,
+            clampedTop,
+            clampedRight - clampedLeft,
+            clampedBottom - clampedTop,
+        )
     }
 
     private fun countVisiblyDifferentPixels(first: Bitmap, second: Bitmap, threshold: Int): Int {
