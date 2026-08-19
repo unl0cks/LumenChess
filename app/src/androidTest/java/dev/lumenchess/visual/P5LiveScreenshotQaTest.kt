@@ -204,8 +204,10 @@ class P5LiveScreenshotQaTest {
             "p5-live-action-exit",
         ).forEach(::waitForTag)
 
-        assertHeightDp("p5-live-opponent-row", 50f, 64f)
-        assertHeightDp("p5-live-player-row", 50f, 64f)
+        // Participant tags sit after the row's 4dp top + 4dp bottom content padding,
+        // so reconstruct the visual surface height rather than asserting the inner semantics box.
+        assertHeightDp("p5-live-opponent-row", 50f, 64f, visualVerticalPaddingDp = 8f)
+        assertHeightDp("p5-live-player-row", 50f, 64f, visualVerticalPaddingDp = 8f)
         assertHeightDp("p5-live-tabs", 34f, 46f)
         assertHeightDp("p5-live-action-strip", 64f, 84f)
 
@@ -215,10 +217,10 @@ class P5LiveScreenshotQaTest {
         assertTrue("opponent clock height must be fixed", abs(opponentClock.height - playerClock.height) <= 1f)
     }
 
-    private fun assertHeightDp(tag: String, min: Float, max: Float) {
+    private fun assertHeightDp(tag: String, min: Float, max: Float, visualVerticalPaddingDp: Float = 0f) {
         val density = composeRule.activity.resources.displayMetrics.density
-        val height = bounds(tag).height / density
-        assertTrue("$tag height=${height}dp expected $min..$max", height in min..max)
+        val height = bounds(tag).height / density + visualVerticalPaddingDp
+        assertTrue("$tag visual height=${height}dp expected $min..$max", height in min..max)
     }
 
     private fun logReferenceMetrics() {
