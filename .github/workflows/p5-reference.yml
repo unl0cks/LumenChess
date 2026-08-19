@@ -6,6 +6,7 @@ on:
       - p5-reference-fidelity-visual-identity
     paths:
       - 'app/**'
+      - 'docs/references/p5/settings-iter3-approved.png'
       - '.github/workflows/p5-reference.yml'
   workflow_dispatch:
 
@@ -30,7 +31,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='Settings root, board-first Live contract and geometry verification are running' \
+            -f description='Approved Settings translation, board-first Live contract and geometry verification are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -95,7 +96,7 @@ jobs:
         run: |
           echo "::error title=P5 Settings build::Screenshot APK build failed"
           tail -n 180 "$RUNNER_TEMP/p5-gradle-build.txt" || true
-      - name: Capture Settings, press state and comparison only
+      - name: Capture approved Settings, press state and comparison only
         id: screenshots
         if: steps.verify.outcome == 'success'
         continue-on-error: true
@@ -128,39 +129,43 @@ jobs:
           from PIL import Image
 
           root = Path('.')
-          reference_path = root / 'docs/references/LumenChess_UI_Concept_Blue.png'
+          reference_path = root / 'docs/references/p5/settings-iter3-approved.png'
           candidate_path = root / 'p5-screenshots/04-settings.png'
-          comparison_path = root / 'p5-screenshots/04-settings-comparison.png'
+          comparison_path = root / 'p5-screenshots/04-settings-approved-comparison.png'
 
-          # Tight crop of the Settings phone under "1. APP OVERVIEW", including its parked root nav.
-          reference = Image.open(reference_path).convert('RGB').crop((807, 15, 955, 367))
+          reference = Image.open(reference_path).convert('RGB')
           candidate = Image.open(candidate_path).convert('RGB')
+          assert reference.size == (390, 844), reference.size
 
-          target_width = reference.width
-          target_height = round(candidate.height * target_width / candidate.width)
-          candidate = candidate.resize((target_width, target_height), Image.Resampling.LANCZOS)
+          # The emulator capture is slightly taller in aspect ratio than the approved 390x844
+          # design canvas because it includes the physical top system-inset band. Normalize by
+          # preserving the full app bottom/navigation edge and cropping only the excess top band.
+          target_aspect = reference.width / reference.height
+          crop_height = round(candidate.width / target_aspect)
+          if crop_height > candidate.height:
+              raise AssertionError((candidate.size, crop_height))
+          top_crop = candidate.height - crop_height
+          candidate = candidate.crop((0, top_crop, candidate.width, candidate.height))
+          candidate = candidate.resize(reference.size, Image.Resampling.LANCZOS)
 
-          gap = 8
+          gap = 10
           canvas = Image.new(
               'RGB',
-              (reference.width + gap + candidate.width, max(reference.height, candidate.height)),
-              (8, 8, 8),
+              (reference.width + gap + candidate.width, reference.height),
+              (5, 7, 9),
           )
           canvas.paste(reference, (0, 0))
           canvas.paste(candidate, (reference.width + gap, 0))
           canvas.save(comparison_path, optimize=True)
-
-          assert reference.size == (148, 352), reference.size
-          assert candidate.width == reference.width
           PY
-          test -f p5-screenshots/04-settings-comparison.png
+          test -f p5-screenshots/04-settings-approved-comparison.png
           FINAL_COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
           if [ "$FINAL_COUNT" != "3" ]; then
             echo "::error title=P5 Settings artifact::Expected exactly 3 final PNGs, found $FINAL_COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
-          printf 'Captured Settings root, deterministic row REST/PRESSED state and normalized reference comparison\n'
+          printf 'Captured native Settings root, deterministic row REST/PRESSED state and approved Iteration 3 comparison\n'
       - name: Upload Settings screenshot artifact
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -168,7 +173,7 @@ jobs:
           name: p5-settings-${{ github.sha }}
           path: |
             p5-screenshots/04-settings.png
-            p5-screenshots/04-settings-comparison.png
+            p5-screenshots/04-settings-approved-comparison.png
             p5-screenshots/04-settings-press-state.png
           if-no-files-found: error
           retention-days: 14
@@ -182,7 +187,7 @@ jobs:
             ${{ runner.temp }}/p5-gradle-build.txt
             ${{ runner.temp }}/p5-screenshot-instrumentation.txt
             p5-screenshots/
-            docs/references/LumenChess_UI_Concept_Blue.png
+            docs/references/p5/settings-iter3-approved.png
           if-no-files-found: warn
           retention-days: 7
       - name: Publish P5 Settings verification success
@@ -194,7 +199,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='Settings root, board-first Live contract and P1 geometry regression passed' \
+            -f description='Approved Settings translation, board-first Live contract and P1 geometry regression passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
@@ -205,7 +210,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='Settings build, Live presentation contract, geometry or capture failed' \
+            -f description='Approved Settings build, Live presentation contract, geometry or capture failed' \
             -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
