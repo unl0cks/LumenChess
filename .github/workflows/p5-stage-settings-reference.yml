@@ -2,6 +2,11 @@ name: P5 stage approved Settings reference
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - p5-reference-fidelity-visual-identity
+    paths:
+      - '.github/workflows/p5-stage-settings-reference.yml'
 
 permissions:
   contents: write
