@@ -4,8 +4,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -13,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,31 +27,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
-import dev.lumenchess.design.LumenTopBar
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
-
-private const val SETTINGS_ROW_HEIGHT_DP = 70
+import dev.lumenchess.design.LumenP5IdentityPalette
+import dev.lumenchess.design.LumenP5SettingsGeometry
+import dev.lumenchess.design.lumenP5IdentityPalette
 
 @Composable
 fun SettingsScreen(
@@ -63,37 +59,50 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     onOpenPlaySettings: () -> Unit = onOpenBoardAppearance,
 ) {
-    // The legacy parameters remain part of the public screen contract for the deeper Play settings
-    // route. Root Settings is intentionally category-only; it does not own those controls.
+    // Root Settings remains category-only. These retained parameters are still owned by the deeper
+    // Settings routes and intentionally remain part of the public screen contract.
     @Suppress("UNUSED_VARIABLE")
     val retainedSettingsContract = Triple(settings, onSettingsChange, onOpenSoundsHaptics)
+    val palette = lumenP5IdentityPalette()
 
     Column(
-        modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
             .testTag("settings-root")
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        LumenColors.BackgroundLift,
-                        LumenColors.Background,
-                        LumenColors.Background,
-                    ),
-                ),
-            )
+            .approvedSettingsBackground(palette)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 13.dp, vertical = 3.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = LumenP5SettingsGeometry.ScreenMargin)
+            .padding(top = LumenP5SettingsGeometry.RootTopPadding),
     ) {
-        LumenTopBar("Settings")
+        Box(
+            Modifier.fillMaxWidth().height(LumenP5SettingsGeometry.TitleHeight),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Settings",
+                modifier = Modifier.testTag("lumen-topbar-title"),
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontSize = LumenP5SettingsGeometry.SettingsTitleSize,
+                    lineHeight = LumenP5SettingsGeometry.SettingsTitleLineHeight,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = palette.text,
+                maxLines = 1,
+            )
+        }
+
+        Spacer(Modifier.height(LumenP5SettingsGeometry.TitleToListGap))
+
         Column(
             Modifier.fillMaxWidth().testTag("settings-category-list"),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(LumenP5SettingsGeometry.RowGap),
         ) {
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.ENGINE,
                 title = "Engines",
                 subtitle = "Manage installed engines",
                 uniqueTag = "settings-category-engines",
+                palette = palette,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.PLAY,
@@ -101,6 +110,7 @@ fun SettingsScreen(
                 subtitle = "Time controls, themes, sounds, board",
                 uniqueTag = "settings-category-play",
                 legacyTag = "settings-play",
+                palette = palette,
                 onClick = onOpenPlaySettings,
             )
             SettingsCategoryRow(
@@ -108,26 +118,49 @@ fun SettingsScreen(
                 title = "Game Review",
                 subtitle = "Analysis settings, move classification",
                 uniqueTag = "settings-category-review",
+                palette = palette,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.RATING,
                 title = "Ratings",
                 subtitle = "Rating mode, system, match options",
                 uniqueTag = "settings-category-ratings",
+                palette = palette,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.ACCOUNT,
                 title = "Accounts & Sync",
                 subtitle = "Chess.com, Lichess",
                 uniqueTag = "settings-category-accounts",
+                palette = palette,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.ADVANCED,
                 title = "Advanced",
                 subtitle = "Developer & advanced",
                 uniqueTag = "settings-category-advanced",
+                palette = palette,
             )
         }
+    }
+}
+
+private fun Modifier.approvedSettingsBackground(palette: LumenP5IdentityPalette): Modifier = drawWithCache {
+    val base = Brush.verticalGradient(
+        colorStops = arrayOf(
+            0f to palette.appBackgroundLift,
+            .28f to palette.appBackground,
+            1f to Color(0xFF070A0C),
+        ),
+    )
+    val ambient = Brush.radialGradient(
+        colors = listOf(palette.steel.copy(alpha = .09f), Color.Transparent),
+        center = Offset(size.width * .55f, -size.height * .04f),
+        radius = size.width * 1.08f,
+    )
+    onDrawBehind {
+        drawRect(base)
+        drawRect(ambient)
     }
 }
 
@@ -137,122 +170,130 @@ private fun SettingsCategoryRow(
     title: String,
     subtitle: String,
     uniqueTag: String,
+    palette: LumenP5IdentityPalette,
     legacyTag: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val interactive = onClick != null
     val scale by animateFloatAsState(
-        targetValue = if (pressed) .984f else 1f,
+        targetValue = if (pressed) .992f else 1f,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "settings-row-scale-$title",
     )
     val offset by animateDpAsState(
-        targetValue = if (pressed) 1.15.dp else 0.dp,
+        targetValue = if (pressed) 2.dp else 0.dp,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "settings-row-offset-$title",
     )
-    val elevation by animateDpAsState(
-        targetValue = if (pressed) .15.dp else 2.0.dp,
+    val shadowElevation by animateDpAsState(
+        targetValue = if (pressed) 1.dp else 6.dp,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "settings-row-shadow-$title",
     )
-    val lowerEdge by animateDpAsState(
-        targetValue = if (pressed) .35.dp else 2.6.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "settings-row-edge-$title",
+    val highlightAlpha by animateFloatAsState(
+        targetValue = if (pressed) .008f else .043f,
+        animationSpec = LumenMotion.fastTween(),
+        label = "settings-row-highlight-$title",
     )
-    val faceTop by animateColorAsState(
-        targetValue = if (pressed) LumenColors.SurfaceHighest.copy(alpha = .80f)
-        else LumenColors.SurfaceHighest.copy(alpha = .67f),
+    val illuminationAlpha by animateFloatAsState(
+        targetValue = if (pressed) .12f else .135f,
+        animationSpec = LumenMotion.fastTween(),
+        label = "settings-row-illumination-$title",
+    )
+    val topColor by animateColorAsState(
+        targetValue = if (pressed) palette.rowPressedTop else palette.rowTop,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "settings-row-top-$title",
     )
-    val faceBottom by animateColorAsState(
-        targetValue = if (pressed) LumenColors.Surface.copy(alpha = .98f)
-        else LumenColors.SurfaceRaised.copy(alpha = .96f),
+    val midColor by animateColorAsState(
+        targetValue = if (pressed) palette.rowPressedMid else palette.rowMid,
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "settings-row-mid-$title",
+    )
+    val bottomColor by animateColorAsState(
+        targetValue = if (pressed) palette.rowPressedBottom else palette.rowBottom,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
         label = "settings-row-bottom-$title",
     )
-    val chevronTint by animateColorAsState(
-        targetValue = when {
-            pressed -> LumenColors.OnSurface
-            interactive -> LumenColors.OnSurfaceMuted
-            else -> LumenColors.OnSurfaceFaint
-        },
+    val outlineColor by animateColorAsState(
+        targetValue = if (pressed) palette.rowPressedOutline else palette.rowOutline,
         animationSpec = LumenMotion.fastTween(),
-        label = "settings-row-chevron-$title",
+        label = "settings-row-outline-$title",
     )
-    val iconTint by animateColorAsState(
-        targetValue = if (pressed) LumenColors.AccentBlueBright else LumenColors.OnSurfaceMuted,
-        animationSpec = LumenMotion.fastTween(),
-        label = "settings-row-icon-$title",
-    )
-    val shape = RoundedCornerShape(8.dp)
-    val lowerEdgeColor = LumenColors.OutlineStrong.copy(alpha = if (pressed) .58f else .78f)
+    val shape = RoundedCornerShape(LumenP5SettingsGeometry.RowRadius)
 
     Box(
-        Modifier.fillMaxWidth()
-            .height(SETTINGS_ROW_HEIGHT_DP.dp)
-            .testTag(uniqueTag)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationY = offset.toPx()
-            }
-            .shadow(elevation, shape, clip = false)
-            .clip(shape)
-            .background(LumenColors.Background)
-            .drawBehind {
-                drawRect(
-                    color = lowerEdgeColor,
-                    topLeft = Offset(0f, size.height - lowerEdge.toPx()),
-                )
-            }
-            .padding(bottom = lowerEdge)
-            .clip(shape)
-            .background(Brush.verticalGradient(listOf(faceTop, faceBottom)))
-            .border(
-                1.dp,
-                if (pressed) LumenColors.OutlineStrong else LumenColors.Outline.copy(alpha = .92f),
-                shape,
-            ),
+        Modifier
+            .fillMaxWidth()
+            .height(LumenP5SettingsGeometry.RowHeight)
+            .testTag(uniqueTag),
     ) {
-        // Stable full-bounds geometry target independent of the pressed paint transform.
+        // Stable full-bounds test target. The visual face may translate/scale while pressed.
         Box(Modifier.matchParentSize().testTag("settings-category-row"))
 
-        Row(
-            Modifier.fillMaxSize().padding(horizontal = 11.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp),
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationY = offset.toPx()
+                }
+                .shadow(shadowElevation, shape, clip = false)
+                .approvedSettingsRowFace(
+                    palette = palette,
+                    topColor = topColor,
+                    midColor = midColor,
+                    bottomColor = bottomColor,
+                    outlineColor = outlineColor,
+                    highlightAlpha = highlightAlpha,
+                    illuminationAlpha = illuminationAlpha,
+                ),
         ) {
-            SettingsIconWell(kind = kind, tint = iconTint, pressed = pressed)
-            Column(
-                Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = LumenP5SettingsGeometry.RowContentHorizontal,
+                        vertical = LumenP5SettingsGeometry.RowContentVertical,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LumenP5SettingsGeometry.RowContentGap),
             ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp, lineHeight = 16.5.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = LumenColors.OnSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp, lineHeight = 12.5.sp),
-                    fontWeight = FontWeight.Medium,
-                    color = LumenColors.OnSurfaceMuted,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                SettingsIconWell(kind = kind, palette = palette, pressed = pressed)
+                Column(
+                    Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = LumenP5SettingsGeometry.RowTitleSize,
+                            lineHeight = LumenP5SettingsGeometry.RowTitleLineHeight,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        color = palette.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = LumenP5SettingsGeometry.RowSubtitleSize,
+                            lineHeight = LumenP5SettingsGeometry.RowSubtitleLineHeight,
+                            fontWeight = FontWeight.Normal,
+                        ),
+                        color = palette.muted,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                SettingsChevron(palette.cyan.copy(alpha = .88f))
             }
-            SettingsChevron(chevronTint)
         }
 
-        if (interactive && onClick != null) {
+        if (onClick != null) {
             var hitTarget = Modifier.matchParentSize()
             if (legacyTag != null) hitTarget = hitTarget.testTag(legacyTag)
             Box(
@@ -267,108 +308,243 @@ private fun SettingsCategoryRow(
     }
 }
 
+private fun Modifier.approvedSettingsRowFace(
+    palette: LumenP5IdentityPalette,
+    topColor: Color,
+    midColor: Color,
+    bottomColor: Color,
+    outlineColor: Color,
+    highlightAlpha: Float,
+    illuminationAlpha: Float,
+): Modifier = drawWithCache {
+    val radiusPx = LumenP5SettingsGeometry.RowRadius.toPx()
+    val corner = CornerRadius(radiusPx, radiusPx)
+    val face = Brush.verticalGradient(
+        colorStops = arrayOf(0f to topColor, .48f to midColor, 1f to bottomColor),
+    )
+    val illumination = Brush.radialGradient(
+        colorStops = arrayOf(
+            0f to palette.steel.copy(alpha = illuminationAlpha),
+            .33f to palette.steel.copy(alpha = illuminationAlpha * .52f),
+            .63f to palette.steel.copy(alpha = illuminationAlpha * .13f),
+            .77f to Color.Transparent,
+        ),
+        center = Offset(53.dp.toPx(), size.height * .50f),
+        radius = 66.dp.toPx(),
+    )
+    val strokeWidth = 1.dp.toPx()
+    val topHighlight = Color.White.copy(alpha = highlightAlpha)
+    onDrawBehind {
+        drawRoundRect(brush = face, cornerRadius = corner)
+        drawRoundRect(brush = illumination, cornerRadius = corner)
+        drawLine(
+            color = topHighlight,
+            start = Offset(radiusPx, strokeWidth),
+            end = Offset(size.width - radiusPx, strokeWidth),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        drawRoundRect(
+            color = outlineColor,
+            cornerRadius = corner,
+            style = Stroke(width = strokeWidth),
+        )
+    }
+}
+
 private enum class SettingsGlyphKind { ENGINE, PLAY, REVIEW, RATING, ACCOUNT, ADVANCED }
 
 @Composable
-private fun SettingsIconWell(kind: SettingsGlyphKind, tint: Color, pressed: Boolean) {
-    val shape = RoundedCornerShape(7.dp)
-    val wellBorder = if (pressed) LumenColors.AccentBlue.copy(alpha = .38f)
-    else LumenColors.OutlineStrong.copy(alpha = .76f)
+private fun SettingsIconWell(kind: SettingsGlyphKind, palette: LumenP5IdentityPalette, pressed: Boolean) {
+    val wellScale by animateFloatAsState(
+        targetValue = if (pressed) .985f else 1f,
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "settings-well-scale-$kind",
+    )
+    val wellOffset by animateDpAsState(
+        targetValue = if (pressed) .75.dp else 0.dp,
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "settings-well-offset-$kind",
+    )
+    val wellElevation by animateDpAsState(
+        targetValue = if (pressed) 1.dp else 3.5.dp,
+        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
+        label = "settings-well-shadow-$kind",
+    )
+    val shape = RoundedCornerShape(LumenP5SettingsGeometry.IconWellRadius)
     Box(
-        Modifier.size(34.dp)
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        LumenColors.SurfaceHighest.copy(alpha = if (pressed) .86f else .72f),
-                        LumenColors.Background.copy(alpha = .88f),
-                    ),
-                ),
-            )
-            .border(1.dp, wellBorder, shape),
+        Modifier
+            .size(LumenP5SettingsGeometry.IconWellSize)
+            .testTag("settings-icon-well")
+            .graphicsLayer {
+                scaleX = wellScale
+                scaleY = wellScale
+                translationY = wellOffset.toPx()
+            }
+            .shadow(wellElevation, shape, clip = false)
+            .approvedIconWell(palette, pressed),
         contentAlignment = Alignment.Center,
     ) {
-        SettingsGlyph(kind, tint, Modifier.size(19.dp))
+        SettingsGlyph(
+            kind = kind,
+            tint = palette.cyanMicro,
+            modifier = Modifier.size(LumenP5SettingsGeometry.SettingsIconSize).testTag("settings-icon-glyph"),
+        )
+    }
+}
+
+private fun Modifier.approvedIconWell(palette: LumenP5IdentityPalette, pressed: Boolean): Modifier = drawWithCache {
+    val radiusPx = LumenP5SettingsGeometry.IconWellRadius.toPx()
+    val corner = CornerRadius(radiusPx, radiusPx)
+    val top = if (pressed) Color(0xFF142C35) else Color(0xFF16303A)
+    val bottom = if (pressed) Color(0xFF0F2229) else Color(0xFF10262E)
+    val face = Brush.verticalGradient(listOf(top, bottom))
+    val localLight = Brush.radialGradient(
+        colors = listOf(
+            palette.cyan.copy(alpha = if (pressed) .17f else .18f),
+            Color.Transparent,
+        ),
+        center = Offset(size.width * .34f, size.height * if (pressed) .30f else .28f),
+        radius = size.minDimension * .62f,
+    )
+    val border = palette.cyan.copy(alpha = .38f)
+    val upperHighlight = palette.cyanMicro.copy(alpha = if (pressed) .07f else .12f)
+    val stroke = 1.dp.toPx()
+    onDrawBehind {
+        drawRoundRect(face, cornerRadius = corner)
+        drawRoundRect(localLight, cornerRadius = corner)
+        drawLine(
+            upperHighlight,
+            start = Offset(radiusPx * .70f, stroke),
+            end = Offset(size.width - radiusPx * .70f, stroke),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
+        drawRoundRect(border, cornerRadius = corner, style = Stroke(stroke))
     }
 }
 
 @Composable
 private fun SettingsGlyph(kind: SettingsGlyphKind, tint: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val s = 1.35.dp.toPx()
+        val unitX = size.width / 24f
+        val unitY = size.height / 24f
+        val strokeWidth = 1.75f * unitX
+        fun point(x: Float, y: Float) = Offset(x * unitX, y * unitY)
+        fun drawLine24(x1: Float, y1: Float, x2: Float, y2: Float, width: Float = strokeWidth) =
+            drawLine(tint, point(x1, y1), point(x2, y2), width, StrokeCap.Round)
+
         when (kind) {
             SettingsGlyphKind.ENGINE -> {
-                val chip = Size(w * .50f, h * .50f)
-                val origin = Offset(w * .25f, h * .25f)
-                drawRoundRect(tint, origin, chip, androidx.compose.ui.geometry.CornerRadius(w * .08f), style = Stroke(s))
-                repeat(3) { index ->
-                    val p = (index + 1) / 4f
-                    drawLine(tint, Offset(w * p, h * .13f), Offset(w * p, h * .25f), s, StrokeCap.Round)
-                    drawLine(tint, Offset(w * p, h * .75f), Offset(w * p, h * .87f), s, StrokeCap.Round)
-                    drawLine(tint, Offset(w * .13f, h * p), Offset(w * .25f, h * p), s, StrokeCap.Round)
-                    drawLine(tint, Offset(w * .75f, h * p), Offset(w * .87f, h * p), s, StrokeCap.Round)
+                drawRoundRect(
+                    tint,
+                    topLeft = point(6f, 6f),
+                    size = Size(12f * unitX, 12f * unitY),
+                    cornerRadius = CornerRadius(2f * unitX, 2f * unitY),
+                    style = Stroke(strokeWidth),
+                )
+                drawRoundRect(
+                    tint,
+                    topLeft = point(9f, 9f),
+                    size = Size(6f * unitX, 6f * unitY),
+                    cornerRadius = CornerRadius(unitX, unitY),
+                    style = Stroke(strokeWidth),
+                )
+                listOf(9f, 12f, 15f).forEach { x ->
+                    drawLine24(x, 3.8f, x, 6f)
+                    drawLine24(x, 18f, x, 20.2f)
                 }
-                drawCircle(tint, w * .075f, Offset(w * .50f, h * .50f), style = Stroke(s))
+                listOf(9f, 12f, 15f).forEach { y ->
+                    drawLine24(3.8f, y, 6f, y)
+                    drawLine24(18f, y, 20.2f, y)
+                }
             }
+
             SettingsGlyphKind.PLAY -> {
-                val path = Path().apply {
-                    moveTo(w * .36f, h * .25f)
-                    lineTo(w * .73f, h * .50f)
-                    lineTo(w * .36f, h * .75f)
+                drawCircle(tint, radius = 2.6f * unitX, center = point(10f, 6.25f), style = Stroke(strokeWidth))
+                drawLine24(6.9f, 16.8f, 13.1f, 16.8f)
+                val pawn = Path().apply {
+                    moveTo(8.1f * unitX, 16.8f * unitY)
+                    lineTo(8.85f * unitX, 13.1f * unitY)
+                    lineTo(11.15f * unitX, 13.1f * unitY)
+                    lineTo(11.9f * unitX, 16.8f * unitY)
+                }
+                drawPath(pawn, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawLine24(8.9f, 10.2f, 11.1f, 10.2f)
+                val play = Path().apply {
+                    moveTo(14.4f * unitX, 8.7f * unitY)
+                    lineTo(19.1f * unitX, 12f * unitY)
+                    lineTo(14.4f * unitX, 15.3f * unitY)
                     close()
                 }
-                drawPath(path, tint, style = Stroke(s))
-                drawLine(tint, Offset(w * .20f, h * .18f), Offset(w * .20f, h * .82f), s, StrokeCap.Round)
+                drawPath(play, tint)
             }
+
             SettingsGlyphKind.REVIEW -> {
-                drawCircle(tint, w * .27f, Offset(w * .43f, h * .43f), style = Stroke(s))
-                drawLine(tint, Offset(w * .62f, h * .62f), Offset(w * .82f, h * .82f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .28f, h * .47f), Offset(w * .40f, h * .56f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .40f, h * .56f), Offset(w * .57f, h * .32f), s, StrokeCap.Round)
-            }
-            SettingsGlyphKind.RATING -> {
-                val cx = w * .50f
-                val cy = h * .51f
-                val outer = w * .34f
-                val inner = outer * .43f
-                val path = Path()
-                repeat(10) { index ->
-                    val radius = if (index % 2 == 0) outer else inner
-                    val angle = -PI / 2 + index * PI / 5
-                    val x = cx + cos(angle).toFloat() * radius
-                    val y = cy + sin(angle).toFloat() * radius
-                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                drawCircle(tint, radius = 4.2f * unitX, center = point(9f, 9f), style = Stroke(strokeWidth))
+                drawLine24(12.1f, 12.1f, 15.4f, 15.4f)
+                val tower = Path().apply {
+                    moveTo(15.1f * unitX, 8.4f * unitY)
+                    lineTo(18.5f * unitX, 8.4f * unitY)
+                    lineTo(18.5f * unitX, 10.4f * unitY)
+                    lineTo(15.9f * unitX, 10.4f * unitY)
+                    lineTo(15.9f * unitX, 13.6f * unitY)
                 }
-                path.close()
-                drawPath(path, tint, style = Stroke(s))
+                drawPath(tower, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                val check = Path().apply {
+                    moveTo(14.9f * unitX, 14.9f * unitY)
+                    lineTo(16.3f * unitX, 16.3f * unitY)
+                    lineTo(19.4f * unitX, 12.9f * unitY)
+                }
+                drawPath(check, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
+
+            SettingsGlyphKind.RATING -> {
+                val star = Path().apply {
+                    moveTo(12f * unitX, 4.3f * unitY)
+                    lineTo(14.22f * unitX, 8.75f * unitY)
+                    lineTo(19.15f * unitX, 9.48f * unitY)
+                    lineTo(15.58f * unitX, 12.95f * unitY)
+                    lineTo(16.42f * unitX, 17.82f * unitY)
+                    lineTo(12f * unitX, 15.5f * unitY)
+                    lineTo(7.58f * unitX, 17.82f * unitY)
+                    lineTo(8.42f * unitX, 12.95f * unitY)
+                    lineTo(4.85f * unitX, 9.48f * unitY)
+                    lineTo(9.78f * unitX, 8.75f * unitY)
+                    close()
+                }
+                drawPath(star, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawCircle(tint, radius = 1.1f * unitX, center = point(12f, 11.55f))
+            }
+
             SettingsGlyphKind.ACCOUNT -> {
-                drawCircle(tint, w * .13f, Offset(w * .35f, h * .38f), style = Stroke(s))
-                drawArc(
+                drawRoundRect(
                     tint,
-                    startAngle = 205f,
-                    sweepAngle = 130f,
-                    useCenter = false,
-                    topLeft = Offset(w * .12f, h * .40f),
-                    size = Size(w * .46f, h * .40f),
-                    style = Stroke(s),
+                    topLeft = point(4.5f, 9.2f),
+                    size = Size(10f * unitX, 5.6f * unitY),
+                    cornerRadius = CornerRadius(2.8f * unitX, 2.8f * unitY),
+                    style = Stroke(strokeWidth),
                 )
-                drawLine(tint, Offset(w * .58f, h * .38f), Offset(w * .80f, h * .38f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .72f, h * .29f), Offset(w * .80f, h * .38f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .72f, h * .47f), Offset(w * .80f, h * .38f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .80f, h * .64f), Offset(w * .58f, h * .64f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .66f, h * .55f), Offset(w * .58f, h * .64f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .66f, h * .73f), Offset(w * .58f, h * .64f), s, StrokeCap.Round)
+                drawCircle(tint, radius = 2.8f * unitX, center = point(17.8f, 12f), style = Stroke(strokeWidth))
+                drawLine24(13.5f, 12f, 15f, 12f)
+                val upperArc = Path().apply {
+                    moveTo(5.7f * unitX, 8.1f * unitY)
+                    cubicTo(7.2f * unitX, 6.55f * unitY, 9.8f * unitX, 6.2f * unitY, 11.8f * unitX, 6.9f * unitY)
+                }
+                drawPath(upperArc, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawLine24(5.7f, 8.1f, 6.1f, 5.9f)
+                val lowerArc = Path().apply {
+                    moveTo(18f * unitX, 16.5f * unitY)
+                    cubicTo(16.4f * unitX, 17.6f * unitY, 14.2f * unitX, 18.2f * unitY, 12.2f * unitX, 17.7f * unitY)
+                }
+                drawPath(lowerArc, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
+
             SettingsGlyphKind.ADVANCED -> {
-                drawLine(tint, Offset(w * .27f, h * .17f), Offset(w * .27f, h * .83f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .50f, h * .17f), Offset(w * .50f, h * .83f), s, StrokeCap.Round)
-                drawLine(tint, Offset(w * .73f, h * .17f), Offset(w * .73f, h * .83f), s, StrokeCap.Round)
-                drawCircle(tint, w * .07f, Offset(w * .27f, h * .38f), style = Stroke(s))
-                drawCircle(tint, w * .07f, Offset(w * .50f, h * .63f), style = Stroke(s))
-                drawCircle(tint, w * .07f, Offset(w * .73f, h * .31f), style = Stroke(s))
+                listOf(7f, 12f, 17f).forEach { x -> drawLine24(x, 4.5f, x, 19.5f) }
+                drawCircle(tint, radius = 1.8f * unitX, center = point(7f, 9f))
+                drawCircle(tint, radius = 1.8f * unitX, center = point(12f, 15f))
+                drawCircle(tint, radius = 1.8f * unitX, center = point(17f, 7f))
             }
         }
     }
@@ -376,21 +552,13 @@ private fun SettingsGlyph(kind: SettingsGlyphKind, tint: Color, modifier: Modifi
 
 @Composable
 private fun SettingsChevron(tint: Color) {
-    Canvas(Modifier.size(15.dp)) {
-        val stroke = 1.35.dp.toPx()
-        drawLine(
-            tint,
-            Offset(size.width * .37f, size.height * .25f),
-            Offset(size.width * .63f, size.height * .50f),
-            stroke,
-            StrokeCap.Round,
-        )
-        drawLine(
-            tint,
-            Offset(size.width * .63f, size.height * .50f),
-            Offset(size.width * .37f, size.height * .75f),
-            stroke,
-            StrokeCap.Round,
-        )
+    Canvas(Modifier.size(LumenP5SettingsGeometry.ChevronSize)) {
+        val strokeWidth = 1.9.dp.toPx()
+        val path = Path().apply {
+            moveTo(size.width * .40f, size.height * .27f)
+            lineTo(size.width * .63f, size.height * .50f)
+            lineTo(size.width * .40f, size.height * .73f)
+        }
+        drawPath(path, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
