@@ -322,7 +322,7 @@ class P5SettingsScreenshotQaTest {
         val a = IntArray(first.width * first.height)
         val b = IntArray(first.width * first.height)
         first.getPixels(a, 0, first.width, 0, 0, first.width, first.height)
-        second.getPixels(b, 0, first.width, 0, 0, first.width, first.height)
+        second.getPixels(b, 0, second.width, 0, 0, second.width, second.height)
         return a.indices.count { index ->
             val one = a[index]
             val two = b[index]
