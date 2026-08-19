@@ -100,15 +100,18 @@ class P5SettingsScreenshotQaTest {
     }
 
     private fun assertSettingsRootStructure() {
-        val expected = listOf(
-            "Engines",
-            "Play",
-            "Game Review",
-            "Ratings",
-            "Accounts & Sync",
-            "Advanced",
-        )
-        expected.forEach { composeRule.onNodeWithText(it).assertIsDisplayed() }
+        listOf(
+            "settings-category-engines",
+            "settings-category-play",
+            "settings-category-review",
+            "settings-category-ratings",
+            "settings-category-accounts",
+            "settings-category-advanced",
+        ).forEach { composeRule.onNodeWithTag(it).assertIsDisplayed() }
+
+        listOf("Engines", "Game Review", "Ratings", "Accounts & Sync", "Advanced").forEach {
+            composeRule.onNodeWithText(it).assertIsDisplayed()
+        }
 
         val categoryRows = composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes()
         assertEquals("Settings root must expose exactly six category rows", 6, categoryRows.size)
