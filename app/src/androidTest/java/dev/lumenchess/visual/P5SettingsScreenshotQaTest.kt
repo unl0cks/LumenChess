@@ -42,8 +42,10 @@ class P5SettingsScreenshotQaTest {
 
     @Before
     fun requireExplicitScreenshotRun() {
-        val enabled = InstrumentationRegistry.getArguments().getString("p5SettingsQa") == "true"
-        assumeTrue("P5 Settings screenshot QA runs only from its dedicated workflow step", enabled)
+        assumeTrue(
+            "P5 Settings screenshot QA runs only from its dedicated workflow step",
+            InstrumentationRegistry.getArguments().getString("p5SettingsQa") == "true",
+        )
     }
 
     @Test
@@ -83,7 +85,6 @@ class P5SettingsScreenshotQaTest {
         assertSettingsRootStructure()
         assertSettingsApprovedGeometry()
         logSettingsMetrics()
-
         capture("04-settings.png")
         capturePressState("settings-category-play")
     }
@@ -113,8 +114,11 @@ class P5SettingsScreenshotQaTest {
             composeRule.onNodeWithText(it).assertIsDisplayed()
         }
 
-        val categoryRows = composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes()
-        assertEquals("Settings root must expose exactly six category rows", 6, categoryRows.size)
+        assertEquals(
+            "Settings root must expose exactly six category rows",
+            6,
+            composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes().size,
+        )
         assertEquals(
             "approved Settings translation must expose exactly six canonical icon wells",
             6,
@@ -144,7 +148,7 @@ class P5SettingsScreenshotQaTest {
         listOf("play", "arena", "games", "insights", "settings").forEach { tab ->
             composeRule.onNodeWithTag("main-tab-$tab").assertIsDisplayed()
         }
-        composeRule.onNodeWithTag("main-tab-settings-well").assertIsDisplayed()
+        composeRule.onNodeWithTag("main-tab-settings-well", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithTag("settings-root").assertIsDisplayed()
     }
 
@@ -188,6 +192,7 @@ class P5SettingsScreenshotQaTest {
             assertTrue("icon well $index width=${widthDp}dp expected 45..50", widthDp in 45f..50f)
             assertTrue("icon well $index height=${heightDp}dp expected 45..50", heightDp in 45f..50f)
         }
+
         val glyphs = composeRule.onAllNodesWithTag("settings-icon-glyph").fetchSemanticsNodes().map { it.boundsInRoot }
         glyphs.forEachIndexed { index, glyph ->
             val widthDp = glyph.width / density
@@ -231,7 +236,7 @@ class P5SettingsScreenshotQaTest {
         composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes()
             .map { it.boundsInRoot }
             .sortedBy { it.top }
-            .forEachIndexed { index, bounds -> println("P5_SETTINGS_METRIC row[$index]=$bounds") }
+            .forEachIndexed { index, rowBounds -> println("P5_SETTINGS_METRIC row[$index]=$rowBounds") }
         println("P5_SETTINGS_METRIC nav=${bounds("main-bottom-nav")}")
     }
 
