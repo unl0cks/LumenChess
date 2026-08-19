@@ -190,6 +190,7 @@ private fun SettingsCategoryRow(
         label = "settings-row-icon-$title",
     )
     val shape = RoundedCornerShape(8.dp)
+    val lowerEdgeColor = LumenColors.OutlineStrong.copy(alpha = if (pressed) .58f else .78f)
 
     Box(
         Modifier.fillMaxWidth()
@@ -205,7 +206,7 @@ private fun SettingsCategoryRow(
             .background(LumenColors.Background)
             .drawBehind {
                 drawRect(
-                    color = LumenColors.OutlineStrong.copy(alpha = if (pressed) .58f else .78f),
+                    color = lowerEdgeColor,
                     topLeft = Offset(0f, size.height - lowerEdge.toPx()),
                 )
             }
