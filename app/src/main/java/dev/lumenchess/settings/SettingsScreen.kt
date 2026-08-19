@@ -430,121 +430,146 @@ private fun SettingsGlyph(kind: SettingsGlyphKind, tint: Color, modifier: Modifi
         val unitX = size.width / 24f
         val unitY = size.height / 24f
         val strokeWidth = 1.75f * unitX
+        val stroke = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         fun point(x: Float, y: Float) = Offset(x * unitX, y * unitY)
-        fun drawLine24(x1: Float, y1: Float, x2: Float, y2: Float, width: Float = strokeWidth) =
-            drawLine(tint, point(x1, y1), point(x2, y2), width, StrokeCap.Round)
+        fun drawLine24(x1: Float, y1: Float, x2: Float, y2: Float) =
+            drawLine(tint, point(x1, y1), point(x2, y2), strokeWidth, StrokeCap.Round)
 
         when (kind) {
             SettingsGlyphKind.ENGINE -> {
                 drawRoundRect(
                     tint,
-                    topLeft = point(6f, 6f),
-                    size = Size(12f * unitX, 12f * unitY),
-                    cornerRadius = CornerRadius(2f * unitX, 2f * unitY),
-                    style = Stroke(strokeWidth),
+                    topLeft = point(6.1f, 6.1f),
+                    size = Size(11.8f * unitX, 11.8f * unitY),
+                    cornerRadius = CornerRadius(2.2f * unitX, 2.2f * unitY),
+                    style = stroke,
                 )
                 drawRoundRect(
                     tint,
                     topLeft = point(9f, 9f),
                     size = Size(6f * unitX, 6f * unitY),
-                    cornerRadius = CornerRadius(unitX, unitY),
-                    style = Stroke(strokeWidth),
+                    cornerRadius = CornerRadius(1.2f * unitX, 1.2f * unitY),
+                    style = stroke,
                 )
-                listOf(9f, 12f, 15f).forEach { x ->
-                    drawLine24(x, 3.8f, x, 6f)
-                    drawLine24(x, 18f, x, 20.2f)
+                listOf(8.3f, 12f, 15.7f).forEach { x ->
+                    drawLine24(x, 3.7f, x, 5.9f)
+                    drawLine24(x, 18.1f, x, 20.3f)
                 }
-                listOf(9f, 12f, 15f).forEach { y ->
-                    drawLine24(3.8f, y, 6f, y)
-                    drawLine24(18f, y, 20.2f, y)
+                listOf(8.3f, 12f, 15.7f).forEach { y ->
+                    drawLine24(3.7f, y, 5.9f, y)
+                    drawLine24(18.1f, y, 20.3f, y)
                 }
+                drawCircle(tint, radius = 1.05f * unitX, center = point(12f, 12f))
             }
 
             SettingsGlyphKind.PLAY -> {
-                drawCircle(tint, radius = 2.6f * unitX, center = point(10f, 6.25f), style = Stroke(strokeWidth))
-                drawLine24(6.9f, 16.8f, 13.1f, 16.8f)
-                val pawn = Path().apply {
-                    moveTo(8.1f * unitX, 16.8f * unitY)
-                    lineTo(8.85f * unitX, 13.1f * unitY)
-                    lineTo(11.15f * unitX, 13.1f * unitY)
-                    lineTo(11.9f * unitX, 16.8f * unitY)
+                drawCircle(tint, radius = 2.2f * unitX, center = point(8.4f, 5.8f), style = stroke)
+                drawLine24(6.4f, 9.2f, 10.4f, 9.2f)
+                val pawnBody = Path().apply {
+                    moveTo(6.9f * unitX, 9.2f * unitY)
+                    cubicTo(7.55f * unitX, 10.75f * unitY, 7.5f * unitX, 12.15f * unitY, 6.45f * unitX, 13.55f * unitY)
+                    lineTo(10.35f * unitX, 13.55f * unitY)
+                    cubicTo(9.3f * unitX, 12.15f * unitY, 9.25f * unitX, 10.75f * unitY, 9.9f * unitX, 9.2f * unitY)
                 }
-                drawPath(pawn, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                drawLine24(8.9f, 10.2f, 11.1f, 10.2f)
+                drawPath(pawnBody, tint, style = stroke)
+                drawLine24(5.55f, 15.9f, 11.25f, 15.9f)
+                drawLine24(4.9f, 18.45f, 11.9f, 18.45f)
                 val play = Path().apply {
-                    moveTo(14.4f * unitX, 8.7f * unitY)
-                    lineTo(19.1f * unitX, 12f * unitY)
-                    lineTo(14.4f * unitX, 15.3f * unitY)
+                    moveTo(15.2f * unitX, 9.25f * unitY)
+                    lineTo(19.35f * unitX, 12f * unitY)
+                    lineTo(15.2f * unitX, 14.75f * unitY)
                     close()
                 }
                 drawPath(play, tint)
             }
 
             SettingsGlyphKind.REVIEW -> {
-                drawCircle(tint, radius = 4.2f * unitX, center = point(9f, 9f), style = Stroke(strokeWidth))
-                drawLine24(12.1f, 12.1f, 15.4f, 15.4f)
-                val tower = Path().apply {
-                    moveTo(15.1f * unitX, 8.4f * unitY)
-                    lineTo(18.5f * unitX, 8.4f * unitY)
-                    lineTo(18.5f * unitX, 10.4f * unitY)
-                    lineTo(15.9f * unitX, 10.4f * unitY)
-                    lineTo(15.9f * unitX, 13.6f * unitY)
+                drawCircle(tint, radius = 5.15f * unitX, center = point(9.8f, 10f), style = stroke)
+                drawLine24(13.75f, 13.85f, 18f, 18.1f)
+                val rookCrown = Path().apply {
+                    moveTo(7.25f * unitX, 7.25f * unitY)
+                    lineTo(12.3f * unitX, 7.25f * unitY)
+                    lineTo(11.65f * unitX, 8.8f * unitY)
+                    lineTo(7.9f * unitX, 8.8f * unitY)
+                    close()
                 }
-                drawPath(tower, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(rookCrown, tint, style = stroke)
+                val rookBody = Path().apply {
+                    moveTo(7.9f * unitX, 8.8f * unitY)
+                    lineTo(7.9f * unitX, 12.2f * unitY)
+                    lineTo(11.65f * unitX, 12.2f * unitY)
+                    lineTo(11.65f * unitX, 8.8f * unitY)
+                }
+                drawPath(rookBody, tint, style = stroke)
+                drawLine24(7.15f, 12.2f, 12.35f, 12.2f)
                 val check = Path().apply {
-                    moveTo(14.9f * unitX, 14.9f * unitY)
-                    lineTo(16.3f * unitX, 16.3f * unitY)
-                    lineTo(19.4f * unitX, 12.9f * unitY)
+                    moveTo(16.05f * unitX, 7.15f * unitY)
+                    lineTo(17.4f * unitX, 8.45f * unitY)
+                    lineTo(19.8f * unitX, 5.8f * unitY)
                 }
-                drawPath(check, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(check, tint, style = stroke)
             }
 
             SettingsGlyphKind.RATING -> {
                 val star = Path().apply {
-                    moveTo(12f * unitX, 4.3f * unitY)
-                    lineTo(14.22f * unitX, 8.75f * unitY)
-                    lineTo(19.15f * unitX, 9.48f * unitY)
-                    lineTo(15.58f * unitX, 12.95f * unitY)
-                    lineTo(16.42f * unitX, 17.82f * unitY)
-                    lineTo(12f * unitX, 15.5f * unitY)
-                    lineTo(7.58f * unitX, 17.82f * unitY)
-                    lineTo(8.42f * unitX, 12.95f * unitY)
-                    lineTo(4.85f * unitX, 9.48f * unitY)
-                    lineTo(9.78f * unitX, 8.75f * unitY)
+                    moveTo(12f * unitX, 4.25f * unitY)
+                    lineTo(14.05f * unitX, 8.43f * unitY)
+                    lineTo(18.67f * unitX, 9.1f * unitY)
+                    lineTo(15.33f * unitX, 12.35f * unitY)
+                    lineTo(16.12f * unitX, 16.95f * unitY)
+                    lineTo(12f * unitX, 14.78f * unitY)
+                    lineTo(7.88f * unitX, 16.95f * unitY)
+                    lineTo(8.67f * unitX, 12.35f * unitY)
+                    lineTo(5.33f * unitX, 9.1f * unitY)
+                    lineTo(9.95f * unitX, 8.43f * unitY)
                     close()
                 }
-                drawPath(star, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                drawCircle(tint, radius = 1.1f * unitX, center = point(12f, 11.55f))
+                drawPath(star, tint, style = stroke)
+                val performance = Path().apply {
+                    moveTo(9.55f * unitX, 12.45f * unitY)
+                    lineTo(11.2f * unitX, 10.75f * unitY)
+                    lineTo(12.65f * unitX, 12f * unitY)
+                    lineTo(15f * unitX, 9.5f * unitY)
+                }
+                drawPath(performance, tint, style = stroke)
             }
 
             SettingsGlyphKind.ACCOUNT -> {
-                drawRoundRect(
-                    tint,
-                    topLeft = point(4.5f, 9.2f),
-                    size = Size(10f * unitX, 5.6f * unitY),
-                    cornerRadius = CornerRadius(2.8f * unitX, 2.8f * unitY),
-                    style = Stroke(strokeWidth),
-                )
-                drawCircle(tint, radius = 2.8f * unitX, center = point(17.8f, 12f), style = Stroke(strokeWidth))
-                drawLine24(13.5f, 12f, 15f, 12f)
-                val upperArc = Path().apply {
-                    moveTo(5.7f * unitX, 8.1f * unitY)
-                    cubicTo(7.2f * unitX, 6.55f * unitY, 9.8f * unitX, 6.2f * unitY, 11.8f * unitX, 6.9f * unitY)
+                drawCircle(tint, radius = 2.45f * unitX, center = point(7.15f, 12f), style = stroke)
+                drawCircle(tint, radius = 2.45f * unitX, center = point(16.85f, 12f), style = stroke)
+                val upper = Path().apply {
+                    moveTo(9.75f * unitX, 8.25f * unitY)
+                    cubicTo(11.05f * unitX, 7.15f * unitY, 12.85f * unitX, 6.85f * unitY, 14.5f * unitX, 7.45f * unitY)
+                    lineTo(16.2f * unitX, 8.1f * unitY)
                 }
-                drawPath(upperArc, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                drawLine24(5.7f, 8.1f, 6.1f, 5.9f)
-                val lowerArc = Path().apply {
-                    moveTo(18f * unitX, 16.5f * unitY)
-                    cubicTo(16.4f * unitX, 17.6f * unitY, 14.2f * unitX, 18.2f * unitY, 12.2f * unitX, 17.7f * unitY)
+                drawPath(upper, tint, style = stroke)
+                val lower = Path().apply {
+                    moveTo(14.25f * unitX, 15.75f * unitY)
+                    cubicTo(12.95f * unitX, 16.85f * unitY, 11.15f * unitX, 17.15f * unitY, 9.5f * unitX, 16.55f * unitY)
+                    lineTo(7.8f * unitX, 15.9f * unitY)
                 }
-                drawPath(lowerArc, tint, style = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(lower, tint, style = stroke)
+                val upperArrow = Path().apply {
+                    moveTo(16.25f * unitX, 6.25f * unitY)
+                    lineTo(16.25f * unitX, 8.6f * unitY)
+                    lineTo(13.9f * unitX, 8.6f * unitY)
+                }
+                drawPath(upperArrow, tint, style = stroke)
+                val lowerArrow = Path().apply {
+                    moveTo(7.75f * unitX, 17.75f * unitY)
+                    lineTo(7.75f * unitX, 15.4f * unitY)
+                    lineTo(10.1f * unitX, 15.4f * unitY)
+                }
+                drawPath(lowerArrow, tint, style = stroke)
             }
 
             SettingsGlyphKind.ADVANCED -> {
-                listOf(7f, 12f, 17f).forEach { x -> drawLine24(x, 4.5f, x, 19.5f) }
-                drawCircle(tint, radius = 1.8f * unitX, center = point(7f, 9f))
-                drawCircle(tint, radius = 1.8f * unitX, center = point(12f, 15f))
-                drawCircle(tint, radius = 1.8f * unitX, center = point(17f, 7f))
+                drawLine24(5f, 6f, 19f, 6f)
+                drawLine24(5f, 12f, 19f, 12f)
+                drawLine24(5f, 18f, 19f, 18f)
+                drawCircle(tint, radius = 1.9f * unitX, center = point(9f, 6f))
+                drawCircle(tint, radius = 1.9f * unitX, center = point(15.2f, 12f))
+                drawCircle(tint, radius = 1.9f * unitX, center = point(11.6f, 18f))
             }
         }
     }

@@ -225,26 +225,27 @@ private fun LumenNavGlyph(tab: MainTab, tint: Color, modifier: Modifier = Modifi
         val uy = size.height / 24f
         val strokeWidth = 1.9f * ux
         fun point(x: Float, y: Float) = Offset(x * ux, y * uy)
-        fun line(x1: Float, y1: Float, x2: Float, y2: Float, width: Float = strokeWidth) =
-            drawLine(tint, point(x1, y1), point(x2, y2), width, StrokeCap.Round)
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float) =
+            drawLine(tint, point(x1, y1), point(x2, y2), strokeWidth, StrokeCap.Round)
         val stroke = Stroke(strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
         when (tab) {
             MainTab.Play -> {
-                drawCircle(tint, 2.6f * ux, point(10f, 6.3f), style = stroke)
-                line(6.9f, 16.7f, 13.1f, 16.7f)
-                val pawn = Path().apply {
-                    moveTo(8.1f * ux, 16.7f * uy)
-                    lineTo(8.9f * ux, 13f * uy)
-                    lineTo(11.1f * ux, 13f * uy)
-                    lineTo(11.9f * ux, 16.7f * uy)
+                drawCircle(tint, 2.05f * ux, point(8.35f, 5.85f), style = stroke)
+                line(6.45f, 9f, 10.25f, 9f)
+                val pawnBody = Path().apply {
+                    moveTo(6.9f * ux, 9f * uy)
+                    cubicTo(7.45f * ux, 10.45f * uy, 7.4f * ux, 11.7f * uy, 6.5f * ux, 13f * uy)
+                    lineTo(10.2f * ux, 13f * uy)
+                    cubicTo(9.3f * ux, 11.7f * uy, 9.25f * ux, 10.45f * uy, 9.8f * ux, 9f * uy)
                 }
-                drawPath(pawn, tint, style = stroke)
-                line(8.9f, 10.1f, 11.1f, 10.1f)
+                drawPath(pawnBody, tint, style = stroke)
+                line(5.65f, 15.2f, 11.05f, 15.2f)
+                line(5f, 17.65f, 11.7f, 17.65f)
                 val play = Path().apply {
-                    moveTo(14.5f * ux, 8.6f * uy)
-                    lineTo(19.2f * ux, 12f * uy)
-                    lineTo(14.5f * ux, 15.4f * uy)
+                    moveTo(15.1f * ux, 9.3f * uy)
+                    lineTo(19.1f * ux, 12f * uy)
+                    lineTo(15.1f * ux, 14.7f * uy)
                     close()
                 }
                 drawPath(play, tint)
@@ -252,85 +253,103 @@ private fun LumenNavGlyph(tab: MainTab, tint: Color, modifier: Modifier = Modifi
 
             MainTab.Arena -> {
                 val left = Path().apply {
-                    moveTo(4.5f * ux, 6.2f * uy)
-                    lineTo(9.8f * ux, 6.2f * uy)
-                    lineTo(9.8f * ux, 9.3f * uy)
-                    lineTo(8.7f * ux, 9.3f * uy)
-                    lineTo(8.7f * ux, 14.4f * uy)
-                    lineTo(10.7f * ux, 14.4f * uy)
-                    lineTo(10.7f * ux, 17.5f * uy)
-                    lineTo(4f * ux, 17.5f * uy)
-                    lineTo(4f * ux, 14.4f * uy)
-                    lineTo(6f * ux, 14.4f * uy)
-                    lineTo(6f * ux, 9.3f * uy)
-                    lineTo(4.5f * ux, 9.3f * uy)
-                    close()
-                }
-                val right = Path().apply {
-                    moveTo(19.5f * ux, 6.2f * uy)
-                    lineTo(14.2f * ux, 6.2f * uy)
-                    lineTo(14.2f * ux, 9.3f * uy)
-                    lineTo(15.3f * ux, 9.3f * uy)
-                    lineTo(15.3f * ux, 14.4f * uy)
-                    lineTo(13.3f * ux, 14.4f * uy)
-                    lineTo(13.3f * ux, 17.5f * uy)
-                    lineTo(20f * ux, 17.5f * uy)
-                    lineTo(20f * ux, 14.4f * uy)
-                    lineTo(18f * ux, 14.4f * uy)
-                    lineTo(18f * ux, 9.3f * uy)
-                    lineTo(19.5f * ux, 9.3f * uy)
+                    moveTo(3.4f * ux, 5.9f * uy)
+                    lineTo(4.9f * ux, 5.9f * uy)
+                    lineTo(4.9f * ux, 7.45f * uy)
+                    lineTo(6.45f * ux, 7.45f * uy)
+                    lineTo(6.45f * ux, 5.9f * uy)
+                    lineTo(7.9f * ux, 5.9f * uy)
+                    lineTo(7.9f * ux, 8.9f * uy)
+                    lineTo(7.15f * ux, 10.05f * uy)
+                    lineTo(7.15f * ux, 15.4f * uy)
+                    lineTo(4.2f * ux, 15.4f * uy)
+                    lineTo(4.2f * ux, 10.05f * uy)
+                    lineTo(3.4f * ux, 8.9f * uy)
                     close()
                 }
                 drawPath(left, tint, style = stroke)
+                line(3.45f, 17.55f, 8.1f, 17.55f)
+
+                val right = Path().apply {
+                    moveTo(16.1f * ux, 5.9f * uy)
+                    lineTo(17.55f * ux, 5.9f * uy)
+                    lineTo(17.55f * ux, 7.45f * uy)
+                    lineTo(19.1f * ux, 7.45f * uy)
+                    lineTo(19.1f * ux, 5.9f * uy)
+                    lineTo(20.6f * ux, 5.9f * uy)
+                    lineTo(20.6f * ux, 8.9f * uy)
+                    lineTo(19.8f * ux, 10.05f * uy)
+                    lineTo(19.8f * ux, 15.4f * uy)
+                    lineTo(16.85f * ux, 15.4f * uy)
+                    lineTo(16.85f * ux, 10.05f * uy)
+                    lineTo(16.1f * ux, 8.9f * uy)
+                    close()
+                }
                 drawPath(right, tint, style = stroke)
-                line(11.2f, 10.1f, 12.8f, 11.7f)
-                line(12.8f, 11.7f, 11.2f, 13.3f)
-                line(12.8f, 10.1f, 11.2f, 11.7f)
-                line(11.2f, 11.7f, 12.8f, 13.3f)
+                line(15.9f, 17.55f, 20.55f, 17.55f)
+
+                val bolt = Path().apply {
+                    moveTo(11.75f * ux, 7.55f * uy)
+                    lineTo(10.25f * ux, 10.8f * uy)
+                    lineTo(11.8f * ux, 10.8f * uy)
+                    lineTo(10.95f * ux, 15.15f * uy)
+                    lineTo(13.75f * ux, 10.25f * uy)
+                    lineTo(12.15f * ux, 10.25f * uy)
+                    lineTo(13.3f * ux, 7.55f * uy)
+                    close()
+                }
+                drawPath(bolt, tint)
             }
 
             MainTab.Games -> {
                 drawRoundRect(
                     tint,
-                    topLeft = point(5f, 4.5f),
-                    size = Size(14f * ux, 15f * uy),
-                    cornerRadius = CornerRadius(2.2f * ux, 2.2f * uy),
+                    topLeft = point(5f, 4.4f),
+                    size = Size(14f * ux, 15.2f * uy),
+                    cornerRadius = CornerRadius(2.15f * ux, 2.15f * uy),
                     style = stroke,
                 )
-                line(5.8f, 8f, 18.2f, 8f)
-                val squareSize = 2.15f * ux
-                listOf(7.5f to 10.3f, 10.3f to 10.3f, 7.5f to 13.1f, 10.3f to 13.1f).forEach { (x, y) ->
-                    drawRoundRect(
-                        tint,
-                        topLeft = point(x, y),
-                        size = Size(squareSize, squareSize),
-                        cornerRadius = CornerRadius(.35f * ux, .35f * uy),
-                    )
-                }
-                line(7.5f, 15.6f, 16.3f, 15.6f)
+                drawRoundRect(
+                    tint,
+                    topLeft = point(7.25f, 6.7f),
+                    size = Size(6.5f * ux, 6.5f * uy),
+                    cornerRadius = CornerRadius(.7f * ux, .7f * uy),
+                    style = stroke,
+                )
+                line(10.5f, 6.7f, 10.5f, 13.2f)
+                line(7.25f, 9.95f, 13.75f, 9.95f)
+                line(7.25f, 16.2f, 15.75f, 16.2f)
             }
 
             MainTab.Insights -> {
-                line(4.5f, 19f, 19.5f, 19f)
-                drawRoundRect(tint, point(6.2f, 12f), Size(2.4f * ux, 5.2f * uy), CornerRadius(.6f * ux, .6f * uy))
-                drawRoundRect(tint, point(10.8f, 9f), Size(2.4f * ux, 8.2f * uy), CornerRadius(.6f * ux, .6f * uy))
-                drawRoundRect(tint, point(15.4f, 5.4f), Size(2.4f * ux, 11.8f * uy), CornerRadius(.6f * ux, .6f * uy))
+                line(5f, 18.5f, 5f, 13f)
+                line(9.2f, 18.5f, 9.2f, 9.7f)
+                line(13.4f, 18.5f, 13.4f, 12.1f)
+                line(17.6f, 18.5f, 17.6f, 6.3f)
                 val trend = Path().apply {
-                    moveTo(6.9f * ux, 9.5f * uy)
-                    lineTo(11.8f * ux, 6.5f * uy)
-                    lineTo(16.2f * ux, 8.1f * uy)
-                    lineTo(19.2f * ux, 4.5f * uy)
+                    moveTo(4.7f * ux, 10.2f * uy)
+                    lineTo(8.7f * ux, 8f * uy)
+                    lineTo(12.7f * ux, 9.5f * uy)
+                    lineTo(17.7f * ux, 5.5f * uy)
                 }
                 drawPath(trend, tint, style = stroke)
+                drawCircle(tint, radius = 1f * ux, center = point(4.7f, 10.2f))
+                drawCircle(tint, radius = 1f * ux, center = point(8.7f, 8f))
+                drawCircle(tint, radius = 1f * ux, center = point(12.7f, 9.5f))
+                drawCircle(tint, radius = 1f * ux, center = point(17.7f, 5.5f))
             }
 
             MainTab.Settings -> {
-                drawCircle(tint, 6.2f * ux, point(12f, 12f), style = stroke)
-                drawCircle(tint, 2.2f * ux, point(12f, 12f), style = stroke)
-                line(3.5f, 12f, 5.2f, 12f)
-                line(18.8f, 12f, 20.5f, 12f)
-                line(12f, 3.5f, 12f, 5.2f)
-                line(12f, 18.8f, 12f, 20.5f)
+                drawCircle(tint, 5.15f * ux, point(12f, 12f), style = stroke)
+                drawCircle(tint, 2.05f * ux, point(12f, 12f), style = stroke)
+                line(12f, 3.2f, 12f, 5.2f)
+                line(12f, 18.8f, 12f, 20.8f)
+                line(3.2f, 12f, 5.2f, 12f)
+                line(18.8f, 12f, 20.8f, 12f)
+                line(5.75f, 5.75f, 7.15f, 7.15f)
+                line(16.85f, 16.85f, 18.25f, 18.25f)
+                line(18.25f, 5.75f, 16.85f, 7.15f)
+                line(7.15f, 16.85f, 5.75f, 18.25f)
             }
         }
     }
