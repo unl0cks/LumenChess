@@ -448,6 +448,11 @@ private fun RowScope.BoardFirstAction(
         LumenColors.SurfaceHighest.copy(alpha = .66f)
     }
     val faceBottom = if (pressed) LumenColors.Surface.copy(alpha = .98f) else LumenColors.SurfaceRaised
+    val lowerEdgeColor = if (destructive) {
+        LumenColors.Destructive.copy(alpha = .23f)
+    } else {
+        LumenColors.OutlineStrong.copy(alpha = .72f)
+    }
 
     Box(
         Modifier.weight(1f).fillMaxSize().testTag(testTag)
@@ -461,8 +466,7 @@ private fun RowScope.BoardFirstAction(
             .background(LumenColors.Background)
             .drawBehind {
                 drawRect(
-                    color = if (destructive) LumenColors.Destructive.copy(alpha = .23f)
-                    else LumenColors.OutlineStrong.copy(alpha = .72f),
+                    color = lowerEdgeColor,
                     topLeft = Offset(0f, size.height - lowerEdge.toPx()),
                 )
             }
