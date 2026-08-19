@@ -139,7 +139,7 @@ class P5SettingsScreenshotQaTest {
         assertEquals(
             "approved root navigation must expose five normalized icon glyphs",
             5,
-            composeRule.onAllNodesWithTag("main-tab-icon").fetchSemanticsNodes().size,
+            composeRule.onAllNodesWithTag("main-tab-icon", useUnmergedTree = true).fetchSemanticsNodes().size,
         )
         listOf("play", "arena", "games", "insights", "settings").forEach { tab ->
             composeRule.onNodeWithTag("main-tab-$tab").assertIsDisplayed()
@@ -199,7 +199,8 @@ class P5SettingsScreenshotQaTest {
         val nav = bounds("main-bottom-nav")
         val navHeightDp = nav.height / density
         assertTrue("approved nav height=${navHeightDp}dp expected 78..84", navHeightDp in 78f..84f)
-        val navIcons = composeRule.onAllNodesWithTag("main-tab-icon").fetchSemanticsNodes().map { it.boundsInRoot }
+        val navIcons = composeRule.onAllNodesWithTag("main-tab-icon", useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.boundsInRoot }
         navIcons.forEachIndexed { index, icon ->
             val widthDp = icon.width / density
             val heightDp = icon.height / density
