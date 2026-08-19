@@ -160,7 +160,7 @@ class P5LiveScreenshotQaTest {
             val runtime = coordinator.state
             val mainline = runtime.gameTree.mainline()
             assertEquals(10, mainline.size)
-            assertEquals("f8e7", mainline.last().move.uci)
+            assertEquals("f8e7", requireNotNull(mainline.last().move).uci)
             assertEquals(Color.WHITE, runtime.position.sideToMove)
             assertTrue("white clock must be noninitial", runtime.clock.whiteRemainingMillis != 600_000L)
             assertTrue("black clock must be noninitial", runtime.clock.blackRemainingMillis != 600_000L)
