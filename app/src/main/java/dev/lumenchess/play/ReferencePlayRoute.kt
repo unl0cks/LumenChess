@@ -70,7 +70,7 @@ fun ReferencePlayRoute(
     }
 
     when (ui.mode) {
-        PlayScreenMode.LIVE -> ReferenceLiveScreen(ui, viewModel, modifier)
+        PlayScreenMode.LIVE -> BoardFirstReferenceLiveScreen(ui, viewModel, modifier)
         PlayScreenMode.SETUP -> AnimatedContent(
             targetState = page,
             modifier = modifier,
