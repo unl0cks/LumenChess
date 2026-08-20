@@ -236,9 +236,9 @@ class P5SetupScreenshotQaTest {
             composeRule.waitForIdle()
             val rest = node.captureToImage().asAndroidBitmap()
             // New Game stays vertically scrollable for resume/Chess960 overflow. PressInteraction
-            // delay, recomposition and the press tween are driven by Compose's MainTestClock, not
-            // by TouchInjectionScope event timestamps or wall-clock sleeping. Hold the real pointer
-            // while advancing that clock, matching the already-green Settings press QA.
+            // delay, recomposition and the press tween are driven by Compose's MainTestClock. Hold
+            // the real pointer through that delay, then CANCEL rather than release so Start Game's
+            // visual proof cannot navigate/persist a game and contaminate the next frozen test.
             val previousAutoAdvance = composeRule.mainClock.autoAdvance
             composeRule.mainClock.autoAdvance = false
             var pointerDown = false
@@ -249,16 +249,20 @@ class P5SetupScreenshotQaTest {
                 composeRule.waitForIdle()
                 node.captureToImage().asAndroidBitmap()
             } finally {
-                if (pointerDown) {
-                    node.performTouchInput { up() }
-                    composeRule.mainClock.advanceTimeBy(160L)
+                try {
+                    if (pointerDown) {
+                        node.performTouchInput { cancel() }
+                        composeRule.mainClock.advanceTimeBy(160L)
+                    }
+                } finally {
+                    composeRule.mainClock.autoAdvance = previousAutoAdvance
                     composeRule.waitForIdle()
                 }
-                composeRule.mainClock.autoAdvance = previousAutoAdvance
             }
 
             val normalized = centerOnCanvas(pressed, rest.width, rest.height)
             val changed = visibleDifferenceRatio(rest, normalized, threshold = 10)
+            println("P5_NEW_GAME_PRESS label=$label visiblyChangedRatio=$changed")
             assertTrue("$label REST/PRESSED must be perceptible; ratio=$changed", changed > 0.018f)
             PressCapture(label, rest, normalized)
         }
