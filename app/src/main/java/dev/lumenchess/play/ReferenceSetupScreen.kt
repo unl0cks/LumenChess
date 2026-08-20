@@ -735,11 +735,30 @@ private fun Modifier.selectedFace(
     pressed: Boolean,
 ): Modifier = drawWithCache {
     val corner = CornerRadius(ref.dp(8f).toPx())
-    val top = if (pressed) Color(0xFF2B5665).copy(alpha = .52f) else Color(0xFF336678).copy(alpha = .58f)
-    val bottom = if (pressed) Color(0xFF1D3E4A).copy(alpha = .52f) else Color(0xFF204654).copy(alpha = .54f)
+    val fill = if (pressed) {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0f to Color(0xFF1C343E),
+                .25f to Color(0xFF1B323A),
+                .50f to Color(0xFF192F38),
+                .75f to Color(0xFF172D36),
+                1f to Color(0xFF162A32),
+            ),
+        )
+    } else {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0f to Color(0xFF22424E),
+                .25f to Color(0xFF1F3D48),
+                .50f to Color(0xFF1D3843),
+                .75f to Color(0xFF1B343E),
+                1f to Color(0xFF182F39),
+            ),
+        )
+    }
     onDrawBehind {
         if (selected) {
-            drawRoundRect(Brush.verticalGradient(listOf(top, bottom)), cornerRadius = corner)
+            drawRoundRect(fill, cornerRadius = corner)
             drawLine(Color(0xFFB0E5F6).copy(alpha = if (pressed) .05f else .11f), Offset(ref.dp(8f).toPx(), ref.vdp(1f).toPx()), Offset(size.width - ref.dp(8f).toPx(), ref.vdp(1f).toPx()), ref.dp(.7f).toPx(), StrokeCap.Round)
             drawRoundRect(palette.cyan.copy(alpha = .20f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
         }
