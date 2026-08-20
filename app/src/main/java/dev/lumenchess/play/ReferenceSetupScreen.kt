@@ -800,7 +800,6 @@ private fun NewGameSelector(
                 onDrawBehind {
                     drawRoundRect(face, cornerRadius = corner)
                     if (expanded) drawRect(palette.cyan.copy(alpha = .48f), Offset(0f, ref.vdp(8f).toPx()), Size(ref.dp(2f).toPx(), size.height - ref.vdp(16f).toPx()))
-                    drawLine(Color.White.copy(alpha = if (pressed) .018f else .03f), Offset(ref.dp(9f).toPx(), ref.vdp(1f).toPx()), Offset(size.width - ref.dp(9f).toPx(), ref.vdp(1f).toPx()), ref.dp(.7f).toPx())
                     drawRoundRect(Color(0xFF879FA8).copy(alpha = if (expanded) .14f else .12f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
                 }
             }
