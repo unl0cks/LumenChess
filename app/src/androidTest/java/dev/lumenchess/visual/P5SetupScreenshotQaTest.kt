@@ -235,15 +235,27 @@ class P5SetupScreenshotQaTest {
             val node = composeRule.onNodeWithTag(tag)
             composeRule.waitForIdle()
             val rest = node.captureToImage().asAndroidBitmap()
-            node.performTouchInput { down(center); advanceEventTime(120L) }
-            // New Game stays vertically scrollable for resume/Chess960 overflow. Compose delays
-            // PressInteraction in scroll containers, so hold the real pointer through that delay
-            // before capturing the production pressed state.
-            Thread.sleep(220L)
-            composeRule.waitForIdle()
-            val pressed = node.captureToImage().asAndroidBitmap()
-            node.performTouchInput { up() }
-            composeRule.waitForIdle()
+            // New Game stays vertically scrollable for resume/Chess960 overflow. PressInteraction
+            // delay, recomposition and the press tween are driven by Compose's MainTestClock, not
+            // by TouchInjectionScope event timestamps or wall-clock sleeping. Hold the real pointer
+            // while advancing that clock, matching the already-green Settings press QA.
+            val previousAutoAdvance = composeRule.mainClock.autoAdvance
+            composeRule.mainClock.autoAdvance = false
+            var pointerDown = false
+            val pressed = try {
+                node.performTouchInput { down(center) }
+                pointerDown = true
+                composeRule.mainClock.advanceTimeBy(240L)
+                composeRule.waitForIdle()
+                node.captureToImage().asAndroidBitmap()
+            } finally {
+                if (pointerDown) {
+                    node.performTouchInput { up() }
+                    composeRule.mainClock.advanceTimeBy(160L)
+                    composeRule.waitForIdle()
+                }
+                composeRule.mainClock.autoAdvance = previousAutoAdvance
+            }
 
             val normalized = centerOnCanvas(pressed, rest.width, rest.height)
             val changed = visibleDifferenceRatio(rest, normalized, threshold = 10)
