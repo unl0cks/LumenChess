@@ -99,7 +99,12 @@ def pinned_actions_browser() -> str:
                 f"Pinned browser archive changed: {archive_sha}"
             )
         with zipfile.ZipFile(archive) as package:
-            package.extractall(install_root)
+            for member in package.infolist():
+                package.extract(member, install_root)
+                mode = (member.external_attr >> 16) & 0o777
+                target = install_root / member.filename
+                if mode and target.exists():
+                    target.chmod(mode)
 
     executable.chmod(executable.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     version = subprocess.check_output([str(executable), "--version"], text=True).strip()
