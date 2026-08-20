@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -19,14 +20,17 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.MainActivity
 import dev.lumenchess.R
+import dev.lumenchess.play.PLAY_SETUP_TEST_TAG
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -49,17 +53,46 @@ class P5PlayOverviewScreenshotQaTest {
     }
 
     @Test
-    fun capturePlayOverviewOnly() {
+    fun captureApprovedPlayOverviewTranslation() {
         verifyInterTightRuntimeResource()
         verifyApprovedHeroAssetsPackaged()
+        openApprovedDarkPlayOverview()
+
+        assertApprovedStructure()
+        assertArenaSubtitleWraps()
+        capture("01-play-overview.png")
+        capturePressStates()
+    }
+
+    @Test
+    fun playVsEngineAndArenaPreserveExistingRoutes() {
+        openApprovedDarkPlayOverview()
+
+        composeRule.onNodeWithTag("play-overview-vs-engine").performClick()
+        waitForTag(PLAY_SETUP_TEST_TAG)
+        pressBack()
         waitForTag("p5-play-overview")
-        // The hero Images are intentionally decorative (contentDescription = null), so Compose may
-        // merge their semantics. Wait on the rendered mode-card nodes after verifying the exact PNGs.
+
+        composeRule.onNodeWithTag("play-overview-arena").performClick()
+        composeRule.onNodeWithText(
+            "Arena setup will arrive with its engine-battle runtime. The Play shell is already reserved for it.",
+        ).assertIsDisplayed()
+    }
+
+    @Test
+    fun quickStartUsesTheExistingSetupRoute() {
+        openApprovedDarkPlayOverview()
+        composeRule.onNodeWithTag("play-overview-quick-start").performClick()
+        waitForTag(PLAY_SETUP_TEST_TAG)
+    }
+
+    private fun openApprovedDarkPlayOverview() {
+        waitForTag("p5-play-overview")
         waitForTag("play-overview-vs-engine")
         waitForTag("play-overview-arena")
 
-        // Screenshot QA uses the product's real appearance preference path. The emulator defaults to
-        // a light system theme, while the approved Play reference is the dark graphite Lumen theme.
+        // Use the product's real appearance preference path. The emulator defaults to a light
+        // system theme while the frozen Iteration 2 reference is the dark graphite Lumen theme.
         composeRule.onNodeWithTag("main-tab-settings").performClick()
         waitForTag("settings-category-list")
         composeRule.onNodeWithTag("settings-play").performClick()
@@ -69,12 +102,8 @@ class P5PlayOverviewScreenshotQaTest {
 
         composeRule.onNodeWithTag("main-tab-play").performClick()
         waitForTag("p5-play-overview")
-        // The depth tag is intentionally inside the pressable card; inspect the unmerged tree so
-        // the parent Button semantics do not hide the internal surface marker.
-        waitForTag("play-overview-vs-engine-depth-surface", useUnmergedTree = true)
-        assertArenaSubtitleWraps()
-        capture("00-play-overview.png")
-        capturePressState("play-overview-vs-engine")
+        waitForTag("play-overview-quick-start")
+        composeRule.onNodeWithContentDescription("Navigate back").assertIsDisplayed()
     }
 
     private fun verifyInterTightRuntimeResource() {
@@ -111,8 +140,46 @@ class P5PlayOverviewScreenshotQaTest {
             check(bounds.outWidth == 1254 && bounds.outHeight == 1254) {
                 "$path must package the approved 1254x1254 hero PNG exactly; got ${bounds.outWidth}x${bounds.outHeight}"
             }
+            println("P5 Play hero SHA-256 verified: $path = $actualSha256")
         }
-        println("P5 Play hero assets verified: exact approved PNG bytes packaged")
+    }
+
+    private fun assertApprovedStructure() {
+        assertEquals(
+            "Play vs Engine must remain one hero action",
+            1,
+            composeRule.onAllNodesWithTag("play-overview-vs-engine").fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            "Engine Arena must remain one hero action",
+            1,
+            composeRule.onAllNodesWithTag("play-overview-arena").fetchSemanticsNodes().size,
+        )
+        assertEquals(
+            "Quick Start must remain one real last-used row",
+            1,
+            composeRule.onAllNodesWithTag("play-overview-quick-start").fetchSemanticsNodes().size,
+        )
+
+        assertArtLeftOfCopy("play-overview-vs-engine-hero", "play-overview-vs-engine-copy")
+        assertArtLeftOfCopy("play-overview-arena-hero", "play-overview-arena-copy")
+
+        composeRule.onNodeWithText("Quick Start").assertIsDisplayed()
+        composeRule.onNodeWithText("Last used").assertIsDisplayed()
+        composeRule.onNodeWithText("10 min · Rapid").assertIsDisplayed()
+        composeRule.onNodeWithText("Stockfish 18 · 1600 Elo").assertIsDisplayed()
+        listOf("play", "arena", "games", "insights", "settings").forEach { tab ->
+            composeRule.onNodeWithTag("main-tab-$tab").assertIsDisplayed()
+        }
+    }
+
+    private fun assertArtLeftOfCopy(artTag: String, copyTag: String) {
+        val art = composeRule.onNodeWithTag(artTag, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val copy = composeRule.onNodeWithTag(copyTag, useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue("$artTag must remain left of its text column", art.right < copy.left)
+        assertTrue("$artTag must have non-zero rendered size", art.width > 0f && art.height > 0f)
     }
 
     private fun assertArenaSubtitleWraps() {
@@ -123,7 +190,7 @@ class P5PlayOverviewScreenshotQaTest {
                 action(textLayoutResults)
             }
         assertEquals(
-            "Engine Arena subtitle must render as exactly two lines in the reference composition",
+            "Engine Arena subtitle must render as exactly two natural lines",
             2,
             textLayoutResults.single().lineCount,
         )
@@ -140,13 +207,67 @@ class P5PlayOverviewScreenshotQaTest {
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
-        composeRule
-            .onNodeWithTag(tag, useUnmergedTree = useUnmergedTree)
-            .assertIsDisplayed()
+        composeRule.onNodeWithTag(tag, useUnmergedTree = useUnmergedTree).assertIsDisplayed()
         composeRule.waitForIdle()
     }
 
-    private fun capturePressState(tag: String) {
+    private data class PressPair(
+        val label: String,
+        val rest: Bitmap,
+        val pressed: Bitmap,
+        val changedRatio: Float,
+    )
+
+    private fun capturePressStates() {
+        val pairs = listOf(
+            capturePressPair("Play vs Engine", "play-overview-vs-engine"),
+            capturePressPair("Engine Arena", "play-overview-arena"),
+            capturePressPair("Quick Start", "play-overview-quick-start"),
+        )
+        pairs.forEach { pair ->
+            assertTrue(
+                "${pair.label} production press state must visibly change at least 1.8% of pixels; actual=${pair.changedRatio}",
+                pair.changedRatio > .018f,
+            )
+        }
+
+        val titleHeight = 30
+        val stateLabelHeight = 28
+        val gap = 10
+        val rowGap = 12
+        val width = pairs.maxOf { it.rest.width + gap + it.pressed.width }
+        val height = pairs.sumOf { titleHeight + stateLabelHeight + maxOf(it.rest.height, it.pressed.height) } +
+            rowGap * (pairs.size - 1)
+        val comparison = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = AndroidCanvas(comparison)
+        canvas.drawColor(android.graphics.Color.rgb(8, 8, 8))
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(242, 245, 246)
+            textSize = 21f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        }
+        val statePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(176, 184, 188)
+            textSize = 18f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        }
+
+        var y = 0f
+        pairs.forEachIndexed { index, pair ->
+            canvas.drawText(pair.label, 8f, y + 22f, titlePaint)
+            y += titleHeight
+            canvas.drawText("REST", 8f, y + 20f, statePaint)
+            canvas.drawText("PRESSED", (pair.rest.width + gap + 8).toFloat(), y + 20f, statePaint)
+            y += stateLabelHeight
+            canvas.drawBitmap(pair.rest, 0f, y, null)
+            canvas.drawBitmap(pair.pressed, (pair.rest.width + gap).toFloat(), y, null)
+            y += maxOf(pair.rest.height, pair.pressed.height)
+            if (index != pairs.lastIndex) y += rowGap
+        }
+        writeBitmap("01-play-overview-press-state.png", comparison)
+    }
+
+    private fun capturePressPair(label: String, tag: String): PressPair {
         composeRule.waitForIdle()
         val node = composeRule.onNodeWithTag(tag)
         val rest = node.captureToImage().asAndroidBitmap()
@@ -157,26 +278,25 @@ class P5PlayOverviewScreenshotQaTest {
         }
         composeRule.waitForIdle()
         val pressed = node.captureToImage().asAndroidBitmap()
-        node.performTouchInput { up() }
+        node.performTouchInput { cancel() }
         composeRule.waitForIdle()
 
-        val labelHeight = 34
-        val gap = 10
-        val width = rest.width + gap + pressed.width
-        val height = labelHeight + maxOf(rest.height, pressed.height)
-        val comparison = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = AndroidCanvas(comparison)
-        canvas.drawColor(android.graphics.Color.rgb(8, 8, 8))
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.rgb(224, 228, 230)
-            textSize = 22f
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        return PressPair(label, rest, pressed, changedPixelRatio(rest, pressed))
+    }
+
+    private fun changedPixelRatio(left: Bitmap, right: Bitmap): Float {
+        assertEquals("Press-state width changed unexpectedly", left.width, right.width)
+        assertEquals("Press-state height changed unexpectedly", left.height, right.height)
+        val size = left.width * left.height
+        val a = IntArray(size)
+        val b = IntArray(size)
+        left.getPixels(a, 0, left.width, 0, 0, left.width, left.height)
+        right.getPixels(b, 0, right.width, 0, 0, right.width, right.height)
+        var changed = 0
+        for (index in 0 until size) {
+            if (a[index] != b[index]) changed++
         }
-        canvas.drawText("REST", 8f, 25f, paint)
-        canvas.drawText("PRESSED", (rest.width + gap + 8).toFloat(), 25f, paint)
-        canvas.drawBitmap(rest, 0f, labelHeight.toFloat(), null)
-        canvas.drawBitmap(pressed, (rest.width + gap).toFloat(), labelHeight.toFloat(), null)
-        writeBitmap("00-play-overview-press-state.png", comparison)
+        return changed.toFloat() / size.toFloat()
     }
 
     private fun capture(name: String) {

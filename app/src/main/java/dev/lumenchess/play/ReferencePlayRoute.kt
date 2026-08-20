@@ -87,7 +87,7 @@ fun ReferencePlayRoute(
             label = "reference-play-page",
         ) { targetPage ->
             when (targetPage) {
-                ReferencePlayPage.OVERVIEW -> ReferencePlayOverviewScreen(
+                ReferencePlayPage.OVERVIEW -> ApprovedPlayOverviewScreen(
                     ui = ui,
                     onPlayVsEngine = { page = ReferencePlayPage.SETUP },
                     onArenaPreview = { page = ReferencePlayPage.ARENA_PREVIEW },
