@@ -124,6 +124,10 @@ jobs:
             dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
             | tee "$RUNNER_TEMP/p5-play-instrumentation.txt"
 
+          # The preceding P1 lane deliberately starts/persists a game. Isolate the frozen
+          # New Game reference state without changing production resume behavior.
+          adb shell pm clear dev.lumenchess
+
           adb shell am instrument -w -r \
             -e p5SetupQa true \
             -e class 'dev.lumenchess.visual.P5SetupScreenshotQaTest' \
