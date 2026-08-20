@@ -1,30 +1,29 @@
 package dev.lumenchess.play
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,7 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -45,10 +44,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,41 +57,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.lumenchess.core.chess.Variant
-import dev.lumenchess.design.LumenColors
-import dev.lumenchess.design.LumenEngineBadge
 import dev.lumenchess.design.LumenMotion
+import dev.lumenchess.design.LumenP5IdentityPalette
+import dev.lumenchess.design.lumenP5IdentityPalette
 import dev.lumenchess.engine.api.EngineStrengthModel
 import dev.lumenchess.engine.api.EngineStrengthTarget
 import kotlin.math.roundToInt
 
-private enum class SetupGlyph { BOARD, CHESS960, WHITE, BLACK, RANDOM, CLOCK, TARGET }
-private enum class SetupSurfaceMode { NORMAL, SELECTED, PRIMARY, DISABLED }
-
-private val SetupHeaderStyle
-    @Composable get() = MaterialTheme.typography.titleMedium.copy(
-        fontSize = 20.sp,
-        lineHeight = 24.sp,
-        fontWeight = FontWeight.SemiBold,
-    )
-private val SetupSectionStyle
-    @Composable get() = MaterialTheme.typography.labelLarge.copy(
-        fontSize = 14.sp,
-        lineHeight = 17.sp,
-        fontWeight = FontWeight.SemiBold,
-    )
-private val SetupControlStyle
-    @Composable get() = MaterialTheme.typography.labelMedium.copy(
-        fontSize = 14.5.sp,
-        lineHeight = 18.sp,
-        fontWeight = FontWeight.SemiBold,
-    )
-private val SetupSupportingStyle
-    @Composable get() = MaterialTheme.typography.labelSmall.copy(
-        fontSize = 11.5.sp,
-        lineHeight = 14.sp,
-        fontWeight = FontWeight.Normal,
-    )
-
+/** Native translation of the visually approved P5 New Game refined 390x844 proof. */
 @Composable
 internal fun ReferenceSetupScreen(
     ui: PlayUiState,
@@ -101,1101 +75,994 @@ internal fun ReferenceSetupScreen(
     var engineExpanded by remember { mutableStateOf(false) }
     var timeExpanded by remember { mutableStateOf(false) }
     var incrementExpanded by remember { mutableStateOf(false) }
-    val shellShape = RoundedCornerShape(12.dp)
-    val pageGlow = LumenColors.AccentBlueBright
-    val shellTopHighlight = LumenColors.OnSurface.copy(alpha = .07f)
+    val palette = lumenP5IdentityPalette()
 
-    Column(
+    BoxWithConstraints(
         modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        lerp(LumenColors.Background, Color.Black, .08f),
-                        LumenColors.Background,
-                    ),
-                ),
-            )
-            .drawBehind {
-                val center = Offset(size.width * .22f, size.height * .21f)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(
-                            pageGlow.copy(alpha = .018f),
-                            pageGlow.copy(alpha = .005f),
-                            Color.Transparent,
-                        ),
-                        center = center,
-                        radius = size.width * .72f,
-                    ),
-                    center = center,
-                    radius = size.width * .72f,
-                )
-            }
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp, vertical = 7.dp)
+            .newGameBackground(palette)
             .testTag(PLAY_SETUP_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val ref = NewGameReferenceScale(maxWidth.value / 390f)
         Column(
             Modifier
-                .fillMaxWidth()
-                .shadow(
-                    elevation = 4.dp,
-                    shape = shellShape,
-                    clip = false,
-                    ambientColor = Color.Black.copy(alpha = .44f),
-                    spotColor = Color.Black.copy(alpha = .58f),
-                )
-                .clip(shellShape)
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0f to lerp(LumenColors.Surface, LumenColors.SurfaceRaised, .42f),
-                            .12f to LumenColors.Surface,
-                            1f to lerp(LumenColors.Surface, Color.Black, .08f),
-                        ),
-                    ),
-                )
-                .drawBehind {
-                    drawLine(
-                        color = shellTopHighlight,
-                        start = Offset(13.dp.toPx(), 1.dp.toPx()),
-                        end = Offset(size.width - 13.dp.toPx(), 1.dp.toPx()),
-                        strokeWidth = .7.dp.toPx(),
-                        cap = StrokeCap.Round,
-                    )
-                }
-                .border(1.dp, LumenColors.OutlineStrong.copy(alpha = .92f), shellShape)
-                .padding(horizontal = 11.dp, vertical = 7.dp)
-                .testTag("p5-setup-shell"),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = ref.dp(16f))
+                .padding(top = ref.dp(20f), bottom = ref.dp(22f)),
         ) {
-            SetupHeader(onBack)
+            NewGameTopBar(ref, onBack, Modifier.fillMaxWidth().height(ref.dp(48f)))
+            Spacer(Modifier.height(ref.dp(8f)))
 
-            ui.restorableGame?.let { restored ->
-                SetupTactileSurface(
-                    modifier = Modifier.fillMaxWidth().height(52.dp).testTag(PLAY_RESUME_TEST_TAG),
-                    onClick = viewModel::resumeLastGame,
-                ) {
-                    Row(
-                        Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("Continue game", style = SetupControlStyle, color = LumenColors.OnSurface)
-                            Text(
-                                "${if (restored.setup.variant == Variant.STANDARD) "Standard" else "Chess960"} · ${restored.setup.engine.displayName}",
-                                style = SetupSupportingStyle,
-                                color = LumenColors.OnSurfaceMuted,
-                            )
-                        }
-                        SetupChevron(expanded = false)
-                    }
-                }
-            }
-
-            Column(
-                Modifier.fillMaxWidth().testTag("p5-setup-content"),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            NewGameSetupPlane(
+                ref = ref,
+                palette = palette,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = ref.dp(692f))
+                    .testTag("p5-setup-shell"),
             ) {
-                SetupSection("Game Mode", Modifier.testTag("p5-setup-game-mode")) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SetupChoiceTile(
-                            label = "Standard",
-                            glyph = SetupGlyph.BOARD,
-                            selected = ui.setup.variant == Variant.STANDARD,
-                            modifier = Modifier.weight(1f).testTag("p5-setup-standard"),
-                            onClick = { viewModel.updateVariant(Variant.STANDARD) },
-                        )
-                        SetupChoiceTile(
-                            label = "Chess960",
-                            glyph = SetupGlyph.CHESS960,
-                            selected = ui.setup.variant == Variant.CHESS960,
-                            modifier = Modifier.weight(1f),
-                            onClick = { viewModel.updateVariant(Variant.CHESS960) },
-                        )
-                    }
-                    if (ui.setup.variant == Variant.CHESS960) {
-                        val index = ui.setup.chess960Index ?: 518
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Starting position", style = SetupSupportingStyle, color = LumenColors.OnSurfaceMuted)
-                            Text("#$index", style = SetupSupportingStyle, color = LumenColors.AccentBlueBright)
-                        }
-                        SetupSlider(
-                            value = index.toFloat(),
-                            valueRange = 0f..959f,
-                            modifier = Modifier.fillMaxWidth(),
-                            onValueChange = {
-                                viewModel.updateChess960Index(it.roundToInt().coerceIn(0, 959))
-                            },
-                        )
-                    }
+                ui.restorableGame?.let { restored ->
+                    NewGameSelector(
+                        ref = ref,
+                        palette = palette,
+                        title = "Continue game · ${if (restored.setup.variant == Variant.STANDARD) "Standard" else "Chess960"} · ${restored.setup.engine.displayName}",
+                        expanded = false,
+                        onClick = viewModel::resumeLastGame,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(ref.dp(52f))
+                            .testTag(PLAY_RESUME_TEST_TAG),
+                    )
+                    Spacer(Modifier.height(ref.dp(8f)))
                 }
 
-                SetupSection("Opponent") {
-                    SetupSelector(
-                        title = ui.setup.engine.displayName,
-                        expanded = engineExpanded,
-                        height = 60.dp,
-                        modifier = Modifier.fillMaxWidth().testTag("p5-setup-opponent"),
-                        leading = {
-                            LumenEngineBadge(ui.setup.engine.displayName, Modifier.size(32.dp))
-                        },
-                        onClick = { engineExpanded = !engineExpanded },
-                    )
-                    Text(
-                        "Engine Info",
-                        modifier = Modifier.align(Alignment.End),
-                        style = SetupSupportingStyle,
-                        color = LumenColors.AccentBlueBright.copy(alpha = .78f),
-                    )
-                    if (engineExpanded) {
-                        SetupDropMenu {
-                            PlayEngine.entries.forEach { engine ->
-                                SetupMenuRow(
-                                    label = engine.displayName,
-                                    selected = ui.setup.engine == engine,
-                                    onClick = {
-                                        viewModel.updateEngine(engine)
-                                        engineExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-
-                SetupSection("Strength (Elo)", info = true) {
-                    val target = ui.setup.strengthTarget
-                    val elo = (target as? EngineStrengthTarget.Elo)?.value ?: 3000
-                    Text(
-                        if (target is EngineStrengthTarget.Elo) elo.toString() else "Maximum",
-                        style = SetupControlStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
-                        color = LumenColors.OnSurface.copy(alpha = .97f),
-                    )
-                    SetupSlider(
-                        value = elo.toFloat(),
-                        valueRange = 400f..3000f,
-                        modifier = Modifier.fillMaxWidth().testTag("p5-setup-strength-slider"),
-                        onValueChange = {
-                            val snapped = ((it / 50f).roundToInt() * 50).coerceIn(400, 3000)
-                            viewModel.updateStrengthTarget(EngineStrengthTarget.Elo(snapped))
-                        },
-                    )
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("400", style = SetupSupportingStyle, color = LumenColors.OnSurfaceMuted)
-                        Text("3000", style = SetupSupportingStyle, color = LumenColors.OnSurfaceMuted)
-                    }
-                    SetupTactileSurface(
-                        modifier = Modifier.fillMaxWidth().height(50.dp).testTag("p5-match-my-elo"),
-                        mode = SetupSurfaceMode.DISABLED,
-                        enabled = false,
-                        onClick = {},
-                    ) {
-                        Row(
-                            Modifier.fillMaxSize().padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                        ) {
-                            SetupIcon(SetupGlyph.TARGET, LumenColors.OnSurfaceMuted, Modifier.size(18.dp))
-                            Spacer(Modifier.size(8.dp))
-                            Text("Match My Elo", style = SetupControlStyle, color = LumenColors.OnSurfaceMuted)
-                        }
-                    }
-                }
-
-                SetupSection("Strength Model", info = true) {
-                    SetupStrengthModelControl(
-                        selected = ui.setup.strengthModel,
-                        onSelect = viewModel::updateStrengthModel,
-                    )
-                    Text(
-                        when (ui.setup.strengthModel) {
-                            EngineStrengthModel.HYBRID -> "Hybrid (default): Engine limits + humanization layer."
-                            EngineStrengthModel.ENGINE_NATIVE -> "Use only the engine's native strength controls."
-                            EngineStrengthModel.HUMANIZED -> "Increase Lumen's human-like move selection."
-                        },
-                        style = SetupSupportingStyle,
-                        color = LumenColors.OnSurfaceMuted.copy(alpha = .96f),
-                    )
-                }
-
-                SetupSection("Side", Modifier.testTag("p5-setup-side")) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        PlaySide.entries.forEach { side ->
-                            SetupChoiceTile(
-                                label = side.name.lowercase().replaceFirstChar { it.uppercase() },
-                                glyph = when (side) {
-                                    PlaySide.WHITE -> SetupGlyph.WHITE
-                                    PlaySide.BLACK -> SetupGlyph.BLACK
-                                    PlaySide.RANDOM -> SetupGlyph.RANDOM
-                                },
-                                selected = ui.setup.side == side,
-                                modifier = Modifier.weight(1f),
-                                compact = true,
-                                onClick = { viewModel.updateSide(side) },
-                            )
-                        }
-                    }
-                }
-
-                SetupSection("Time Control") {
-                    SetupSelector(
-                        title = referenceTimeCategory(ui.setup.timeControl),
-                        expanded = timeExpanded,
-                        modifier = Modifier.fillMaxWidth().testTag("p5-setup-time"),
-                        leading = {
-                            SetupIcon(SetupGlyph.CLOCK, LumenColors.OnSurfaceMuted, Modifier.size(20.dp))
-                        },
-                        onClick = { timeExpanded = !timeExpanded },
-                    )
-                    if (timeExpanded) {
-                        SetupDropMenu {
-                            REFERENCE_TIME_CONTROLS.forEach { option ->
-                                SetupMenuRow(
-                                    label = option.label,
-                                    selected = ui.setup.timeControl.initialMillis == option.control.initialMillis,
-                                    onClick = {
-                                        viewModel.updateTimeControl(
-                                            option.control.copy(incrementMillis = ui.setup.timeControl.incrementMillis),
-                                        )
-                                        timeExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-
-                SetupSection("Inc / Delay") {
-                    SetupSelector(
-                        title = "${ui.setup.timeControl.incrementMillis / 1_000L} sec",
-                        expanded = incrementExpanded,
-                        modifier = Modifier.fillMaxWidth().testTag("p5-inc-delay"),
-                        onClick = { incrementExpanded = !incrementExpanded },
-                    )
-                    if (incrementExpanded) {
-                        SetupDropMenu {
-                            listOf(0L, 1L, 2L, 5L, 10L).forEach { seconds ->
-                                SetupMenuRow(
-                                    label = "$seconds sec",
-                                    selected = ui.setup.timeControl.incrementMillis == seconds * 1_000L,
-                                    onClick = {
-                                        viewModel.updateTimeControl(
-                                            ui.setup.timeControl.copy(incrementMillis = seconds * 1_000L),
-                                        )
-                                        incrementExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
+                NewGameModeSection(ref, palette, ui.setup, viewModel::updateVariant, viewModel::updateChess960Index)
+                NewGameOpponentSection(
+                    ref = ref,
+                    palette = palette,
+                    engine = ui.setup.engine,
+                    expanded = engineExpanded,
+                    onToggle = { engineExpanded = !engineExpanded },
+                    onEngine = {
+                        viewModel.updateEngine(it)
+                        engineExpanded = false
+                    },
+                )
+                NewGameStrengthSection(ref, palette, ui.setup.strengthTarget, viewModel::updateStrengthTarget)
+                NewGameStrengthModelSection(ref, palette, ui.setup.strengthModel, viewModel::updateStrengthModel)
+                NewGameSideSection(ref, palette, ui.setup.side, viewModel::updateSide)
+                NewGameTimeSection(
+                    ref = ref,
+                    palette = palette,
+                    control = ui.setup.timeControl,
+                    expanded = timeExpanded,
+                    onToggle = { timeExpanded = !timeExpanded },
+                    onControl = {
+                        viewModel.updateTimeControl(it.copy(incrementMillis = ui.setup.timeControl.incrementMillis))
+                        timeExpanded = false
+                    },
+                )
+                NewGameIncrementSection(
+                    ref = ref,
+                    palette = palette,
+                    control = ui.setup.timeControl,
+                    expanded = incrementExpanded,
+                    onToggle = { incrementExpanded = !incrementExpanded },
+                    onIncrement = {
+                        viewModel.updateTimeControl(ui.setup.timeControl.copy(incrementMillis = it * 1_000L))
+                        incrementExpanded = false
+                    },
+                )
 
                 val validationMessage = when (val validation = ui.setupValidation) {
                     PlaySetupValidation.Valid -> null
                     is PlaySetupValidation.Invalid -> validation.reason
                     is PlaySetupValidation.UnsupportedStrength -> validation.reason
                 }
-                (validationMessage ?: ui.message)?.let { message ->
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .background(LumenColors.DestructiveSoft, RoundedCornerShape(7.dp))
-                            .border(1.dp, LumenColors.Destructive.copy(alpha = .42f), RoundedCornerShape(7.dp))
-                            .padding(horizontal = 10.dp, vertical = 7.dp),
-                    ) {
-                        Text(message, style = SetupSupportingStyle, color = LumenColors.Destructive)
-                    }
+                (validationMessage ?: ui.message)?.let {
+                    NewGameValidationMessage(ref, it, Modifier.fillMaxWidth().padding(bottom = ref.dp(5f)))
                 }
 
-                Box(Modifier.fillMaxWidth().testTag("p5-setup-start")) {
-                    SetupTactileSurface(
-                        modifier = Modifier.fillMaxWidth().height(50.dp).testTag(PLAY_START_TEST_TAG),
-                        mode = if (ui.setupValidation is PlaySetupValidation.Valid) {
-                            SetupSurfaceMode.PRIMARY
-                        } else {
-                            SetupSurfaceMode.DISABLED
-                        },
+                // Frozen proof: exactly 5 reference units between Inc / Delay and the CTA.
+                Spacer(Modifier.height(ref.dp(5f)))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(ref.dp(52f))
+                        .testTag("p5-setup-start"),
+                ) {
+                    NewGamePrimaryButton(
+                        ref = ref,
+                        palette = palette,
                         enabled = ui.setupValidation is PlaySetupValidation.Valid,
                         onClick = viewModel::startNewGame,
-                    ) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                "Start Game",
-                                style = SetupControlStyle.copy(fontSize = 15.5.sp, fontWeight = FontWeight.Bold),
-                                color = if (ui.setupValidation is PlaySetupValidation.Valid) {
-                                    Color(0xFFF7FBFD)
-                                } else {
-                                    LumenColors.OnSurfaceFaint
-                                },
-                            )
-                        }
-                    }
+                        modifier = Modifier.fillMaxSize().testTag("p5-setup-start-button"),
+                    )
                 }
             }
-        }
 
-        SetupNote(
-            text = "Match My Elo is preview-only in this build.",
-            modifier = Modifier.testTag("p5-setup-note-1"),
+            Spacer(Modifier.height(ref.dp(17f)))
+            NewGameNotes(ref, palette, Modifier.fillMaxWidth().padding(horizontal = ref.dp(5f)))
+        }
+    }
+}
+
+private data class NewGameReferenceScale(val factor: Float) {
+    fun dp(referencePx: Float): Dp = (referencePx * factor).dp
+    fun sp(referencePx: Float) = (referencePx * factor).sp
+}
+
+private enum class NewGameGlyph { BOARD, CHESS960, ENGINE, WHITE, BLACK, RANDOM, CLOCK, TARGET, INFO, CHECK }
+
+private fun Modifier.newGameBackground(palette: LumenP5IdentityPalette): Modifier = drawWithCache {
+    val base = Brush.verticalGradient(
+        colorStops = arrayOf(
+            0f to palette.appBackgroundLift,
+            .28f to palette.appBackground,
+            1f to Color(0xFF070A0C),
+        ),
+    )
+    onDrawBehind {
+        drawRect(base)
+        drawRect(
+            Brush.radialGradient(
+                listOf(Color(0xFF38687A).copy(alpha = .045f), Color.Transparent),
+                center = Offset(size.width * .15f, -size.height * .04f),
+                radius = size.width * .92f,
+            ),
         )
-        SetupNote(
-            text = "Your selected strength, side and clock apply when the game starts.",
-            modifier = Modifier.testTag("p5-setup-note-2"),
-        )
-        Spacer(Modifier.height(3.dp))
     }
 }
 
 @Composable
-private fun SetupHeader(onBack: () -> Unit) {
+private fun NewGameTopBar(ref: NewGameReferenceScale, onBack: () -> Unit, modifier: Modifier) {
+    val palette = lumenP5IdentityPalette()
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val backTint = LumenColors.OnSurfaceMuted.copy(alpha = .94f)
     val scale by animateFloatAsState(
-        targetValue = if (pressed) .90f else 1f,
+        targetValue = if (pressed) .92f else 1f,
         animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "p5-setup-back-scale",
+        label = "new-game-back-scale",
     )
-    Box(Modifier.fillMaxWidth().height(40.dp).testTag("p5-setup-header")) {
+    Box(modifier, contentAlignment = Alignment.Center) {
         Text(
             "New Game",
-            modifier = Modifier.align(Alignment.Center),
-            style = SetupHeaderStyle,
-            color = LumenColors.OnSurface.copy(alpha = .99f),
+            color = palette.text,
+            fontSize = ref.sp(21f),
+            lineHeight = ref.sp(25f),
+            fontWeight = FontWeight.SemiBold,
         )
         Box(
             Modifier
                 .align(Alignment.CenterStart)
-                .size(38.dp)
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
+                .size(ref.dp(48f))
+                .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clickable(
                     interactionSource = interaction,
                     indication = null,
                     role = Role.Button,
                     onClick = onBack,
                 )
+                .semantics { contentDescription = "Navigate back" }
                 .testTag("p5-setup-back"),
-            contentAlignment = Alignment.CenterStart,
+            contentAlignment = Alignment.Center,
         ) {
-            Canvas(Modifier.size(18.dp)) {
-                val stroke = 1.55.dp.toPx()
-                drawLine(
-                    backTint,
-                    Offset(size.width * .70f, size.height * .16f),
-                    Offset(size.width * .31f, size.height * .50f),
-                    stroke,
-                    StrokeCap.Round,
-                )
-                drawLine(
-                    backTint,
-                    Offset(size.width * .31f, size.height * .50f),
-                    Offset(size.width * .70f, size.height * .84f),
-                    stroke,
-                    StrokeCap.Round,
-                )
+            Canvas(Modifier.size(ref.dp(22f))) {
+                val stroke = ref.dp(1.8f).toPx()
+                val tint = Color(0xFF99A4A9)
+                drawLine(tint, Offset(size.width * .64f, size.height * .19f), Offset(size.width * .35f, size.height * .50f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .35f, size.height * .50f), Offset(size.width * .64f, size.height * .81f), stroke, StrokeCap.Round)
             }
         }
     }
 }
 
 @Composable
-private fun SetupSection(
-    label: String,
-    modifier: Modifier = Modifier,
-    info: Boolean = false,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(label, style = SetupSectionStyle, color = LumenColors.OnSurface.copy(alpha = .98f))
-            if (info) SetupInfoIcon()
-        }
-        content()
-    }
-}
-
-@Composable
-private fun SetupChoiceTile(
-    label: String,
-    glyph: SetupGlyph,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    compact: Boolean = false,
-    onClick: () -> Unit,
-) {
-    SetupTactileSurface(
-        modifier = modifier.height(if (compact) 56.dp else 60.dp),
-        mode = if (selected) SetupSurfaceMode.SELECTED else SetupSurfaceMode.NORMAL,
-        role = Role.RadioButton,
-        onClick = onClick,
-    ) {
-        Row(
-            Modifier.fillMaxSize().padding(horizontal = if (compact) 9.dp else 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (compact) Arrangement.Center else Arrangement.Start,
-        ) {
-            SetupIcon(
-                glyph,
-                if (selected) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
-                Modifier.size(if (compact) 20.dp else 23.dp),
-            )
-            Spacer(Modifier.size(if (compact) 7.dp else 9.dp))
-            Text(
-                label,
-                style = SetupControlStyle,
-                color = if (selected) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SetupSelector(
-    title: String,
-    expanded: Boolean,
-    modifier: Modifier = Modifier,
-    height: Dp = 56.dp,
-    leading: (@Composable () -> Unit)? = null,
-    onClick: () -> Unit,
-) {
-    SetupTactileSurface(
-        modifier = modifier.height(height),
-        mode = if (expanded) SetupSurfaceMode.SELECTED else SetupSurfaceMode.NORMAL,
-        onClick = onClick,
-    ) {
-        Row(
-            Modifier.fillMaxSize().padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            leading?.invoke()
-            Text(
-                title,
-                Modifier.weight(1f),
-                style = SetupControlStyle,
-                color = LumenColors.OnSurface.copy(alpha = .98f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            SetupChevron(expanded)
-        }
-    }
-}
-
-@Composable
-private fun SetupTactileSurface(
+private fun NewGameSetupPlane(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
     modifier: Modifier,
-    mode: SetupSurfaceMode = SetupSurfaceMode.NORMAL,
-    enabled: Boolean = true,
-    role: Role = Role.Button,
-    onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val primary = mode == SetupSurfaceMode.PRIMARY
-    val selected = mode == SetupSurfaceMode.SELECTED
-    val disabled = mode == SetupSurfaceMode.DISABLED || !enabled
-    val shape = RoundedCornerShape(if (primary) 7.dp else 8.dp)
-
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) .98f else 1f,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "setup-surface-scale-$mode",
-    )
-    val pressOffset by animateDpAsState(
-        targetValue = if (pressed) 1.6.dp else 0.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "setup-surface-offset-$mode",
-    )
-    val contentOffset by animateDpAsState(
-        targetValue = if (pressed) 1.15.dp else 0.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "setup-surface-content-offset-$mode",
-    )
-    val elevation by animateDpAsState(
-        targetValue = if (pressed) .1.dp else if (primary) 4.dp else 3.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "setup-surface-shadow-$mode",
-    )
-    val lowerEdge by animateDpAsState(
-        targetValue = if (pressed) 0.dp else if (primary) 3.2.dp else 3.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "setup-surface-edge-$mode",
-    )
-    val border by animateColorAsState(
-        targetValue = when {
-            disabled -> LumenColors.OutlineStrong.copy(alpha = .58f)
-            pressed && (selected || primary) -> LumenColors.AccentBlueBright.copy(alpha = 1f)
-            selected -> LumenColors.AccentBlueBright.copy(alpha = .92f)
-            primary -> LumenColors.AccentBlueBright.copy(alpha = .82f)
-            pressed -> LumenColors.OutlineStrong.copy(alpha = 1f)
-            else -> LumenColors.OutlineStrong.copy(alpha = .78f)
-        },
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "setup-surface-border-$mode",
-    )
-    val selectedGlow = LumenColors.AccentBlueBright
-
-    val baseLeft = when {
-        primary -> lerp(LumenColors.AccentBlue, Color.White, .23f)
-        selected -> lerp(LumenColors.SurfaceRaised, LumenColors.AccentBlue, .16f)
-        disabled -> lerp(LumenColors.SurfaceRaised, Color.Black, .05f)
-        else -> lerp(LumenColors.Surface, LumenColors.SurfaceRaised, .46f)
-    }
-    val baseRight = when {
-        primary -> lerp(LumenColors.AccentBlue, Color.Black, .12f)
-        selected -> lerp(LumenColors.Surface, LumenColors.AccentBlue, .07f)
-        disabled -> lerp(LumenColors.Surface, Color.Black, .08f)
-        else -> lerp(LumenColors.Surface, Color.Black, .06f)
-    }
-
+    val shape = RoundedCornerShape(ref.dp(14f))
     Box(
         modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationY = pressOffset.toPx()
-                alpha = if (disabled) .82f else 1f
-            }
             .shadow(
-                elevation = elevation,
-                shape = shape,
+                ref.dp(3.5f),
+                shape,
                 clip = false,
-                ambientColor = Color.Black.copy(alpha = if (pressed) .10f else .38f),
-                spotColor = Color.Black.copy(alpha = if (pressed) .12f else .52f),
-            )
-            .clip(shape)
-            .background(Brush.horizontalGradient(listOf(baseLeft, baseRight)))
-            .drawBehind {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = if (primary) .14f else if (selected) .075f else .055f),
-                            Color.Transparent,
-                        ),
-                        startY = 0f,
-                        endY = size.height * .52f,
-                    ),
-                )
-                if (selected) {
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            listOf(
-                                selectedGlow.copy(alpha = if (pressed) .15f else .085f),
-                                Color.Transparent,
-                            ),
-                            center = Offset(size.width * .28f, size.height * .38f),
-                            radius = size.width * .58f,
-                        ),
-                    )
-                }
-                if (pressed) {
-                    drawRect(Color.Black.copy(alpha = if (primary) .18f else .23f))
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = .34f),
-                                Color.Black.copy(alpha = .10f),
-                                Color.Transparent,
-                            ),
-                            startY = 0f,
-                            endY = 9.dp.toPx(),
-                        ),
-                        size = Size(size.width, 9.dp.toPx()),
-                    )
-                }
-                val edge = lowerEdge.toPx()
-                if (edge > 0f) {
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = .06f),
-                                Color.Black.copy(alpha = if (primary) .36f else .31f),
-                            ),
-                            startY = size.height - edge,
-                            endY = size.height,
-                        ),
-                        topLeft = Offset(0f, size.height - edge),
-                        size = Size(size.width, edge),
-                    )
-                }
-                drawLine(
-                    color = Color.White.copy(alpha = if (pressed) .16f else if (primary) .16f else .08f),
-                    start = Offset(9.dp.toPx(), 1.dp.toPx()),
-                    end = Offset(size.width - 9.dp.toPx(), 1.dp.toPx()),
-                    strokeWidth = .75.dp.toPx(),
-                    cap = StrokeCap.Round,
-                )
-                val inset = 1.dp.toPx()
-                drawRoundRect(
-                    color = Color.White.copy(alpha = if (pressed) .095f else .04f),
-                    topLeft = Offset(inset, inset),
-                    size = Size(
-                        (size.width - inset * 2f).coerceAtLeast(0f),
-                        (size.height - inset * 2f).coerceAtLeast(0f),
-                    ),
-                    cornerRadius = CornerRadius(7.dp.toPx()),
-                    style = Stroke(.6.dp.toPx()),
-                )
-            }
-            .border(1.dp, border, shape)
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                enabled = enabled && !disabled,
-                role = role,
-                onClick = onClick,
+                ambientColor = Color.Black.copy(alpha = .20f),
+                spotColor = Color.Black.copy(alpha = .28f),
             ),
     ) {
         Box(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { translationY = contentOffset.toPx() },
+                .clip(shape)
+                .drawWithCache {
+                    val corner = CornerRadius(ref.dp(14f).toPx())
+                    onDrawBehind {
+                        drawRoundRect(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color(0xFF12171A).copy(alpha = .72f),
+                                    Color(0xFF0A0E10).copy(alpha = .66f),
+                                ),
+                            ),
+                            cornerRadius = corner,
+                        )
+                        drawLine(
+                            Brush.horizontalGradient(listOf(Color.Transparent, palette.text.copy(alpha = .045f), Color.Transparent)),
+                            Offset(ref.dp(16f).toPx(), ref.dp(1f).toPx()),
+                            Offset(size.width - ref.dp(16f).toPx(), ref.dp(1f).toPx()),
+                            ref.dp(1f).toPx().coerceAtLeast(1f),
+                        )
+                        drawRoundRect(
+                            Color(0xFF8FAAB5).copy(alpha = .055f),
+                            cornerRadius = corner,
+                            style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)),
+                        )
+                    }
+                }
+                .testTag("p5-setup-plane"),
         ) {
-            content()
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = ref.dp(11f), end = ref.dp(11f), top = ref.dp(11f), bottom = ref.dp(5f)),
+            ) { content() }
         }
     }
 }
 
 @Composable
-private fun SetupSlider(
+private fun NewGameModeSection(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    setup: PlaySetupConfig,
+    onVariant: (Variant) -> Unit,
+    onChess960Index: (Int) -> Unit,
+) {
+    val chess960 = setup.variant == Variant.CHESS960
+    Column(Modifier.fillMaxWidth().heightIn(min = ref.dp(80f)).testTag("p5-setup-game-mode")) {
+        NewGameSectionHeader(ref, "Game Mode")
+        NewGameChoiceBed(ref, palette, Modifier.fillMaxWidth().height(ref.dp(56f))) {
+            NewGameChoiceFace(
+                ref,
+                palette,
+                "Standard",
+                NewGameGlyph.BOARD,
+                !chess960,
+                { onVariant(Variant.STANDARD) },
+                Modifier.weight(1f).testTag("p5-setup-standard"),
+            )
+            Spacer(Modifier.width(ref.dp(4f)))
+            NewGameChoiceFace(
+                ref,
+                palette,
+                "Chess960",
+                NewGameGlyph.CHESS960,
+                chess960,
+                { onVariant(Variant.CHESS960) },
+                Modifier.weight(1f),
+            )
+        }
+        if (chess960) {
+            val index = setup.chess960Index ?: 518
+            Spacer(Modifier.height(ref.dp(7f)))
+            Row(
+                Modifier.fillMaxWidth().testTag("p5-setup-chess960-position"),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Starting position", color = palette.muted, fontSize = ref.sp(10f), lineHeight = ref.sp(13f))
+                Text("#$index", color = palette.cyan, fontSize = ref.sp(10f), lineHeight = ref.sp(13f), fontWeight = FontWeight.SemiBold)
+            }
+            NewGameSlider(
+                ref = ref,
+                palette = palette,
+                value = index.toFloat(),
+                valueRange = 0f..959f,
+                semanticLabel = "Chess960 starting position",
+                onValueChange = { onChess960Index(it.roundToInt().coerceIn(0, 959)) },
+                modifier = Modifier.fillMaxWidth().height(ref.dp(28f)),
+            )
+            Spacer(Modifier.height(ref.dp(6f)))
+        }
+    }
+}
+
+@Composable
+private fun NewGameOpponentSection(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    engine: PlayEngine,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onEngine: (PlayEngine) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().heightIn(min = ref.dp(81f))) {
+        // Engine Info intentionally remains informational text only; production has no destination.
+        NewGameSectionHeader(ref, "Opponent", trailing = "Engine Info")
+        NewGameSelector(
+            ref = ref,
+            palette = palette,
+            title = engine.displayName,
+            expanded = expanded,
+            leading = NewGameGlyph.ENGINE,
+            onClick = onToggle,
+            modifier = Modifier.fillMaxWidth().height(ref.dp(55f)).testTag("p5-setup-opponent"),
+        )
+        if (expanded) {
+            Spacer(Modifier.height(ref.dp(5f)))
+            NewGameMenu(
+                ref,
+                palette,
+                PlayEngine.entries.map { it.displayName to (it == engine) },
+            ) { label -> onEngine(PlayEngine.entries.first { it.displayName == label }) }
+            Spacer(Modifier.height(ref.dp(6f)))
+        }
+    }
+}
+
+@Composable
+private fun NewGameStrengthSection(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    target: EngineStrengthTarget,
+    onStrength: (EngineStrengthTarget) -> Unit,
+) {
+    val elo = (target as? EngineStrengthTarget.Elo)?.value ?: 3000
+    Column(Modifier.fillMaxWidth().height(ref.dp(130f))) {
+        NewGameSectionHeader(ref, "Strength (Elo)", info = true)
+        Box(Modifier.fillMaxWidth().height(ref.dp(19f)), contentAlignment = Alignment.CenterStart) {
+            Text(
+                if (target is EngineStrengthTarget.Elo) elo.toString() else "Maximum",
+                color = palette.text,
+                fontSize = ref.sp(14f),
+                lineHeight = ref.sp(17f),
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        NewGameSlider(
+            ref = ref,
+            palette = palette,
+            value = elo.toFloat(),
+            valueRange = 400f..3000f,
+            semanticLabel = "Strength Elo",
+            onValueChange = {
+                val snapped = ((it / 50f).roundToInt() * 50).coerceIn(400, 3000)
+                onStrength(EngineStrengthTarget.Elo(snapped))
+            },
+            modifier = Modifier.fillMaxWidth().height(ref.dp(25f)).testTag("p5-setup-strength-slider"),
+        )
+        Row(Modifier.fillMaxWidth().height(ref.dp(16f)), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("400", color = Color(0xFF8A959A), fontSize = ref.sp(10f), lineHeight = ref.sp(12f))
+            Text("3000", color = Color(0xFF8A959A), fontSize = ref.sp(10f), lineHeight = ref.sp(12f))
+        }
+        NewGameDisabledAction(ref, Modifier.fillMaxWidth().height(ref.dp(48f)).testTag("p5-match-my-elo"))
+    }
+}
+
+@Composable
+private fun NewGameStrengthModelSection(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    selectedModel: EngineStrengthModel,
+    onModel: (EngineStrengthModel) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().height(ref.dp(100f))) {
+        NewGameSectionHeader(ref, "Strength Model", info = true)
+        NewGameChoiceBed(
+            ref,
+            palette,
+            Modifier.fillMaxWidth().height(ref.dp(56f)).testTag("p5-setup-strength-model"),
+        ) {
+            NewGameSegment(ref, palette, "Hybrid", selectedModel == EngineStrengthModel.HYBRID, { onModel(EngineStrengthModel.HYBRID) }, Modifier.weight(1f))
+            Spacer(Modifier.width(ref.dp(4f)))
+            NewGameSegment(ref, palette, "Engine Native", selectedModel == EngineStrengthModel.ENGINE_NATIVE, { onModel(EngineStrengthModel.ENGINE_NATIVE) }, Modifier.weight(1.22f))
+            Spacer(Modifier.width(ref.dp(4f)))
+            NewGameSegment(ref, palette, "Humanized", selectedModel == EngineStrengthModel.HUMANIZED, { onModel(EngineStrengthModel.HUMANIZED) }, Modifier.weight(1.08f))
+        }
+        Text(
+            when (selectedModel) {
+                EngineStrengthModel.HYBRID -> "Hybrid (default): Engine limits + humanization layer."
+                EngineStrengthModel.ENGINE_NATIVE -> "Use only the engine's native strength controls."
+                EngineStrengthModel.HUMANIZED -> "Increase Lumen's human-like move selection."
+            },
+            modifier = Modifier.padding(start = ref.dp(1f), top = ref.dp(5f)),
+            color = Color(0xFF8D989D),
+            fontSize = ref.sp(9.7f),
+            lineHeight = ref.sp(14f),
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun NewGameSideSection(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    selectedSide: PlaySide,
+    onSide: (PlaySide) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().height(ref.dp(76f)).testTag("p5-setup-side")) {
+        NewGameSectionHeader(ref, "Side")
+        NewGameChoiceBed(ref, palette, Modifier.fillMaxWidth().height(ref.dp(56f))) {
+            PlaySide.entries.forEachIndexed { index, side ->
+                NewGameChoiceFace(
+                    ref = ref,
+                    palette = palette,
+                    label = side.name.lowercase().replaceFirstChar { it.uppercase() },
+                    glyph = when (side) {
+                        PlaySide.WHITE -> NewGameGlyph.WHITE
+                        PlaySide.BLACK -> NewGameGlyph.BLACK
+                        PlaySide.RANDOM -> NewGameGlyph.RANDOM
+                    },
+                    selected = side == selectedSide,
+                    onClick = { onSide(side) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(if (side == selectedSide) Modifier.testTag("p5-setup-side-selected") else Modifier),
+                )
+                if (index != PlaySide.entries.lastIndex) Spacer(Modifier.width(ref.dp(4f)))
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewGameTimeSection(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    control: PlayTimeControl,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onControl: (PlayTimeControl) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().heightIn(min = ref.dp(76f))) {
+        NewGameSectionHeader(ref, "Time Control")
+        NewGameSelector(
+            ref,
+            palette,
+            referenceTimeCategory(control),
+            expanded,
+            Modifier.fillMaxWidth().height(ref.dp(52f)).testTag("p5-setup-time"),
+            NewGameGlyph.CLOCK,
+            true,
+            onToggle,
+        )
+        if (expanded) {
+            Spacer(Modifier.height(ref.dp(5f)))
+            NewGameMenu(
+                ref,
+                palette,
+                REFERENCE_TIME_CONTROLS.map { it.label to (it.control.initialMillis == control.initialMillis) },
+            ) { label -> onControl(REFERENCE_TIME_CONTROLS.first { it.label == label }.control) }
+            Spacer(Modifier.height(ref.dp(6f)))
+        }
+    }
+}
+
+@Composable
+private fun NewGameIncrementSection(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    control: PlayTimeControl,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onIncrement: (Long) -> Unit,
+) {
+    val seconds = control.incrementMillis / 1_000L
+    val choices = listOf(0L, 1L, 2L, 5L, 10L)
+    Column(Modifier.fillMaxWidth().heightIn(min = ref.dp(76f))) {
+        NewGameSectionHeader(ref, "Inc / Delay")
+        NewGameSelector(
+            ref,
+            palette,
+            "$seconds sec",
+            expanded,
+            Modifier.fillMaxWidth().height(ref.dp(52f)).testTag("p5-inc-delay"),
+            null,
+            true,
+            onToggle,
+        )
+        if (expanded) {
+            Spacer(Modifier.height(ref.dp(5f)))
+            NewGameMenu(ref, palette, choices.map { "$it sec" to (it == seconds) }) {
+                onIncrement(it.substringBefore(' ').toLong())
+            }
+            Spacer(Modifier.height(ref.dp(6f)))
+        }
+    }
+}
+
+@Composable
+private fun NewGameSectionHeader(
+    ref: NewGameReferenceScale,
+    label: String,
+    info: Boolean = false,
+    trailing: String? = null,
+) {
+    val palette = lumenP5IdentityPalette()
+    Row(
+        Modifier.fillMaxWidth().height(ref.dp(20f)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ref.dp(6f)),
+    ) {
+        Text(label, color = palette.text, fontSize = ref.sp(13f), lineHeight = ref.sp(16f), fontWeight = FontWeight.SemiBold)
+        if (info) NewGameIcon(NewGameGlyph.INFO, Color(0xFF879298), Modifier.size(ref.dp(13f)), ref)
+        if (trailing != null) {
+            Spacer(Modifier.weight(1f))
+            Text(trailing, color = palette.cyan.copy(alpha = .76f), fontSize = ref.sp(10f), lineHeight = ref.sp(16f), fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun NewGameChoiceBed(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    modifier: Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(ref.dp(11f))
+    Row(
+        modifier
+            .clip(shape)
+            .drawWithCache {
+                val corner = CornerRadius(ref.dp(11f).toPx())
+                onDrawBehind {
+                    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF0B1013), Color(0xFF0F1519))), cornerRadius = corner)
+                    drawRoundRect(Color(0xFF77939D).copy(alpha = .07f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+                    drawLine(Color.White.copy(alpha = .012f), Offset(ref.dp(8f).toPx(), ref.dp(1f).toPx()), Offset(size.width - ref.dp(8f).toPx(), ref.dp(1f).toPx()), ref.dp(.6f).toPx())
+                }
+            }
+            .padding(ref.dp(3f)),
+        content = content,
+    )
+}
+
+@Composable
+private fun NewGameChoiceFace(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    label: String,
+    glyph: NewGameGlyph,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .986f else 1f, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "choice-$label-scale")
+    val offset by animateDpAsState(if (pressed) ref.dp(1.5f) else 0.dp, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "choice-$label-y")
+    val elevation by animateDpAsState(if (pressed || !selected) 0.dp else ref.dp(2.5f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "choice-$label-shadow")
+    val shape = RoundedCornerShape(ref.dp(8f))
+    Box(
+        modifier
+            .fillMaxSize()
+            .graphicsLayer { scaleX = scale; scaleY = scale; translationY = offset.toPx() }
+            .shadow(elevation, shape, clip = false)
+            .clip(shape)
+            .selectedFace(ref, palette, selected, pressed)
+            .clickable(interactionSource = interaction, indication = null, role = Role.RadioButton, onClick = onClick)
+            .semantics { this.selected = selected },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ref.dp(7f))) {
+            NewGameIcon(glyph, if (selected) palette.text else Color(0xFF8F999E), Modifier.size(ref.dp(19f)), ref)
+            Text(
+                label,
+                color = if (selected) Color(0xFFE6F6FB) else Color(0xFF8F999E),
+                fontSize = ref.sp(11.5f),
+                lineHeight = ref.sp(14f),
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NewGameSegment(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .986f else 1f, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "segment-$label-scale")
+    val offset by animateDpAsState(if (pressed) ref.dp(1.5f) else 0.dp, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "segment-$label-y")
+    val elevation by animateDpAsState(if (pressed || !selected) 0.dp else ref.dp(2.5f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "segment-$label-shadow")
+    val shape = RoundedCornerShape(ref.dp(8f))
+    Box(
+        modifier
+            .fillMaxSize()
+            .then(if (selected) Modifier.testTag("p5-setup-strength-model-selected") else Modifier)
+            .graphicsLayer { scaleX = scale; scaleY = scale; translationY = offset.toPx() }
+            .shadow(elevation, shape, clip = false)
+            .clip(shape)
+            .selectedFace(ref, palette, selected, pressed)
+            .clickable(interactionSource = interaction, indication = null, role = Role.RadioButton, onClick = onClick)
+            .semantics { this.selected = selected },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (selected) Color(0xFFDDF6FF) else Color(0xFF879196),
+            fontSize = ref.sp(10.5f),
+            lineHeight = ref.sp(13f),
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun Modifier.selectedFace(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    selected: Boolean,
+    pressed: Boolean,
+): Modifier = drawWithCache {
+    val corner = CornerRadius(ref.dp(8f).toPx())
+    val top = if (pressed) Color(0xFF2B5665).copy(alpha = .52f) else Color(0xFF336678).copy(alpha = .58f)
+    val bottom = if (pressed) Color(0xFF1D3E4A).copy(alpha = .52f) else Color(0xFF204654).copy(alpha = .54f)
+    onDrawBehind {
+        if (selected) {
+            drawRoundRect(Brush.verticalGradient(listOf(top, bottom)), cornerRadius = corner)
+            drawLine(Color(0xFFB0E5F6).copy(alpha = if (pressed) .05f else .11f), Offset(ref.dp(8f).toPx(), ref.dp(1f).toPx()), Offset(size.width - ref.dp(8f).toPx(), ref.dp(1f).toPx()), ref.dp(.7f).toPx(), StrokeCap.Round)
+            drawRoundRect(palette.cyan.copy(alpha = .20f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+        }
+    }
+}
+
+@Composable
+private fun NewGameSelector(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    title: String,
+    expanded: Boolean,
+    modifier: Modifier,
+    leading: NewGameGlyph? = null,
+    compact: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .994f else 1f, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "selector-$title-scale")
+    val offset by animateDpAsState(if (pressed) ref.dp(2f) else 0.dp, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "selector-$title-y")
+    val elevation by animateDpAsState(if (pressed) ref.dp(1f) else ref.dp(4f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "selector-$title-shadow")
+    val shape = RoundedCornerShape(ref.dp(10f))
+    Row(
+        modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale; translationY = offset.toPx() }
+            .shadow(elevation, shape, clip = false)
+            .clip(shape)
+            .drawWithCache {
+                val corner = CornerRadius(ref.dp(10f).toPx())
+                val face = Brush.verticalGradient(
+                    if (pressed) listOf(Color(0xFF141A1D), Color(0xFF111619)) else listOf(Color(0xFF171D21), Color(0xFF12181B)),
+                )
+                onDrawBehind {
+                    drawRoundRect(face, cornerRadius = corner)
+                    if (expanded) drawRect(palette.cyan.copy(alpha = .48f), Offset(0f, ref.dp(8f).toPx()), Size(ref.dp(2f).toPx(), size.height - ref.dp(16f).toPx()))
+                    drawLine(Color.White.copy(alpha = if (pressed) .018f else .03f), Offset(ref.dp(9f).toPx(), ref.dp(1f).toPx()), Offset(size.width - ref.dp(9f).toPx(), ref.dp(1f).toPx()), ref.dp(.7f).toPx())
+                    drawRoundRect(Color(0xFF879FA8).copy(alpha = if (expanded) .14f else .12f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+                }
+            }
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = ref.dp(if (compact) 11f else 12f)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ref.dp(if (compact) 8f else 10f)),
+    ) {
+        if (leading == NewGameGlyph.ENGINE) NewGameEngineWell(ref, palette)
+        else if (leading != null) NewGameIcon(leading, Color(0xFF93A0A5), Modifier.size(ref.dp(19f)), ref)
+        Text(
+            title,
+            Modifier.weight(1f),
+            color = palette.text,
+            fontSize = ref.sp(if (compact) 12.8f else 13f),
+            lineHeight = ref.sp(16f),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        NewGameChevron(ref, Color(0xFF89959A), expanded)
+    }
+}
+
+@Composable
+private fun NewGameEngineWell(ref: NewGameReferenceScale, palette: LumenP5IdentityPalette) {
+    val shape = RoundedCornerShape(ref.dp(9f))
+    Box(
+        Modifier
+            .size(ref.dp(36f))
+            .shadow(ref.dp(2.5f), shape, clip = false)
+            .clip(shape)
+            .drawWithCache {
+                val corner = CornerRadius(ref.dp(9f).toPx())
+                onDrawBehind {
+                    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF18323C), Color(0xFF12262E))), cornerRadius = corner)
+                    drawRoundRect(Brush.radialGradient(listOf(palette.cyan.copy(alpha = .13f), Color.Transparent), center = Offset(size.width * .30f, size.height * .18f), radius = size.width * .72f), cornerRadius = corner)
+                    drawRoundRect(palette.cyan.copy(alpha = .18f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) { NewGameIcon(NewGameGlyph.ENGINE, palette.cyan, Modifier.size(ref.dp(20f)), ref) }
+}
+
+@Composable
+private fun NewGameSlider(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
-    modifier: Modifier = Modifier,
+    semanticLabel: String,
     onValueChange: (Float) -> Unit,
+    modifier: Modifier,
 ) {
     var dragging by remember { mutableStateOf(false) }
-    val thumbScale by animateFloatAsState(
-        targetValue = if (dragging) 1.08f else 1f,
-        animationSpec = if (dragging) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "setup-slider-thumb",
-    )
+    val thumbScale by animateFloatAsState(if (dragging) 1.08f else 1f, if (dragging) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-slider-thumb")
     val fraction = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
-    val accent = LumenColors.AccentBlueBright
-    val trackColor = LumenColors.SurfaceHighest.copy(alpha = .98f)
-
     Canvas(
         modifier
-            .height(26.dp)
             .pointerInput(valueRange) {
                 fun update(x: Float) {
                     val f = (x / size.width.toFloat()).coerceIn(0f, 1f)
                     onValueChange(valueRange.start + (valueRange.endInclusive - valueRange.start) * f)
                 }
                 detectDragGestures(
-                    onDragStart = {
-                        dragging = true
-                        update(it.x)
-                    },
+                    onDragStart = { dragging = true; update(it.x) },
                     onDragEnd = { dragging = false },
                     onDragCancel = { dragging = false },
                 ) { change, _ ->
                     change.consume()
                     update(change.position.x)
                 }
-            },
+            }
+            .semantics { contentDescription = "$semanticLabel. $value from ${valueRange.start} to ${valueRange.endInclusive}" },
     ) {
         val y = size.height * .5f
-        val track = 2.8.dp.toPx()
+        val trackWidth = ref.dp(3f).toPx()
         val thumbX = size.width * fraction
-        drawLine(
-            color = trackColor,
-            start = Offset(0f, y),
-            end = Offset(size.width, y),
-            strokeWidth = track,
-            cap = StrokeCap.Round,
-        )
-        drawLine(
-            color = accent.copy(alpha = .96f),
-            start = Offset(0f, y),
-            end = Offset(thumbX, y),
-            strokeWidth = track,
-            cap = StrokeCap.Round,
-        )
-        drawCircle(Color.Black.copy(alpha = .42f), 7.2.dp.toPx() * thumbScale, Offset(thumbX, y))
-        drawCircle(accent.copy(alpha = .99f), 5.8.dp.toPx() * thumbScale, Offset(thumbX, y))
-        drawCircle(Color.White.copy(alpha = .15f), 4.0.dp.toPx() * thumbScale, Offset(thumbX, y))
+        drawLine(Color(0xFF1D2428), Offset(0f, y), Offset(size.width, y), trackWidth, StrokeCap.Round)
+        drawLine(Brush.horizontalGradient(listOf(Color(0xFF4D91A8), palette.cyan)), Offset(0f, y), Offset(thumbX, y), trackWidth, StrokeCap.Round)
+        drawCircle(Color.Black.copy(alpha = .38f), ref.dp(8f).toPx() * thumbScale, Offset(thumbX, y))
+        drawCircle(Color(0xFF17333D), ref.dp(7f).toPx() * thumbScale, Offset(thumbX, y))
+        drawCircle(palette.cyan, ref.dp(5f).toPx() * thumbScale, Offset(thumbX, y))
+        drawCircle(Color.White.copy(alpha = .18f), ref.dp(3.1f).toPx() * thumbScale, Offset(thumbX, y))
     }
 }
 
 @Composable
-private fun SetupStrengthModelControl(
-    selected: EngineStrengthModel,
-    onSelect: (EngineStrengthModel) -> Unit,
-) {
-    val shape = RoundedCornerShape(8.dp)
-    val topHighlight = LumenColors.OnSurface.copy(alpha = .07f)
+private fun NewGameDisabledAction(ref: NewGameReferenceScale, modifier: Modifier) {
+    val shape = RoundedCornerShape(ref.dp(9f))
     Row(
-        Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-            .shadow(
-                elevation = 2.8.dp,
-                shape = shape,
-                clip = false,
-                ambientColor = Color.Black.copy(alpha = .32f),
-                spotColor = Color.Black.copy(alpha = .44f),
-            )
+        modifier
             .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        lerp(LumenColors.SurfaceRaised, Color.White, .025f),
-                        LumenColors.Surface,
-                    ),
-                ),
-            )
-            .drawBehind {
-                drawRect(
-                    Color.Black.copy(alpha = .24f),
-                    topLeft = Offset(0f, size.height - 2.2.dp.toPx()),
-                    size = Size(size.width, 2.2.dp.toPx()),
-                )
-                drawLine(
-                    topHighlight,
-                    Offset(8.dp.toPx(), 1.dp.toPx()),
-                    Offset(size.width - 8.dp.toPx(), 1.dp.toPx()),
-                    .65.dp.toPx(),
-                    StrokeCap.Round,
-                )
+            .drawWithCache {
+                val corner = CornerRadius(ref.dp(9f).toPx())
+                onDrawBehind {
+                    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF151B1E), Color(0xFF111619))), cornerRadius = corner)
+                    drawLine(Color.White.copy(alpha = .018f), Offset(ref.dp(8f).toPx(), ref.dp(1f).toPx()), Offset(size.width - ref.dp(8f).toPx(), ref.dp(1f).toPx()), ref.dp(.6f).toPx())
+                    drawRoundRect(Color(0xFF879FA8).copy(alpha = .08f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+                }
             }
-            .border(1.dp, LumenColors.OutlineStrong.copy(alpha = .82f), shape)
-            .testTag("p5-setup-strength-model"),
+            .clickable(enabled = false, onClick = {}),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        SetupSegment(
-            label = "Hybrid",
-            selected = selected == EngineStrengthModel.HYBRID,
-            modifier = Modifier.weight(1f),
-            first = true,
-            onClick = { onSelect(EngineStrengthModel.HYBRID) },
-        )
-        SetupSegment(
-            label = "Engine Native",
-            selected = selected == EngineStrengthModel.ENGINE_NATIVE,
-            modifier = Modifier.weight(1.25f),
-            onClick = { onSelect(EngineStrengthModel.ENGINE_NATIVE) },
-        )
-        SetupSegment(
-            label = "Humanized",
-            selected = selected == EngineStrengthModel.HUMANIZED,
-            modifier = Modifier.weight(1.12f),
-            last = true,
-            onClick = { onSelect(EngineStrengthModel.HUMANIZED) },
-        )
+        NewGameIcon(NewGameGlyph.TARGET, Color(0xFF69757A), Modifier.size(ref.dp(18f)), ref)
+        Spacer(Modifier.width(ref.dp(8f)))
+        Text("Match My Elo", color = Color(0xFF69757A), fontSize = ref.sp(12f), lineHeight = ref.sp(15f), fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
-private fun SetupSegment(
-    label: String,
-    selected: Boolean,
-    modifier: Modifier,
-    first: Boolean = false,
-    last: Boolean = false,
+private fun NewGamePrimaryButton(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    enabled: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val pressOffset by animateDpAsState(
-        targetValue = if (pressed) .8.dp else 0.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "setup-segment-offset-$label",
-    )
-    val shape = RoundedCornerShape(
-        topStart = if (first) 7.dp else 0.dp,
-        bottomStart = if (first) 7.dp else 0.dp,
-        topEnd = if (last) 7.dp else 0.dp,
-        bottomEnd = if (last) 7.dp else 0.dp,
-    )
-    val baseFace = if (selected) {
-        lerp(LumenColors.SurfaceRaised, LumenColors.AccentBlue, .17f)
-    } else {
-        lerp(LumenColors.Surface, LumenColors.SurfaceRaised, .25f)
-    }
-    val face = if (pressed) lerp(baseFace, Color.Black, .10f) else baseFace
-    val segmentAccent = LumenColors.AccentBlueBright
-    Box(
-        modifier
-            .fillMaxSize()
-            .graphicsLayer { translationY = pressOffset.toPx() }
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        lerp(face, Color.White, if (selected) .025f else .012f),
-                        face,
-                    ),
-                ),
-            )
-            .drawBehind {
-                if (selected) {
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            listOf(
-                                segmentAccent.copy(alpha = if (pressed) .11f else .07f),
-                                Color.Transparent,
-                            ),
-                            center = Offset(size.width * .45f, size.height * .35f),
-                            radius = size.width * .8f,
-                        ),
-                    )
+    val offset by animateDpAsState(if (pressed) ref.dp(4f) else 0.dp, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-cta-y")
+    val elevation by animateDpAsState(if (pressed) ref.dp(1f) else ref.dp(5f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-cta-shadow")
+    val shape = RoundedCornerShape(ref.dp(10f))
+    Box(modifier) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationY = offset.toPx(); alpha = if (enabled) 1f else .50f }
+                .shadow(elevation, shape, clip = false)
+                .clip(shape)
+                .drawWithCache {
+                    val corner = CornerRadius(ref.dp(10f).toPx())
+                    val face = if (pressed) {
+                        Brush.verticalGradient(listOf(Color(0xFF4E93AB), Color(0xFF3F7F96)))
+                    } else {
+                        Brush.verticalGradient(colorStops = arrayOf(0f to Color(0xFF589FB7), .46f to Color(0xFF4789A1), 1f to Color(0xFF39758B)))
+                    }
+                    val lower = if (pressed) ref.dp(1f).toPx() else ref.dp(4f).toPx()
+                    onDrawBehind {
+                        drawRoundRect(face, cornerRadius = corner)
+                        drawRect(Color(0xFF244A58), Offset(0f, size.height - lower), Size(size.width, lower))
+                        drawLine(Color(0xFFF4FDFF).copy(alpha = if (pressed) .12f else .27f), Offset(ref.dp(10f).toPx(), ref.dp(1f).toPx()), Offset(size.width - ref.dp(10f).toPx(), ref.dp(1f).toPx()), ref.dp(.7f).toPx(), StrokeCap.Round)
+                        drawRoundRect(palette.cyan.copy(alpha = .18f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+                    }
                 }
-                drawRect(
-                    Color.Black.copy(alpha = if (pressed) .10f else .20f),
-                    topLeft = Offset(0f, size.height - if (pressed) .35.dp.toPx() else 2.dp.toPx()),
-                    size = Size(size.width, if (pressed) .35.dp.toPx() else 2.dp.toPx()),
-                )
-            }
-            .border(
-                1.dp,
-                if (selected) segmentAccent.copy(alpha = if (pressed) 1f else .90f)
-                else LumenColors.Outline.copy(alpha = .72f),
-                shape,
-            )
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.RadioButton,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            style = SetupSupportingStyle.copy(
-                fontSize = 11.5.sp,
-                lineHeight = 14.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            ),
-            color = if (selected) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
-            maxLines = 1,
-            textAlign = TextAlign.Center,
-        )
+                .clickable(interactionSource = interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
+                .testTag(PLAY_START_TEST_TAG),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Start Game", color = Color(0xFFF6FBFD), fontSize = ref.sp(13.5f), lineHeight = ref.sp(17f), fontWeight = FontWeight.Bold)
+        }
     }
 }
 
 @Composable
-private fun SetupDropMenu(content: @Composable ColumnScope.() -> Unit) {
-    val shape = RoundedCornerShape(8.dp)
+private fun NewGameValidationMessage(ref: NewGameReferenceScale, message: String, modifier: Modifier) {
+    val shape = RoundedCornerShape(ref.dp(8f))
+    Box(modifier.clip(shape).drawWithCache {
+        val corner = CornerRadius(ref.dp(8f).toPx())
+        onDrawBehind {
+            drawRoundRect(Color(0xFF2B1518), cornerRadius = corner)
+            drawRoundRect(Color(0xFFC96B72).copy(alpha = .42f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx()))
+        }
+    }.padding(horizontal = ref.dp(10f), vertical = ref.dp(7f))) {
+        Text(message, color = Color(0xFFE18A90), fontSize = ref.sp(10f), lineHeight = ref.sp(13f))
+    }
+}
+
+@Composable
+private fun NewGameNotes(ref: NewGameReferenceScale, palette: LumenP5IdentityPalette, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(ref.dp(7f))) {
+        NewGameNote(ref, palette, "Match My Elo is preview-only in this build.", "p5-setup-note-1")
+        NewGameNote(ref, palette, "Your selected strength, side and clock apply when the game starts.", "p5-setup-note-2")
+    }
+}
+
+@Composable
+private fun NewGameNote(ref: NewGameReferenceScale, palette: LumenP5IdentityPalette, text: String, tag: String) {
+    Row(
+        Modifier.fillMaxWidth().testTag(tag),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(ref.dp(8f)),
+    ) {
+        NewGameIcon(NewGameGlyph.CHECK, palette.cyan.copy(alpha = .72f), Modifier.size(ref.dp(15f)), ref)
+        Text(text, color = Color(0xFF8C979C), fontSize = ref.sp(9.7f), lineHeight = ref.sp(14f))
+    }
+}
+
+@Composable
+private fun NewGameMenu(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    items: List<Pair<String, Boolean>>,
+    onSelect: (String) -> Unit,
+) {
+    val shape = RoundedCornerShape(ref.dp(9f))
     Column(
         Modifier
             .fillMaxWidth()
-            .shadow(3.dp, shape, clip = false)
+            .shadow(ref.dp(3f), shape, clip = false)
             .clip(shape)
-            .background(LumenColors.Surface)
-            .border(1.dp, LumenColors.OutlineStrong.copy(alpha = .80f), shape),
-        content = content,
-    )
-}
-
-@Composable
-private fun SetupMenuRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(42.dp)
-            .background(if (selected) LumenColors.AccentBlueGhost else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            label,
-            Modifier.weight(1f),
-            style = SetupControlStyle.copy(fontSize = 13.5.sp),
-            color = if (selected) LumenColors.OnSurface else LumenColors.OnSurfaceMuted,
-        )
-        if (selected) SetupCheck(Modifier.size(14.dp))
-    }
-}
-
-@Composable
-private fun SetupChevron(expanded: Boolean) {
-    val rotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = LumenMotion.normalTween(),
-        label = "setup-chevron",
-    )
-    val tint = LumenColors.OnSurfaceMuted.copy(alpha = .94f)
-    Canvas(Modifier.size(15.dp).graphicsLayer { rotationZ = rotation }) {
-        val stroke = 1.45.dp.toPx()
-        drawLine(
-            tint,
-            Offset(size.width * .24f, size.height * .40f),
-            Offset(size.width * .50f, size.height * .65f),
-            stroke,
-            StrokeCap.Round,
-        )
-        drawLine(
-            tint,
-            Offset(size.width * .50f, size.height * .65f),
-            Offset(size.width * .76f, size.height * .40f),
-            stroke,
-            StrokeCap.Round,
-        )
-    }
-}
-
-@Composable
-private fun SetupInfoIcon() {
-    val tint = LumenColors.OnSurfaceMuted.copy(alpha = .84f)
-    Canvas(Modifier.size(13.dp)) {
-        drawCircle(tint, size.minDimension * .43f, style = Stroke(1.dp.toPx()))
-        drawCircle(tint, .8.dp.toPx(), Offset(center.x, size.height * .32f))
-        drawLine(
-            tint,
-            Offset(center.x, size.height * .45f),
-            Offset(center.x, size.height * .69f),
-            1.dp.toPx(),
-            StrokeCap.Round,
-        )
-    }
-}
-
-@Composable
-private fun SetupNote(text: String, modifier: Modifier = Modifier) {
-    Row(
-        modifier.fillMaxWidth().padding(horizontal = 5.dp),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        SetupCheck(Modifier.size(14.dp))
-        Text(
-            text,
-            style = SetupSupportingStyle,
-            color = LumenColors.OnSurfaceMuted.copy(alpha = .96f),
-        )
-    }
-}
-
-@Composable
-private fun SetupCheck(modifier: Modifier = Modifier) {
-    val tint = LumenColors.AccentBlueBright.copy(alpha = .90f)
-    Canvas(modifier) {
-        drawCircle(tint.copy(alpha = .11f), size.minDimension * .46f)
-        drawCircle(tint.copy(alpha = .76f), size.minDimension * .43f, style = Stroke(.8.dp.toPx()))
-        val stroke = .9.dp.toPx()
-        drawLine(
-            tint,
-            Offset(size.width * .25f, size.height * .53f),
-            Offset(size.width * .43f, size.height * .70f),
-            stroke,
-            StrokeCap.Round,
-        )
-        drawLine(
-            tint,
-            Offset(size.width * .43f, size.height * .70f),
-            Offset(size.width * .76f, size.height * .33f),
-            stroke,
-            StrokeCap.Round,
-        )
-    }
-}
-
-@Composable
-private fun SetupIcon(glyph: SetupGlyph, tint: Color, modifier: Modifier = Modifier) {
-    val accent = LumenColors.AccentBlueBright.copy(alpha = .92f)
-    Canvas(modifier) {
-        val stroke = 1.2.dp.toPx()
-        when (glyph) {
-            SetupGlyph.BOARD,
-            SetupGlyph.CHESS960,
-            -> {
-                val boardSize = size.minDimension * .80f
-                val left = (size.width - boardSize) / 2f
-                val top = (size.height - boardSize) / 2f
-                val cell = boardSize / 4f
-                drawRoundRect(
-                    color = tint.copy(alpha = .15f),
-                    topLeft = Offset(left - 1.dp.toPx(), top - 1.dp.toPx()),
-                    size = Size(boardSize + 2.dp.toPx(), boardSize + 2.dp.toPx()),
-                    cornerRadius = CornerRadius(1.6.dp.toPx()),
-                )
-                repeat(4) { row ->
-                    repeat(4) { col ->
-                        val bright = if (glyph == SetupGlyph.CHESS960) {
-                            (row + col * 2) % 3 != 0
-                        } else {
-                            (row + col) % 2 == 0
-                        }
-                        drawRect(
-                            color = if (bright) tint.copy(alpha = .94f) else Color.Black.copy(alpha = .44f),
-                            topLeft = Offset(left + col * cell, top + row * cell),
-                            size = Size(cell, cell),
-                        )
-                    }
+            .drawWithCache {
+                val corner = CornerRadius(ref.dp(9f).toPx())
+                onDrawBehind {
+                    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF151B1E), Color(0xFF101518))), cornerRadius = corner)
+                    drawRoundRect(Color(0xFF879FA8).copy(alpha = .10f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx()))
                 }
-                if (glyph == SetupGlyph.CHESS960) {
-                    drawLine(
-                        accent,
-                        Offset(left + cell * .35f, top + cell * 3.55f),
-                        Offset(left + cell * 3.65f, top + cell * .45f),
-                        .95.dp.toPx(),
-                        StrokeCap.Round,
+            },
+    ) {
+        items.forEach { (label, selected) ->
+            val interaction = remember(label) { MutableInteractionSource() }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(ref.dp(44f))
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        role = Role.RadioButton,
+                        onClick = { onSelect(label) },
                     )
-                }
+                    .semantics { this.selected = selected }
+                    .padding(horizontal = ref.dp(12f)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(label, Modifier.weight(1f), color = if (selected) palette.text else palette.muted, fontSize = ref.sp(12f), lineHeight = ref.sp(15f), fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
+                if (selected) NewGameIcon(NewGameGlyph.CHECK, palette.cyan, Modifier.size(ref.dp(15f)), ref)
             }
-            SetupGlyph.WHITE,
-            SetupGlyph.BLACK,
-            -> {
-                val pieceTint = if (glyph == SetupGlyph.WHITE) tint else tint.copy(alpha = .60f)
-                drawCircle(pieceTint, size.minDimension * .15f, Offset(center.x, size.height * .28f))
-                val body = Path().apply {
-                    moveTo(size.width * .37f, size.height * .43f)
-                    lineTo(size.width * .63f, size.height * .43f)
-                    lineTo(size.width * .70f, size.height * .70f)
-                    lineTo(size.width * .30f, size.height * .70f)
+        }
+    }
+}
+
+@Composable
+private fun NewGameChevron(ref: NewGameReferenceScale, color: Color, expanded: Boolean) {
+    Canvas(Modifier.size(ref.dp(17f)).graphicsLayer { rotationZ = if (expanded) 180f else 0f }) {
+        val stroke = ref.dp(1.7f).toPx()
+        drawLine(color, Offset(size.width * .30f, size.height * .42f), Offset(size.width * .50f, size.height * .62f), stroke, StrokeCap.Round)
+        drawLine(color, Offset(size.width * .50f, size.height * .62f), Offset(size.width * .70f, size.height * .42f), stroke, StrokeCap.Round)
+    }
+}
+
+@Composable
+private fun NewGameIcon(glyph: NewGameGlyph, tint: Color, modifier: Modifier, ref: NewGameReferenceScale) {
+    Canvas(modifier) {
+        val stroke = ref.dp(1.45f).toPx().coerceAtLeast(1f)
+        when (glyph) {
+            NewGameGlyph.BOARD, NewGameGlyph.CHESS960 -> {
+                val left = size.width * .18f
+                val top = size.height * .18f
+                val board = size.minDimension * .64f
+                val half = board / 2f
+                drawRoundRect(tint.copy(alpha = .18f), Offset(left, top), Size(board, board), CornerRadius(ref.dp(1.6f).toPx()))
+                drawLine(tint, Offset(left + half, top), Offset(left + half, top + board), stroke)
+                drawLine(tint, Offset(left, top + half), Offset(left + board, top + half), stroke)
+                drawRect(tint.copy(alpha = .28f), Offset(left, top), Size(half, half))
+                drawRect(tint.copy(alpha = .28f), Offset(left + half, top + half), Size(half, half))
+                if (glyph == NewGameGlyph.CHESS960) drawLine(tint, Offset(size.width * .29f, size.height * .72f), Offset(size.width * .73f, size.height * .28f), stroke, StrokeCap.Round)
+            }
+            NewGameGlyph.ENGINE -> {
+                drawRoundRect(tint.copy(alpha = .15f), Offset(size.width * .20f, size.height * .25f), Size(size.width * .60f, size.height * .50f), CornerRadius(ref.dp(2f).toPx()), style = Stroke(stroke))
+                drawCircle(tint, ref.dp(1.15f).toPx(), Offset(size.width * .38f, size.height * .47f))
+                drawCircle(tint, ref.dp(1.15f).toPx(), Offset(size.width * .62f, size.height * .47f))
+                drawLine(tint, Offset(size.width * .37f, size.height * .63f), Offset(size.width * .63f, size.height * .63f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .50f, size.height * .11f), Offset(size.width * .50f, size.height * .25f), stroke, StrokeCap.Round)
+                drawCircle(tint, ref.dp(1.2f).toPx(), Offset(size.width * .50f, size.height * .10f))
+            }
+            NewGameGlyph.WHITE, NewGameGlyph.BLACK -> {
+                val fill = if (glyph == NewGameGlyph.WHITE) Color(0xFFEEF3F5) else Color(0xFF606A6E)
+                drawCircle(fill, size.minDimension * .14f, Offset(center.x, size.height * .30f))
+                val piece = Path().apply {
+                    moveTo(size.width * .38f, size.height * .44f)
+                    lineTo(size.width * .62f, size.height * .44f)
+                    lineTo(size.width * .68f, size.height * .66f)
+                    lineTo(size.width * .78f, size.height * .76f)
+                    lineTo(size.width * .22f, size.height * .76f)
+                    lineTo(size.width * .32f, size.height * .66f)
                     close()
                 }
-                drawPath(body, pieceTint)
-                drawLine(
-                    pieceTint,
-                    Offset(size.width * .28f, size.height * .77f),
-                    Offset(size.width * .72f, size.height * .77f),
-                    stroke * 1.25f,
-                    StrokeCap.Round,
-                )
+                drawPath(piece, fill)
+                drawLine(tint, Offset(size.width * .24f, size.height * .80f), Offset(size.width * .76f, size.height * .80f), stroke, StrokeCap.Round)
             }
-            SetupGlyph.RANDOM -> {
-                drawRoundRect(
-                    tint.copy(alpha = .26f),
-                    Offset(size.width * .19f, size.height * .25f),
-                    Size(size.width * .45f, size.height * .55f),
-                    CornerRadius(1.7.dp.toPx()),
-                    style = Stroke(stroke),
-                )
-                drawRoundRect(
-                    tint.copy(alpha = .84f),
-                    Offset(size.width * .36f, size.height * .17f),
-                    Size(size.width * .45f, size.height * .55f),
-                    CornerRadius(1.7.dp.toPx()),
-                    style = Stroke(stroke),
-                )
-                drawLine(tint, Offset(size.width * .43f, size.height * .47f), Offset(size.width * .68f, size.height * .47f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .62f, size.height * .39f), Offset(size.width * .70f, size.height * .47f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .70f, size.height * .47f), Offset(size.width * .62f, size.height * .55f), stroke, StrokeCap.Round)
+            NewGameGlyph.RANDOM -> {
+                drawRoundRect(tint.copy(alpha = .40f), Offset(size.width * .20f, size.height * .30f), Size(size.width * .45f, size.height * .52f), CornerRadius(ref.dp(1.8f).toPx()), style = Stroke(stroke))
+                drawRoundRect(tint, Offset(size.width * .36f, size.height * .18f), Size(size.width * .45f, size.height * .52f), CornerRadius(ref.dp(1.8f).toPx()), style = Stroke(stroke))
+                drawLine(tint, Offset(size.width * .47f, size.height * .48f), Offset(size.width * .69f, size.height * .48f), stroke, StrokeCap.Round)
             }
-            SetupGlyph.CLOCK -> {
-                drawCircle(tint.copy(alpha = .14f), size.minDimension * .38f)
+            NewGameGlyph.CLOCK -> {
                 drawCircle(tint, size.minDimension * .35f, style = Stroke(stroke))
                 drawLine(tint, center, Offset(center.x, size.height * .28f), stroke, StrokeCap.Round)
                 drawLine(tint, center, Offset(size.width * .65f, size.height * .56f), stroke, StrokeCap.Round)
             }
-            SetupGlyph.TARGET -> {
-                drawCircle(tint, size.minDimension * .35f, style = Stroke(stroke))
-                drawCircle(tint.copy(alpha = .86f), size.minDimension * .14f, style = Stroke(stroke * .9f))
-                drawCircle(tint, size.minDimension * .05f)
-                drawLine(tint, Offset(center.x, size.height * .08f), Offset(center.x, size.height * .24f), stroke * .8f, StrokeCap.Round)
-                drawLine(tint, Offset(center.x, size.height * .76f), Offset(center.x, size.height * .92f), stroke * .8f, StrokeCap.Round)
+            NewGameGlyph.TARGET -> {
+                drawCircle(tint, size.minDimension * .34f, style = Stroke(stroke))
+                drawCircle(tint, size.minDimension * .15f, style = Stroke(stroke * .85f))
+                drawCircle(tint, ref.dp(.9f).toPx())
+            }
+            NewGameGlyph.INFO -> {
+                drawCircle(tint, size.minDimension * .43f, style = Stroke(ref.dp(1f).toPx()))
+                drawCircle(tint, ref.dp(.7f).toPx(), Offset(center.x, size.height * .32f))
+                drawLine(tint, Offset(center.x, size.height * .46f), Offset(center.x, size.height * .70f), ref.dp(1f).toPx(), StrokeCap.Round)
+            }
+            NewGameGlyph.CHECK -> {
+                drawCircle(tint.copy(alpha = .11f), size.minDimension * .46f)
+                drawCircle(tint.copy(alpha = .76f), size.minDimension * .43f, style = Stroke(ref.dp(.8f).toPx()))
+                drawLine(tint, Offset(size.width * .25f, size.height * .53f), Offset(size.width * .43f, size.height * .70f), ref.dp(.9f).toPx(), StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .43f, size.height * .70f), Offset(size.width * .76f, size.height * .33f), ref.dp(.9f).toPx(), StrokeCap.Round)
             }
         }
     }
