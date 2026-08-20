@@ -417,23 +417,19 @@ private fun Modifier.approvedHeroMaterial(
                 cornerRadius = corner,
             )
         }
-        drawRoundRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = if (pressed) .018f else .040f),
-                    Color.White.copy(alpha = if (pressed) .006f else .012f),
-                    Color.Transparent,
-                ),
-                endY = size.height * .48f,
-            ),
-            cornerRadius = corner,
+        drawLine(
+            color = Color.White.copy(alpha = if (pressed) .018f else .042f),
+            start = Offset(corner.x, outlineWidth),
+            end = Offset(size.width - corner.x, outlineWidth),
+            strokeWidth = outlineWidth,
+            cap = StrokeCap.Round,
         )
-        // Diffuse whole-body lower occlusion; deliberately not a painted bottom strip/divider.
+        // Localized lower occlusion matching the approved 22-reference-unit bottom falloff.
         drawRoundRect(
             brush = Brush.verticalGradient(
                 colorStops = arrayOf(
-                    .58f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = if (pressed) .10f else .19f),
+                    .87f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = if (pressed) .07f else .14f),
                 ),
             ),
             cornerRadius = corner,
@@ -516,6 +512,7 @@ private fun ApprovedQuickStartRow(
             .clip(shape)
             .drawWithCache {
                 val corner = CornerRadius(ref.dp(11f).toPx())
+                val strokeWidth = ref.dp(.75f).toPx().coerceAtLeast(1f)
                 val face = if (pressed) {
                     Brush.verticalGradient(listOf(palette.rowPressedTop, palette.rowPressedBottom))
                 } else {
@@ -523,29 +520,17 @@ private fun ApprovedQuickStartRow(
                 }
                 onDrawBehind {
                     drawRoundRect(brush = face, cornerRadius = corner)
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(alpha = if (pressed) .014f else .028f),
-                                Color.Transparent,
-                            ),
-                            endY = size.height * .45f,
-                        ),
-                        cornerRadius = corner,
+                    drawLine(
+                        color = Color.White.copy(alpha = if (pressed) .014f else .028f),
+                        start = Offset(corner.x, strokeWidth),
+                        end = Offset(size.width - corner.x, strokeWidth),
+                        strokeWidth = strokeWidth,
+                        cap = StrokeCap.Round,
                     )
                     drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                .62f to Color.Transparent,
-                                1f to Color.Black.copy(alpha = if (pressed) .07f else .13f),
-                            ),
-                        ),
+                        color = palette.rowOutline.copy(alpha = .075f),
                         cornerRadius = corner,
-                    )
-                    drawRoundRect(
-                        color = palette.rowOutline.copy(alpha = .88f),
-                        cornerRadius = corner,
-                        style = Stroke(width = ref.dp(.75f).toPx().coerceAtLeast(1f)),
+                        style = Stroke(width = strokeWidth),
                     )
                 }
             }
@@ -669,8 +654,8 @@ private fun Modifier.approvedPlayBackground(
 ): Modifier = drawWithCache {
     val dark = (palette.appBackground.red + palette.appBackground.green + palette.appBackground.blue) < 1.5f
     val bottom = if (dark) Color(0xFF070A0C) else palette.appBackground
-    val topGlowCenter = Offset(size.width * .09f, 0f)
-    val topGlowRadius = size.width * 1.05f
+    val topGlowCenter = Offset(size.width * .09f, -size.height * .04f)
+    val topGlowRadius = size.width * .56f
     onDrawBehind {
         drawRect(
             brush = Brush.verticalGradient(
