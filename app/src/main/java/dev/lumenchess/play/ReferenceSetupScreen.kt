@@ -942,23 +942,30 @@ private fun NewGamePrimaryButton(
                 .drawWithCache {
                     val corner = CornerRadius(ref.dp(10f).toPx())
                     val face = if (pressed) {
-                        Brush.verticalGradient(listOf(Color(0xFF4E93AB), Color(0xFF3F7F96)))
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color(0xFF5A9AB1),
+                                .24f to Color(0xFF4E91A8),
+                                .52f to Color(0xFF498AA1),
+                                .78f to Color(0xFF438299),
+                                1f to Color(0xFF3F7F96),
+                            ),
+                        )
                     } else {
-                        Brush.verticalGradient(colorStops = arrayOf(0f to Color(0xFF589FB7), .46f to Color(0xFF4789A1), 1f to Color(0xFF39758B)))
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0f to Color(0xFF6EACC1),
+                                .22f to Color(0xFF579CB4),
+                                .46f to Color(0xFF4789A1),
+                                .73f to Color(0xFF407F96),
+                                1f to Color(0xFF39758B),
+                            ),
+                        )
                     }
-                    val upperLight = Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0f to Color(0xFFF4FDFF).copy(alpha = if (pressed) .07f else .14f),
-                            1f to Color.Transparent,
-                        ),
-                        startY = 0f,
-                        endY = ref.vdp(7f).toPx().coerceAtLeast(1f),
-                    )
                     val lower = if (pressed) ref.vdp(1f).toPx() else ref.vdp(4f).toPx()
                     onDrawBehind {
                         drawRoundRect(face, cornerRadius = corner)
                         drawRect(Color(0xFF244A58), Offset(0f, size.height - lower), Size(size.width, lower))
-                        drawRoundRect(upperLight, cornerRadius = corner)
                         drawRoundRect(palette.cyan.copy(alpha = .18f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
                     }
                 }
