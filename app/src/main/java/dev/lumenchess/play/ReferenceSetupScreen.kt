@@ -655,9 +655,14 @@ private fun NewGameChoiceFace(
     Box(
         modifier
             .fillMaxSize()
-            .graphicsLayer { scaleX = scale; scaleY = scale; translationY = offset.toPx() }
-            .shadow(elevation, shape, clip = false)
-            .clip(shape)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = offset.toPx()
+                shadowElevation = elevation.toPx()
+                this.shape = shape
+                clip = true
+            }
             .selectedFace(ref, palette, selected, pressed)
             .clickable(interactionSource = interaction, indication = null, role = Role.RadioButton, onClick = onClick)
             .semantics { this.selected = selected },
@@ -697,9 +702,14 @@ private fun NewGameSegment(
         modifier
             .fillMaxSize()
             .then(if (selected) Modifier.testTag("p5-setup-strength-model-selected") else Modifier)
-            .graphicsLayer { scaleX = scale; scaleY = scale; translationY = offset.toPx() }
-            .shadow(elevation, shape, clip = false)
-            .clip(shape)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = offset.toPx()
+                shadowElevation = elevation.toPx()
+                this.shape = shape
+                clip = true
+            }
             .selectedFace(ref, palette, selected, pressed)
             .clickable(interactionSource = interaction, indication = null, role = Role.RadioButton, onClick = onClick)
             .semantics { this.selected = selected },
@@ -755,9 +765,14 @@ private fun NewGameSelector(
     val shape = RoundedCornerShape(ref.dp(10f))
     Row(
         modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale; translationY = offset.toPx() }
-            .shadow(elevation, shape, clip = false)
-            .clip(shape)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = offset.toPx()
+                shadowElevation = elevation.toPx()
+                this.shape = shape
+                clip = true
+            }
             .drawWithCache {
                 val corner = CornerRadius(ref.dp(10f).toPx())
                 val face = Brush.verticalGradient(
@@ -797,8 +812,11 @@ private fun NewGameEngineWell(ref: NewGameReferenceScale, palette: LumenP5Identi
     Box(
         Modifier
             .size(ref.dp(36f))
-            .shadow(ref.dp(2.5f), shape, clip = false)
-            .clip(shape)
+            .graphicsLayer {
+                shadowElevation = ref.dp(2.5f).toPx()
+                this.shape = shape
+                clip = true
+            }
             .drawWithCache {
                 val corner = CornerRadius(ref.dp(9f).toPx())
                 onDrawBehind {
@@ -895,9 +913,13 @@ private fun NewGamePrimaryButton(
         Box(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { translationY = offset.toPx(); alpha = if (enabled) 1f else .50f }
-                .shadow(elevation, shape, clip = false)
-                .clip(shape)
+                .graphicsLayer {
+                    translationY = offset.toPx()
+                    alpha = if (enabled) 1f else .50f
+                    shadowElevation = elevation.toPx()
+                    this.shape = shape
+                    clip = true
+                }
                 .drawWithCache {
                     val corner = CornerRadius(ref.dp(10f).toPx())
                     val face = if (pressed) {
@@ -905,11 +927,19 @@ private fun NewGamePrimaryButton(
                     } else {
                         Brush.verticalGradient(colorStops = arrayOf(0f to Color(0xFF589FB7), .46f to Color(0xFF4789A1), 1f to Color(0xFF39758B)))
                     }
+                    val upperLight = Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color(0xFFF4FDFF).copy(alpha = if (pressed) .07f else .14f),
+                            1f to Color.Transparent,
+                        ),
+                        startY = 0f,
+                        endY = ref.vdp(7f).toPx().coerceAtLeast(1f),
+                    )
                     val lower = if (pressed) ref.vdp(1f).toPx() else ref.vdp(4f).toPx()
                     onDrawBehind {
                         drawRoundRect(face, cornerRadius = corner)
                         drawRect(Color(0xFF244A58), Offset(0f, size.height - lower), Size(size.width, lower))
-                        drawLine(Color(0xFFF4FDFF).copy(alpha = if (pressed) .12f else .27f), Offset(ref.dp(10f).toPx(), ref.vdp(1f).toPx()), Offset(size.width - ref.dp(10f).toPx(), ref.vdp(1f).toPx()), ref.dp(.7f).toPx(), StrokeCap.Round)
+                        drawRoundRect(upperLight, cornerRadius = corner)
                         drawRoundRect(palette.cyan.copy(alpha = .18f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
                     }
                 }
