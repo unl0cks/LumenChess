@@ -8,7 +8,7 @@ on:
       - '.github/workflows/p5-cta-lighting-diagnostic.yml'
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 jobs:
@@ -161,6 +161,16 @@ jobs:
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-cta/
           test -f p5-cta/02-new-game.png
           test -f p5-cta/02-new-game-press-state.png
+
+      - name: Commit validated CTA lighting fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt
+          test -n "$(git diff --cached --name-only)"
+          test "$(git diff --cached --name-only)" = 'app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt'
+          git commit -m 'fix(P5): integrate CTA face lighting'
+          git push origin HEAD:p5-reference-fidelity-visual-identity
 
       - name: Upload CTA diagnostic
         if: always()
