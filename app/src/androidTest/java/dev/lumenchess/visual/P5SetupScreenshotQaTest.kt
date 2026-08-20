@@ -236,6 +236,10 @@ class P5SetupScreenshotQaTest {
             composeRule.waitForIdle()
             val rest = node.captureToImage().asAndroidBitmap()
             node.performTouchInput { down(center); advanceEventTime(120L) }
+            // New Game stays vertically scrollable for resume/Chess960 overflow. Compose delays
+            // PressInteraction in scroll containers, so hold the real pointer through that delay
+            // before capturing the production pressed state.
+            Thread.sleep(220L)
             composeRule.waitForIdle()
             val pressed = node.captureToImage().asAndroidBitmap()
             node.performTouchInput { up() }
