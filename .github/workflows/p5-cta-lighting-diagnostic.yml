@@ -63,48 +63,57 @@ jobs:
 
           path = Path('app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt')
           source = path.read_text()
-          old_face = '''                    val face = if (pressed) {
-                        Brush.verticalGradient(listOf(Color(0xFF4E93AB), Color(0xFF3F7F96)))
-                    } else {
-                        Brush.verticalGradient(colorStops = arrayOf(0f to Color(0xFF589FB7), .46f to Color(0xFF4789A1), 1f to Color(0xFF39758B)))
-                    }
-                    val upperLight = Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0f to Color(0xFFF4FDFF).copy(alpha = if (pressed) .07f else .14f),
-                            1f to Color.Transparent,
-                        ),
-                        startY = 0f,
-                        endY = ref.vdp(7f).toPx().coerceAtLeast(1f),
-                    )
-          '''
-          new_face = '''                    val face = if (pressed) {
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0f to Color(0xFF5A9AB1),
-                                .24f to Color(0xFF4E91A8),
-                                .52f to Color(0xFF498AA1),
-                                .78f to Color(0xFF438299),
-                                1f to Color(0xFF3F7F96),
-                            ),
-                        )
-                    } else {
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0f to Color(0xFF6EACC1),
-                                .22f to Color(0xFF579CB4),
-                                .46f to Color(0xFF4789A1),
-                                .73f to Color(0xFF407F96),
-                                1f to Color(0xFF39758B),
-                            ),
-                        )
-                    }
-          '''
-          old_draw = '                        drawRoundRect(upperLight, cornerRadius = corner)\n'
-          if source.count(old_face) != 1:
-              raise SystemExit(f'expected exactly one CTA face/upperLight target, found {source.count(old_face)}')
-          if source.count(old_draw) != 1:
-              raise SystemExit(f'expected exactly one CTA upperLight draw target, found {source.count(old_draw)}')
-          patched = source.replace(old_face, new_face).replace(old_draw, '')
+          start_token = 'val face = if (pressed) {'
+          lower_token = 'val lower = if (pressed) ref.vdp(1f).toPx() else ref.vdp(4f).toPx()'
+          draw_token = 'drawRoundRect(upperLight, cornerRadius = corner)'
+          if source.count(start_token) != 1:
+              raise SystemExit(f'expected exactly one CTA face token, found {source.count(start_token)}')
+          if source.count(lower_token) != 1:
+              raise SystemExit(f'expected exactly one CTA lower token, found {source.count(lower_token)}')
+          if source.count(draw_token) != 1:
+              raise SystemExit(f'expected exactly one CTA upperLight draw token, found {source.count(draw_token)}')
+
+          token_index = source.index(start_token)
+          block_start = source.rfind('\n', 0, token_index) + 1
+          indent = source[block_start:token_index]
+          lower_index = source.index(lower_token, token_index)
+          lower_line_start = source.rfind('\n', 0, lower_index) + 1
+
+          def line(level, text):
+              return indent + ('    ' * level) + text + '\n'
+
+          replacement = (
+              line(0, 'val face = if (pressed) {') +
+              line(1, 'Brush.verticalGradient(') +
+              line(2, 'colorStops = arrayOf(') +
+              line(3, '0f to Color(0xFF5A9AB1),') +
+              line(3, '.24f to Color(0xFF4E91A8),') +
+              line(3, '.52f to Color(0xFF498AA1),') +
+              line(3, '.78f to Color(0xFF438299),') +
+              line(3, '1f to Color(0xFF3F7F96),') +
+              line(2, '),') +
+              line(1, ')') +
+              line(0, '} else {') +
+              line(1, 'Brush.verticalGradient(') +
+              line(2, 'colorStops = arrayOf(') +
+              line(3, '0f to Color(0xFF6EACC1),') +
+              line(3, '.22f to Color(0xFF579CB4),') +
+              line(3, '.46f to Color(0xFF4789A1),') +
+              line(3, '.73f to Color(0xFF407F96),') +
+              line(3, '1f to Color(0xFF39758B),') +
+              line(2, '),') +
+              line(1, ')') +
+              line(0, '}')
+          )
+          patched = source[:block_start] + replacement + source[lower_line_start:]
+
+          draw_index = patched.index(draw_token)
+          draw_line_start = patched.rfind('\n', 0, draw_index) + 1
+          draw_line_end = patched.index('\n', draw_index) + 1
+          patched = patched[:draw_line_start] + patched[draw_line_end:]
+
+          if 'upperLight' in patched:
+              raise SystemExit('upperLight survived CTA diagnostic patch')
           path.write_text(patched)
           print('patched_sha256=' + hashlib.sha256(patched.encode()).hexdigest())
           PY
