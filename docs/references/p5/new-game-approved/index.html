@@ -1,1 +1,154 @@
-PLACEHOLDER
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LumenChess P5 — New Game Design Candidate</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<svg class="svg-defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15.4 5.2 8.7 12l6.7 6.8"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8.7 9.4 3.3 3.4 3.3-3.4"/></symbol>
+    <symbol id="i-board" viewBox="0 0 24 24"><rect x="4.3" y="4.3" width="15.4" height="15.4" rx="2"/><path d="M12 4.6v15M4.6 12h15"/><path class="fill-soft" d="M4.6 4.6h7.2v7.2H4.6zM12.2 12.2h7.2v7.2h-7.2z"/></symbol>
+    <symbol id="i-960" viewBox="0 0 24 24"><rect x="4.3" y="4.3" width="15.4" height="15.4" rx="2"/><path d="M12 4.6v15M4.6 12h15"/><path d="m6.6 16.8 10.8-9.6"/><path d="m14.9 7.2 2.6-.1-.1 2.6"/></symbol>
+    <symbol id="i-engine" viewBox="0 0 24 24"><path d="M8.1 6.6h7.8a2.7 2.7 0 0 1 2.7 2.7v5.4a2.7 2.7 0 0 1-2.7 2.7H8.1a2.7 2.7 0 0 1-2.7-2.7V9.3a2.7 2.7 0 0 1 2.7-2.7Z"/><path d="M9 3.9v2.7m6-2.7v2.7M9 17.4v2.7m6-2.7v2.7M5.4 10H3.1m2.3 4H3.1m17.8-4h-2.3m2.3 4h-2.3"/><path d="m12 9.2.7 1.5 1.7.2-1.2 1.2.3 1.7-1.5-.8-1.5.8.3-1.7-1.2-1.2 1.7-.2z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle class="fill-dot" cx="12" cy="8" r="1"/><path d="M12 11v5"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.4"/><circle cx="12" cy="12" r="3.4"/><circle class="fill-dot" cx="12" cy="12" r=".8"/><path d="M12 2.5v2.2m0 14.6v2.2"/></symbol>
+    <symbol id="i-white" viewBox="0 0 24 24"><circle class="piece-fill" cx="12" cy="7" r="3"/><path class="piece-fill" d="M9.5 10.4h5l.8 4 2 2.2H6.7l2-2.2z"/><path d="M6.1 19h11.8"/></symbol>
+    <symbol id="i-black" viewBox="0 0 24 24"><circle class="piece-dark" cx="12" cy="7" r="3"/><path class="piece-dark" d="M9.5 10.4h5l.8 4 2 2.2H6.7l2-2.2z"/><path d="M6.1 19h11.8"/></symbol>
+    <symbol id="i-random" viewBox="0 0 24 24"><rect x="5" y="7" width="10.5" height="12" rx="2"/><rect x="8.5" y="4" width="10.5" height="12" rx="2"/><path d="M11.3 10h4.9m-1.7-1.7 1.7 1.7-1.7 1.7"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.4v5l3.4 1.8"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="m8.1 12.2 2.4 2.5 5.5-5.6"/></symbol>
+  </defs>
+</svg>
+
+<main class="qa-shell">
+  <section class="phone-section" id="phone-section">
+    <div class="desktop-title desktop-only">
+      <div><p>NEW GAME · DESIGN CANDIDATE</p><h1>P5 focused setup reconstruction</h1></div>
+      <span>390 × 844 · current product state · no root navigation</span>
+    </div>
+
+    <div class="phone" id="new-game-phone">
+      <div class="atmosphere"></div>
+      <header class="topbar">
+        <button class="back-button" type="button" aria-label="Back"><svg><use href="#i-back"/></svg></button>
+        <h2>New Game</h2>
+      </header>
+
+      <div class="setup-plane">
+        <section class="form-section mode-section">
+          <div class="section-head"><h3>Game Mode</h3></div>
+          <div class="choice-group game-mode" role="radiogroup" aria-label="Game Mode">
+            <button class="choice is-selected" data-group="mode" type="button" role="radio" aria-checked="true"><svg><use href="#i-board"/></svg><span>Standard</span></button>
+            <button class="choice" data-group="mode" type="button" role="radio" aria-checked="false"><svg><use href="#i-960"/></svg><span>Chess960</span></button>
+          </div>
+        </section>
+
+        <section class="form-section opponent-section">
+          <div class="section-head"><h3>Opponent</h3><span class="text-action">Engine Info</span></div>
+          <button class="selector opponent-selector" type="button" aria-expanded="false">
+            <span class="selector-well"><svg><use href="#i-engine"/></svg></span>
+            <strong>Stockfish 18</strong>
+            <svg class="chevron"><use href="#i-chevron"/></svg>
+          </button>
+        </section>
+
+        <section class="form-section strength-section">
+          <div class="section-head"><h3>Strength (Elo)</h3><svg class="info"><use href="#i-info"/></svg></div>
+          <div class="strength-value">1600</div>
+          <div class="slider" aria-label="Strength 1600 of 400 to 3000"><span class="track"><i style="width:46.15%"></i><b style="left:46.15%"></b></span></div>
+          <div class="range"><span>400</span><span>3000</span></div>
+          <button class="subtle-button" type="button" disabled><svg><use href="#i-target"/></svg><span>Match My Elo</span></button>
+        </section>
+
+        <section class="form-section model-section">
+          <div class="section-head"><h3>Strength Model</h3><svg class="info"><use href="#i-info"/></svg></div>
+          <div class="segmented" role="radiogroup" aria-label="Strength Model">
+            <button class="segment is-selected" data-group="model" type="button" role="radio" aria-checked="true">Hybrid</button>
+            <button class="segment" data-group="model" type="button" role="radio" aria-checked="false">Engine Native</button>
+            <button class="segment" data-group="model" type="button" role="radio" aria-checked="false">Humanized</button>
+          </div>
+          <p class="helper">Hybrid (default): Engine limits + humanization layer.</p>
+        </section>
+
+        <section class="form-section side-section">
+          <div class="section-head"><h3>Side</h3></div>
+          <div class="choice-group side-choice" role="radiogroup" aria-label="Side">
+            <button class="choice is-selected" data-group="side" type="button" role="radio" aria-checked="true"><svg><use href="#i-white"/></svg><span>White</span></button>
+            <button class="choice" data-group="side" type="button" role="radio" aria-checked="false"><svg><use href="#i-black"/></svg><span>Black</span></button>
+            <button class="choice" data-group="side" type="button" role="radio" aria-checked="false"><svg><use href="#i-random"/></svg><span>Random</span></button>
+          </div>
+        </section>
+
+        <section class="form-section time-section">
+          <div class="section-head"><h3>Time Control</h3></div>
+          <button class="selector compact-selector" type="button" aria-expanded="false"><svg class="selector-icon"><use href="#i-clock"/></svg><strong>Rapid</strong><svg class="chevron"><use href="#i-chevron"/></svg></button>
+        </section>
+
+        <section class="form-section inc-section">
+          <div class="section-head"><h3>Inc / Delay</h3></div>
+          <button class="selector compact-selector" type="button" aria-expanded="false"><strong>0 sec</strong><svg class="chevron"><use href="#i-chevron"/></svg></button>
+        </section>
+
+        <button class="primary-cta" type="button">Start Game</button>
+      </div>
+
+      <div class="notes">
+        <p><svg><use href="#i-check"/></svg><span>Match My Elo is preview-only in this build.</span></p>
+        <p><svg><use href="#i-check"/></svg><span>Your selected strength, side and clock apply when the game starts.</span></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="state-section" id="states-section">
+    <div class="board-heading desktop-only"><div><p>COMPONENT STATES</p><h2>New Game control families</h2></div><span>Deterministic REST · PRESSED · SELECTED proofs</span></div>
+    <div class="state-grid">
+      <article>
+        <h3>Selector</h3>
+        <div class="state-pair">
+          <div><label>REST</label><button class="selector demo-selector" type="button"><span><small>Opponent</small><strong>Stockfish 18</strong></span><svg class="chevron"><use href="#i-chevron"/></svg></button></div>
+          <div><label>PRESSED</label><button class="selector demo-selector is-pressed" type="button"><span><small>Opponent</small><strong>Stockfish 18</strong></span><svg class="chevron"><use href="#i-chevron"/></svg></button></div>
+        </div>
+      </article>
+      <article>
+        <h3>Segmented control</h3>
+        <div class="state-pair">
+          <div><label>SELECTED</label><div class="segmented demo-segmented"><button class="segment is-selected" type="button">Hybrid</button><button class="segment" type="button">Engine Native</button><button class="segment" type="button">Humanized</button></div></div>
+          <div><label>PRESSED</label><div class="segmented demo-segmented"><button class="segment is-selected is-pressed" type="button">Hybrid</button><button class="segment" type="button">Engine Native</button><button class="segment" type="button">Humanized</button></div></div>
+        </div>
+      </article>
+      <article>
+        <h3>Primary CTA</h3>
+        <div class="state-pair">
+          <div><label>REST</label><button class="primary-cta demo-cta" type="button">Start Game</button></div>
+          <div><label>PRESSED</label><button class="primary-cta demo-cta is-pressed" type="button">Start Game</button></div>
+        </div>
+      </article>
+      <article>
+        <h3>Selection tile</h3>
+        <div class="state-pair">
+          <div><label>SELECTED</label><div class="choice-group demo-choice"><button class="choice is-selected" type="button"><svg><use href="#i-white"/></svg><span>White</span></button><button class="choice" type="button"><svg><use href="#i-black"/></svg><span>Black</span></button></div></div>
+          <div><label>PRESSED</label><div class="choice-group demo-choice"><button class="choice is-selected is-pressed" type="button"><svg><use href="#i-white"/></svg><span>White</span></button><button class="choice" type="button"><svg><use href="#i-black"/></svg><span>Black</span></button></div></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="notes-section" id="tokens-section">
+    <div class="board-heading desktop-only"><div><p>NEW GAME-SPECIFIC NOTES</p><h2>Only deviations/additions</h2></div></div>
+    <div class="token-notes">
+      <article><h3>Setup plane</h3><p>One low-contrast graphite field preserves parked occupancy without making every section a card. Outline is intentionally fainter than the parked shell.</p></article>
+      <article><h3>Selection groups</h3><p>Game Mode and Side retain the same options/row geometry but share a recessed outer bed. Only the active face rises and receives restrained cyan.</p></article>
+      <article><h3>Selector</h3><p>54–56px raised graphite control. Low neutral outline, compact chevron, optional icon well. Press settles 2px and compresses shadow.</p></article>
+      <article><h3>Primary CTA</h3><p>52px steel-blue face + 4px physical lower face. Strongest interaction on the page; pressed state consumes the lower depth instead of scaling/bouncing.</p></article>
+      <article><h3>Density</h3><p>390×844 target uses 16px screen gutters, 8–10px inter-section rhythm, and 48px+ actionable targets while retaining all current setup fields.</p></article>
+      <article><h3>Color discipline</h3><p>Cyan is limited to selected faces, slider progress/thumb, engine well, small text actions and micro-icons. Large planes remain neutral graphite.</p></article>
+    </div>
+  </section>
+</main>
+<script src="prototype.js"></script>
+</body>
+</html>
