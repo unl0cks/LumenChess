@@ -4,8 +4,11 @@ import hashlib
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
+import urllib.request
+import zipfile
 from pathlib import Path
 
 from PIL import Image
@@ -20,6 +23,12 @@ SOURCE_SHA256 = {
 }
 APPROVED_PNG_SHA256 = "e07580cebf4579db9c06bebe44bcabd224cc3f3489a9a79bc18d2043ada1ab8e"
 APPROVED_RGB_SHA256 = "c95f60918335d222b60d9f6f98884be598948a751d3f496c3b1a56728775b357"
+PINNED_BROWSER_VERSION = "144.0.7559.96"
+PINNED_BROWSER_URL = (
+    "https://storage.googleapis.com/chrome-for-testing-public/"
+    f"{PINNED_BROWSER_VERSION}/linux64/chrome-linux64.zip"
+)
+PINNED_BROWSER_SHA256 = "ebb811eef0a0206b6f15dbd325840e39331a132399a4e7e0770cbc1624c3bff0"
 
 
 def sha256(data: bytes) -> str:
@@ -74,7 +83,35 @@ def ensure_inter_font() -> None:
     print(f"Resolved reference font: {family}")
 
 
+def pinned_actions_browser() -> str:
+    runner_temp = Path(os.environ.get("RUNNER_TEMP", str(ROOT)))
+    install_root = runner_temp / f"p5-chrome-{PINNED_BROWSER_VERSION}"
+    archive = install_root / "chrome-linux64.zip"
+    executable = install_root / "chrome-linux64" / "chrome"
+
+    if not executable.exists():
+        install_root.mkdir(parents=True, exist_ok=True)
+        print(f"Downloading pinned New Game browser: {PINNED_BROWSER_VERSION}")
+        urllib.request.urlretrieve(PINNED_BROWSER_URL, archive)
+        archive_sha = sha256(archive.read_bytes())
+        if archive_sha != PINNED_BROWSER_SHA256:
+            raise AssertionError(
+                f"Pinned browser archive changed: {archive_sha}"
+            )
+        with zipfile.ZipFile(archive) as package:
+            package.extractall(install_root)
+
+    executable.chmod(executable.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    version = subprocess.check_output([str(executable), "--version"], text=True).strip()
+    if PINNED_BROWSER_VERSION not in version:
+        raise RuntimeError(f"Unexpected pinned browser version: {version!r}")
+    print(f"Resolved reference browser: {version}")
+    return str(executable)
+
+
 def browser_executable() -> str:
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return pinned_actions_browser()
     explicit = os.environ.get("P5_BROWSER")
     if explicit:
         return explicit
