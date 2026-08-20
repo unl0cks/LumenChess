@@ -1,4 +1,4 @@
-name: P5 Settings reference
+name: P5 Play + Settings reference
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     paths:
       - 'app/**'
       - 'docs/references/p5/.settings-iter3-approved-lossless*.b64'
+      - 'docs/references/p5/play-overview-iter2/**'
       - '.github/workflows/p5-reference.yml'
   workflow_dispatch:
 
@@ -23,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Mark P5 Settings verification pending
+      - name: Mark P5 reference verification pending
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -31,7 +32,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='Approved Settings translation, board-first Live contract and geometry verification are running' \
+            -f description='Approved Play + Settings translations and Play/Live geometry regressions are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -60,12 +61,12 @@ jobs:
           echo "no" | avdmanager create avd --force --name p5-reference \
             --package "system-images;android-37.0;google_apis_ps16k;x86_64"
           AVD_CONFIG="$HOME/.android/avd/p5-reference.avd/config.ini"
-          cat >> "$AVD_CONFIG" <<'EOF'
+          cat >> "$AVD_CONFIG" <<'AVDEOF'
           hw.lcd.width=1344
           hw.lcd.height=2992
           hw.lcd.density=489
           showDeviceFrame=no
-          EOF
+          AVDEOF
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
           "$ANDROID_HOME/emulator/emulator" -avd p5-reference \
             -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 \
@@ -82,7 +83,7 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
-      - name: Build Settings screenshot APKs
+      - name: Build P5 reference screenshot APKs
         id: verify
         continue-on-error: true
         shell: bash
@@ -90,13 +91,13 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace \
             2>&1 | tee "$RUNNER_TEMP/p5-gradle-build.txt"
-      - name: Surface Settings build failure
+      - name: Surface P5 build failure
         if: steps.verify.outcome != 'success'
         shell: bash
         run: |
-          echo "::error title=P5 Settings build::Screenshot APK build failed"
+          echo "::error title=P5 reference build::Screenshot APK build failed"
           tail -n 180 "$RUNNER_TEMP/p5-gradle-build.txt" || true
-      - name: Capture approved Settings, press state and comparison only
+      - name: Capture approved Settings, Play, press states and regressions
         id: screenshots
         if: steps.verify.outcome == 'success'
         continue-on-error: true
@@ -106,24 +107,35 @@ jobs:
           adb install -r app/build/outputs/apk/debug/app-debug.apk
           adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           adb shell pm clear dev.lumenchess
-          rm -rf p5-screenshots
-          mkdir -p p5-screenshots
+          rm -rf p5-screenshots p5-reference-render
+          mkdir -p p5-screenshots p5-reference-render
+
           adb shell am instrument -w -r \
             -e p5SettingsQa true \
             -e class 'dev.lumenchess.visual.P5SettingsScreenshotQaTest,dev.lumenchess.play.PlayUiIntegrationTest#boardBoundsStayStableAcrossHumanMoveEngineThinkingAndEngineResult' \
             dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
-            | tee "$RUNNER_TEMP/p5-screenshot-instrumentation.txt"
+            | tee "$RUNNER_TEMP/p5-settings-instrumentation.txt"
+
+          adb shell am instrument -w -r \
+            -e p5PlayOverviewQa true \
+            -e class 'dev.lumenchess.visual.P5PlayOverviewScreenshotQaTest' \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p5-play-instrumentation.txt"
+
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
           COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$COUNT" != "2" ]; then
-            echo "::error title=P5 Settings screenshot::Expected exactly 2 device screenshots, found $COUNT"
+          if [ "$COUNT" != "4" ]; then
+            echo "::error title=P5 screenshots::Expected exactly 4 device screenshots, found $COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
           test -f p5-screenshots/04-settings.png
           test -f p5-screenshots/04-settings-press-state.png
+          test -f p5-screenshots/01-play-overview.png
+          test -f p5-screenshots/01-play-overview-press-state.png
 
-          python3 -m pip install --quiet --disable-pip-version-check pillow
+          python3 -m pip install --quiet --disable-pip-version-check pillow playwright
+
           python3 - <<'PY'
           import base64
           import hashlib
@@ -136,8 +148,6 @@ jobs:
           candidate_path = root / 'p5-screenshots/04-settings.png'
           comparison_path = root / 'p5-screenshots/04-settings-approved-comparison.png'
 
-          # Frozen Iteration 3 reference. Keep this canonical list in sync with
-          # docs/references/p5/README.md; decoded RGB is the visual authority.
           paths = [
               prefix / '.settings-iter3-approved-lossless.part00.b64',
               prefix / '.settings-iter3-approved-lossless.part01.b64',
@@ -157,9 +167,6 @@ jobs:
           assert hashlib.sha256(reference.tobytes()).hexdigest() == '791a5d6cac599e83a3083d369b42e2c39b09099cc59033255d6360b0ad906452'
           candidate = Image.open(candidate_path).convert('RGB')
 
-          # The emulator capture is slightly taller in aspect ratio than the approved 390x844
-          # design canvas because it includes the physical top system-inset band. Normalize by
-          # preserving the full app bottom/navigation edge and cropping only the excess top band.
           target_aspect = reference.width / reference.height
           crop_height = round(candidate.width / target_aspect)
           if crop_height > candidate.height:
@@ -169,23 +176,58 @@ jobs:
           candidate = candidate.resize(reference.size, Image.Resampling.LANCZOS)
 
           gap = 10
-          canvas = Image.new(
-              'RGB',
-              (reference.width + gap + candidate.width, reference.height),
-              (5, 7, 9),
-          )
+          canvas = Image.new('RGB', (reference.width + gap + candidate.width, reference.height), (5, 7, 9))
           canvas.paste(reference, (0, 0))
           canvas.paste(candidate, (reference.width + gap, 0))
           canvas.save(comparison_path, optimize=True)
           PY
           test -f p5-screenshots/04-settings-approved-comparison.png
+
+          BROWSER="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$BROWSER" ]; then
+            echo "::error title=P5 Play reference::No system Chromium/Chrome executable available"
+            exit 1
+          fi
+          P5_BROWSER="$BROWSER" python3 docs/references/p5/play-overview-iter2/render_reference.py \
+            p5-reference-render/01-play-overview-approved-reference.png \
+            | tee "$RUNNER_TEMP/p5-play-reference.txt"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          root = Path('.')
+          reference_path = root / 'p5-reference-render/01-play-overview-approved-reference.png'
+          candidate_path = root / 'p5-screenshots/01-play-overview.png'
+          comparison_path = root / 'p5-screenshots/01-play-overview-approved-comparison.png'
+
+          reference = Image.open(reference_path).convert('RGB')
+          assert reference.size == (390, 844), reference.size
+          candidate = Image.open(candidate_path).convert('RGB')
+
+          target_aspect = reference.width / reference.height
+          crop_height = round(candidate.width / target_aspect)
+          if crop_height > candidate.height:
+              raise AssertionError((candidate.size, crop_height))
+          top_crop = candidate.height - crop_height
+          candidate = candidate.crop((0, top_crop, candidate.width, candidate.height))
+          candidate = candidate.resize(reference.size, Image.Resampling.LANCZOS)
+
+          gap = 10
+          canvas = Image.new('RGB', (reference.width + gap + candidate.width, reference.height), (5, 7, 9))
+          canvas.paste(reference, (0, 0))
+          canvas.paste(candidate, (reference.width + gap, 0))
+          canvas.save(comparison_path, optimize=True)
+          PY
+          test -f p5-screenshots/01-play-overview-approved-comparison.png
+
           FINAL_COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$FINAL_COUNT" != "3" ]; then
-            echo "::error title=P5 Settings artifact::Expected exactly 3 final PNGs, found $FINAL_COUNT"
+          if [ "$FINAL_COUNT" != "6" ]; then
+            echo "::error title=P5 artifacts::Expected exactly 6 final screenshot PNGs, found $FINAL_COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
-          printf 'Captured native Settings root, deterministic row REST/PRESSED state and approved Iteration 3 comparison\n'
+          printf 'Captured approved Settings + Play native REST/PRESSED states, canonicalized Play reference comparison, Live board-first and P1 geometry regressions\n'
       - name: Upload Settings screenshot artifact
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -197,6 +239,17 @@ jobs:
             p5-screenshots/04-settings-press-state.png
           if-no-files-found: error
           retention-days: 14
+      - name: Upload Play Overview screenshot artifact
+        if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: p5-play-overview-${{ github.sha }}
+          path: |
+            p5-screenshots/01-play-overview.png
+            p5-screenshots/01-play-overview-approved-comparison.png
+            p5-screenshots/01-play-overview-press-state.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload P5 diagnostics on failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         uses: actions/upload-artifact@v4
@@ -205,11 +258,14 @@ jobs:
           path: |
             ${{ runner.temp }}/p5-emulator.log
             ${{ runner.temp }}/p5-gradle-build.txt
-            ${{ runner.temp }}/p5-screenshot-instrumentation.txt
+            ${{ runner.temp }}/p5-settings-instrumentation.txt
+            ${{ runner.temp }}/p5-play-instrumentation.txt
+            ${{ runner.temp }}/p5-play-reference.txt
             p5-screenshots/
+            p5-reference-render/
           if-no-files-found: warn
           retention-days: 7
-      - name: Publish P5 Settings verification success
+      - name: Publish P5 reference verification success
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -218,7 +274,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='Approved Settings translation, board-first Live contract and P1 geometry regression passed' \
+            -f description='Approved Play + Settings translations, Play behavior/press QA, Live board-first and P1 geometry passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
@@ -229,7 +285,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='Approved Settings build, Live presentation contract, geometry or capture failed' \
+            -f description='Approved Play/Settings build, screenshot QA, behavior, Live presentation or geometry failed' \
             -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')

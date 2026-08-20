@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>LumenChess — P5 Play Overview Design Sandbox</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<svg class="svg-defs" aria-hidden="true" width="0" height="0">
+  <defs>
+    <symbol id="nav-play" viewBox="0 0 24 24"><circle cx="8.35" cy="5.85" r="2.05"/><path d="M6.45 9h3.8M6.9 9c.55 1.45.5 2.7-.4 4h3.7c-.9-1.3-.95-2.55-.4-4M5.65 15.2h5.4M5 17.65h6.7"/><path d="M15.1 9.3l4 2.7-4 2.7z" class="fill-accent"/></symbol>
+    <symbol id="nav-arena" viewBox="0 0 24 24"><path d="M3.4 5.9h1.5v1.55h1.55V5.9H7.9v3l-.75 1.15v5.35H4.2v-5.35L3.4 8.9zM3.45 17.55H8.1"/><path d="M16.1 5.9h1.45v1.55h1.55V5.9h1.5v3l-.8 1.15v5.35h-2.95v-5.35L16.1 8.9zM15.9 17.55h4.65"/><path d="M11.75 7.55l-1.5 3.25h1.55l-.85 4.35 2.8-4.9h-1.6l1.15-2.7z" class="fill-accent"/></symbol>
+    <symbol id="nav-games" viewBox="0 0 24 24"><rect x="5" y="4.4" width="14" height="15.2" rx="2.15"/><rect x="7.25" y="6.7" width="6.5" height="6.5" rx=".7"/><path d="M10.5 6.7v6.5M7.25 9.95h6.5M7.25 16.2h8.5"/></symbol>
+    <symbol id="nav-insights" viewBox="0 0 24 24"><path d="M5 18.5V13M9.2 18.5V9.7M13.4 18.5V12.1M17.6 18.5V6.3"/><path d="M4.7 10.2l4-2.2 4 1.5 5-4"/><circle cx="4.7" cy="10.2" r="1" class="fill-dot"/><circle cx="8.7" cy="8" r="1" class="fill-dot"/><circle cx="12.7" cy="9.5" r="1" class="fill-dot"/><circle cx="17.7" cy="5.5" r="1" class="fill-dot"/></symbol>
+    <symbol id="nav-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5.15"/><circle cx="12" cy="12" r="2.05"/><path d="M12 3.2v2M12 18.8v2M3.2 12h2M18.8 12h2M5.75 5.75l1.4 1.4M16.85 16.85l1.4 1.4M18.25 5.75l-1.4 1.4M7.15 16.85l-1.4 1.4"/></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.2"/><path d="M12 7.6v4.8l3.2 1.9"/></symbol>
+    <symbol id="icon-chip" viewBox="0 0 24 24"><rect x="6.4" y="6.4" width="11.2" height="11.2" rx="2"/><path d="M9 4v2.4M12 4v2.4M15 4v2.4M9 17.6V20M12 17.6V20M15 17.6V20M4 9h2.4M4 12h2.4M4 15h2.4M17.6 9H20M17.6 12H20M17.6 15H20"/><circle cx="12" cy="12" r="1.3" class="fill-dot"/></symbol>
+    <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="M9 5.5l6.1 6.5L9 18.5"/></symbol>
+    <symbol id="icon-back" viewBox="0 0 24 24"><path d="M15.6 5.5L9.2 12l6.4 6.5"/></symbol>
+  </defs>
+</svg>
+
+<main class="qa-shell">
+  <section class="play-stage qa-section" id="play-section">
+    <div class="stage-header desktop-only"><div><p class="eyebrow">P5 · PLAY OVERVIEW · DESIGN FIRST</p><h1>390 × 844 proof</h1></div><p>Approved Settings material language, richer hero depth, current product structure.</p></div>
+    <div class="phone-frame" id="play-phone">
+      <div class="phone-atmosphere"></div>
+      <header class="play-header">
+        <button class="back-button" aria-label="Back" type="button"><svg><use href="#icon-back"/></svg></button>
+        <div><h2>Play</h2></div>
+      </header>
+
+      <section class="hero-stack" aria-label="Play modes">
+        <button class="hero-card hero-cool" type="button" data-stateful="hero">
+          <span class="art-light"></span>
+          <img class="hero-art rook-art" src="assets/rook-native-render-extract.png" alt="" />
+          <span class="hero-copy"><strong>Play vs Engine</strong><small>Challenge a chess engine</small></span>
+        </button>
+        <button class="hero-card hero-arena" type="button" data-stateful="hero">
+          <span class="art-light"></span>
+          <img class="hero-art knight-art" src="assets/knight-native-render-extract.png" alt="" />
+          <span class="hero-copy"><strong>Engine Arena</strong><small>Watch engines battle each other</small></span>
+        </button>
+      </section>
+
+      <section class="quick-section" aria-label="Quick Start">
+        <header><h3>Quick Start</h3><span>Last used</span></header>
+        <button class="quick-card" type="button" data-stateful="quick">
+          <span class="quick-well"><svg><use href="#icon-clock"/></svg></span>
+          <span class="quick-copy"><strong>10 min · Rapid</strong><small>Stockfish 18 · 1600 Elo</small></span>
+          <svg class="quick-chevron"><use href="#icon-chevron"/></svg>
+        </button>
+      </section>
+
+      <nav class="bottom-nav" aria-label="Primary navigation">
+        <button class="nav-item is-selected" type="button" aria-current="page"><span class="selected-indicator"></span><span class="nav-icon-well"><svg class="nav-icon"><use href="#nav-play"/></svg></span><span>Play</span></button>
+        <button class="nav-item" type="button"><span class="nav-icon-well"><svg class="nav-icon"><use href="#nav-arena"/></svg></span><span>Arena</span></button>
+        <button class="nav-item" type="button"><span class="nav-icon-well"><svg class="nav-icon"><use href="#nav-games"/></svg></span><span>Games</span></button>
+        <button class="nav-item" type="button"><span class="nav-icon-well"><svg class="nav-icon"><use href="#nav-insights"/></svg></span><span>Insights</span></button>
+        <button class="nav-item" type="button"><span class="nav-icon-well"><svg class="nav-icon"><use href="#nav-settings"/></svg></span><span>Settings</span></button>
+      </nav>
+    </div>
+  </section>
+
+  <section class="component-section qa-section" id="components-section">
+    <header class="board-header"><p class="eyebrow">PLAY-SPECIFIC COMPONENTS</p><h2>Hero + Quick Start state board</h2><p>Deterministic REST/PRESSED pairs. Pressed cards compress physically without ripple.</p></header>
+    <div class="component-grid">
+      <article class="board-card wide"><h3>Play vs Engine</h3><div class="state-pair"><div><label>REST</label><button class="hero-card demo-hero hero-cool"><span class="art-light"></span><img class="hero-art rook-art" src="assets/rook-native-render-extract.png" alt=""/><span class="hero-copy"><strong>Play vs Engine</strong><small>Challenge a chess engine</small></span></button></div><div><label>PRESSED</label><button class="hero-card demo-hero hero-cool is-pressed"><span class="art-light"></span><img class="hero-art rook-art" src="assets/rook-native-render-extract.png" alt=""/><span class="hero-copy"><strong>Play vs Engine</strong><small>Challenge a chess engine</small></span></button></div></div></article>
+      <article class="board-card wide"><h3>Engine Arena</h3><div class="state-pair"><div><label>REST</label><button class="hero-card demo-hero hero-arena"><span class="art-light"></span><img class="hero-art knight-art" src="assets/knight-native-render-extract.png" alt=""/><span class="hero-copy"><strong>Engine Arena</strong><small>Watch engines battle each other</small></span></button></div><div><label>PRESSED</label><button class="hero-card demo-hero hero-arena is-pressed"><span class="art-light"></span><img class="hero-art knight-art" src="assets/knight-native-render-extract.png" alt=""/><span class="hero-copy"><strong>Engine Arena</strong><small>Watch engines battle each other</small></span></button></div></div></article>
+      <article class="board-card wide"><h3>Quick Start</h3><div class="state-pair"><div><label>REST</label><button class="quick-card demo-quick"><span class="quick-well"><svg><use href="#icon-clock"/></svg></span><span class="quick-copy"><strong>10 min · Rapid</strong><small>Stockfish 18 · 1600 Elo</small></span><svg class="quick-chevron"><use href="#icon-chevron"/></svg></button></div><div><label>PRESSED</label><button class="quick-card demo-quick is-pressed"><span class="quick-well"><svg><use href="#icon-clock"/></svg></span><span class="quick-copy"><strong>10 min · Rapid</strong><small>Stockfish 18 · 1600 Elo</small></span><svg class="quick-chevron"><use href="#icon-chevron"/></svg></button></div></div></article>
+    </div>
+  </section>
+
+  <section class="notes-section qa-section" id="notes-section">
+    <header class="board-header"><p class="eyebrow">PLAY ADDITIONS ONLY</p><h2>Token + component notes</h2></header>
+    <div class="notes-grid">
+      <article><h3>Hero geometry</h3><dl><div><dt>Width</dt><dd>358px</dd></div><div><dt>Height</dt><dd>166px</dd></div><div><dt>Radius</dt><dd>14px</dd></div><div><dt>Art optical</dt><dd>96–100px</dd></div></dl></article>
+      <article><h3>Hero depth</h3><p>Graphite face + faint top lift + whole-body lower occlusion + localized left-art light. Press: scale .982, +2px Y, tighter light, shorter shadow.</p></article>
+      <article><h3>Quick Start</h3><p>80px actionable row. Less elevation than hero cards, 42px recessed cyan-gray icon well, no repeated divider.</p></article>
+      <article><h3>Color discipline</h3><p>Page remains #080B0E family. Cyan is local to art, wells, and selected nav. Arena receives only a microscopic warm reflection from its existing gold artwork.</p></article>
+    </div>
+  </section>
+</main>
+<script src="prototype.js"></script>
+</body>
+</html>
