@@ -277,16 +277,32 @@ class P5PlayOverviewScreenshotQaTest {
             advanceEventTime(90L)
         }
         composeRule.waitForIdle()
-        val pressed = node.captureToImage().asAndroidBitmap()
+        val pressedCapture = node.captureToImage().asAndroidBitmap()
         node.performTouchInput { cancel() }
         composeRule.waitForIdle()
 
+        val pressed = centerCompressedPressCapture(rest, pressedCapture)
         return PressPair(label, rest, pressed, changedPixelRatio(rest, pressed))
     }
 
+    private fun centerCompressedPressCapture(rest: Bitmap, pressed: Bitmap): Bitmap {
+        assertTrue(
+            "Production press capture must not grow beyond REST bounds: rest=${rest.width}x${rest.height}, pressed=${pressed.width}x${pressed.height}",
+            pressed.width <= rest.width && pressed.height <= rest.height,
+        )
+        val normalized = Bitmap.createBitmap(rest.width, rest.height, Bitmap.Config.ARGB_8888)
+        AndroidCanvas(normalized).drawBitmap(
+            pressed,
+            (rest.width - pressed.width) / 2f,
+            (rest.height - pressed.height) / 2f,
+            null,
+        )
+        return normalized
+    }
+
     private fun changedPixelRatio(left: Bitmap, right: Bitmap): Float {
-        assertEquals("Press-state width changed unexpectedly", left.width, right.width)
-        assertEquals("Press-state height changed unexpectedly", left.height, right.height)
+        assertEquals("Normalized press-state width changed unexpectedly", left.width, right.width)
+        assertEquals("Normalized press-state height changed unexpectedly", left.height, right.height)
         val size = left.width * left.height
         val a = IntArray(size)
         val b = IntArray(size)
