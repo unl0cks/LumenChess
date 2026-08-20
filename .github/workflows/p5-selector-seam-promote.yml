@@ -1,0 +1,49 @@
+name: P5 selector seam promotion
+
+on:
+  push:
+    branches:
+      - p5-reference-fidelity-visual-identity
+    paths:
+      - '.github/workflows/p5-selector-seam-promote.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply exact validated selector seam fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          path = Path('app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt')
+          source = path.read_text()
+          target = 'drawLine(Color.White.copy(alpha = if (pressed) .018f else .03f), Offset(ref.dp(9f).toPx(), ref.vdp(1f).toPx()), Offset(size.width - ref.dp(9f).toPx(), ref.vdp(1f).toPx()), ref.dp(.7f).toPx())'
+          if source.count(target) != 1:
+              raise SystemExit(f'expected exactly one selector upper-light target, found {source.count(target)}')
+          index = source.index(target)
+          line_start = source.rfind('\n', 0, index) + 1
+          line_end = source.index('\n', index) + 1
+          patched = source[:line_start] + source[line_end:]
+          digest = hashlib.sha256(patched.encode()).hexdigest()
+          expected = 'a995fc4b3de6f86bdcc2e9130826f73c16f1d01b8f2d2bcf281057cae4eee727'
+          if digest != expected:
+              raise SystemExit(f'validated selector source hash mismatch: {digest}')
+          path.write_text(patched)
+          print('validated_sha256=' + digest)
+          PY
+          git diff --check
+          git diff -- app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt
+      - name: Commit validated selector seam fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt
+          git diff --cached --quiet && { echo 'Expected selector production diff is empty'; exit 1; }
+          git commit -m 'fix(P5): remove selector highlight seam'
+          git push origin HEAD:p5-reference-fidelity-visual-identity
