@@ -117,12 +117,14 @@ jobs:
             -e class 'dev.lumenchess.visual.P5SettingsScreenshotQaTest,dev.lumenchess.play.PlayUiIntegrationTest#boardBoundsStayStableAcrossHumanMoveEngineThinkingAndEngineResult,dev.lumenchess.play.PlayUiIntegrationTest#defaultHumanVsEngineLivePresentationIsBoardFirst' \
             dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
             | tee "$RUNNER_TEMP/p5-settings-instrumentation.txt"
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
 
           adb shell am instrument -w -r \
             -e p5PlayOverviewQa true \
             -e class 'dev.lumenchess.visual.P5PlayOverviewScreenshotQaTest' \
             dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
             | tee "$RUNNER_TEMP/p5-play-instrumentation.txt"
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
 
           # The preceding P1 lane deliberately starts/persists a game. Isolate the frozen
           # New Game reference state without changing production resume behavior.
