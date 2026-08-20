@@ -4,6 +4,7 @@ import hashlib
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,6 +37,43 @@ def verify_frozen_source() -> tuple[str, str, str]:
     return tuple(parts)  # type: ignore[return-value]
 
 
+def ensure_inter_font() -> None:
+    fc_match = shutil.which("fc-match")
+    if fc_match:
+        family = subprocess.check_output(
+            [fc_match, "-f", "%{family}", "Inter"],
+            text=True,
+        ).strip()
+        if family.split(",", 1)[0].strip() == "Inter":
+            print(f"Resolved reference font: {family}")
+            return
+
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        raise RuntimeError(
+            "Frozen New Game reference requires the Inter font family used by the approved render"
+        )
+
+    subprocess.run(["sudo", "apt-get", "update", "-qq"], check=True)
+    subprocess.run(
+        ["sudo", "apt-get", "install", "-y", "-qq", "fonts-inter=4.0+ds-1"],
+        check=True,
+    )
+    fc_cache = shutil.which("fc-cache")
+    if fc_cache:
+        subprocess.run([fc_cache, "-f"], check=True)
+
+    fc_match = shutil.which("fc-match")
+    if not fc_match:
+        raise RuntimeError("fontconfig fc-match unavailable after installing pinned Inter")
+    family = subprocess.check_output(
+        [fc_match, "-f", "%{family}", "Inter"],
+        text=True,
+    ).strip()
+    if family.split(",", 1)[0].strip() != "Inter":
+        raise RuntimeError(f"Pinned Inter did not resolve through fontconfig: {family!r}")
+    print(f"Resolved reference font: {family}")
+
+
 def browser_executable() -> str:
     explicit = os.environ.get("P5_BROWSER")
     if explicit:
@@ -52,6 +90,7 @@ def main() -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     html, css, js = verify_frozen_source()
+    ensure_inter_font()
     document = re.sub(
         r'<link rel="stylesheet" href="styles.css"\s*/?>',
         f"<style>{css}</style>",
