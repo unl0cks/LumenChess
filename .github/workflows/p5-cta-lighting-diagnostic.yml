@@ -1,0 +1,202 @@
+name: P5 CTA lighting diagnostic
+
+on:
+  push:
+    branches:
+      - p5-reference-fidelity-visual-identity
+    paths:
+      - '.github/workflows/p5-cta-lighting-diagnostic.yml'
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  cta-lighting-diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mark CTA diagnostic pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context='P5 CTA lighting diagnostic' \
+            -f description='Face-wide CTA upper-light integration is running' \
+            -f target_url="$RUN_URL"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools emulator
+
+      - name: Install Android 17 emulator and pinned native toolchain
+        run: |
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            "system-images;android-37.0;google_apis_ps16k;x86_64" \
+            --channel=3
+
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Apply single-variable CTA lighting diagnostic
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          path = Path('app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt')
+          source = path.read_text()
+          old = '''                .drawWithCache {
+                      val corner = CornerRadius(ref.dp(10f).toPx())
+                      val face = if (pressed) {
+                          Brush.verticalGradient(listOf(Color(0xFF4E93AB), Color(0xFF3F7F96)))
+                      } else {
+                          Brush.verticalGradient(colorStops = arrayOf(0f to Color(0xFF589FB7), .46f to Color(0xFF4789A1), 1f to Color(0xFF39758B)))
+                      }
+                      val upperLight = Brush.verticalGradient(
+                          colorStops = arrayOf(
+                              0f to Color(0xFFF4FDFF).copy(alpha = if (pressed) .07f else .14f),
+                              1f to Color.Transparent,
+                          ),
+                          startY = 0f,
+                          endY = ref.vdp(7f).toPx().coerceAtLeast(1f),
+                      )
+                      val lower = if (pressed) ref.vdp(1f).toPx() else ref.vdp(4f).toPx()
+                      onDrawBehind {
+                          drawRoundRect(face, cornerRadius = corner)
+                          drawRect(Color(0xFF244A58), Offset(0f, size.height - lower), Size(size.width, lower))
+                          drawRoundRect(upperLight, cornerRadius = corner)
+                          drawRoundRect(palette.cyan.copy(alpha = .18f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+                      }
+                  }
+          '''
+          new = '''                .drawWithCache {
+                      val corner = CornerRadius(ref.dp(10f).toPx())
+                      val face = if (pressed) {
+                          Brush.verticalGradient(
+                              colorStops = arrayOf(
+                                  0f to Color(0xFF5A9AB1),
+                                  .24f to Color(0xFF4E91A8),
+                                  .52f to Color(0xFF498AA1),
+                                  .78f to Color(0xFF438299),
+                                  1f to Color(0xFF3F7F96),
+                              ),
+                          )
+                      } else {
+                          Brush.verticalGradient(
+                              colorStops = arrayOf(
+                                  0f to Color(0xFF6EACC1),
+                                  .22f to Color(0xFF579CB4),
+                                  .46f to Color(0xFF4789A1),
+                                  .73f to Color(0xFF407F96),
+                                  1f to Color(0xFF39758B),
+                              ),
+                          )
+                      }
+                      val lower = if (pressed) ref.vdp(1f).toPx() else ref.vdp(4f).toPx()
+                      onDrawBehind {
+                          drawRoundRect(face, cornerRadius = corner)
+                          drawRect(Color(0xFF244A58), Offset(0f, size.height - lower), Size(size.width, lower))
+                          drawRoundRect(palette.cyan.copy(alpha = .18f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+                      }
+                  }
+          '''
+          if source.count(old) != 1:
+              raise SystemExit(f'expected exactly one CTA lighting target, found {source.count(old)}')
+          patched = source.replace(old, new)
+          path.write_text(patched)
+          print('patched_sha256=' + hashlib.sha256(patched.encode()).hexdigest())
+          PY
+          git diff --check
+          git diff -- app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt
+
+      - name: Boot Pixel 8 Pro sized Android 17 emulator
+        run: |
+          echo "no" | avdmanager create avd --force --name p5-cta-lighting \
+            --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          AVD_CONFIG="$HOME/.android/avd/p5-cta-lighting.avd/config.ini"
+          cat >> "$AVD_CONFIG" <<'AVDEOF'
+          hw.lcd.width=1344
+          hw.lcd.height=2992
+          hw.lcd.density=489
+          showDeviceFrame=no
+          AVDEOF
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          "$ANDROID_HOME/emulator/emulator" -avd p5-cta-lighting \
+            -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 \
+            > "$RUNNER_TEMP/p5-cta-emulator.log" 2>&1 &
+          timeout 90 bash -c 'until adb devices | grep -Eq "^emulator-[0-9]+[[:space:]]+device$"; do sleep 2; done'
+          timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell wm size reset
+          adb shell wm density reset
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+
+      - name: Build diagnostic APKs
+        run: |
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+
+      - name: Capture CTA diagnostic
+        run: |
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+          adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell pm clear dev.lumenchess
+          adb shell am instrument -w -r \
+            -e p5SetupQa true \
+            -e class 'dev.lumenchess.visual.P5SetupScreenshotQaTest#approvedStandardStateCapturesFrozenNewGameAndPressFamilies' \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p5-cta-instrumentation.txt"
+          mkdir -p p5-cta
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-cta/
+          test -f p5-cta/02-new-game.png
+          test -f p5-cta/02-new-game-press-state.png
+
+      - name: Upload CTA diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p5-cta-lighting-diagnostic-${{ github.sha }}
+          path: |
+            p5-cta/
+            ${{ runner.temp }}/p5-cta-instrumentation.txt
+            ${{ runner.temp }}/p5-cta-emulator.log
+            app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Publish CTA diagnostic status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          STATE=failure
+          DESCRIPTION='CTA lighting isolation failed'
+          if [ "$JOB_STATUS" = 'success' ]; then
+            STATE=success
+            DESCRIPTION='CTA lighting isolation captured successfully'
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$STATE" \
+            -f context='P5 CTA lighting diagnostic' \
+            -f description="$DESCRIPTION" \
+            -f target_url="$RUN_URL"
