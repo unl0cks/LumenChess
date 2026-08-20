@@ -10,12 +10,24 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   selected-fill-diagnostic:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Mark selected-fill diagnostic pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state=pending \
+            -f context='P5 selected-fill diagnostic' \
+            -f description='Opaque precomposited selected-face fill isolation is running' \
+            -f target_url="$RUN_URL"
 
       - uses: actions/setup-java@v4
         with:
@@ -146,3 +158,22 @@ jobs:
             app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Publish selected-fill diagnostic status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          STATE=failure
+          DESCRIPTION='Selected-face fill isolation failed'
+          if [ "$JOB_STATUS" = 'success' ]; then
+            STATE=success
+            DESCRIPTION='Selected-face fill isolation captured successfully'
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="$STATE" \
+            -f context='P5 selected-fill diagnostic' \
+            -f description="$DESCRIPTION" \
+            -f target_url="$RUN_URL"
