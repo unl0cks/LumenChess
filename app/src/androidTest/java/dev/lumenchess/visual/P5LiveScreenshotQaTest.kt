@@ -83,6 +83,7 @@ class P5LiveScreenshotQaTest {
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
         waitForLiveReady()
 
+        assertCanonicalSetupAndRuntime()
         seedDeterministicOpening()
         assertAuthoritativeOpeningState()
         assertBoardFirstPresentation()
@@ -144,8 +145,26 @@ class P5LiveScreenshotQaTest {
             viewModel.cancelPremove()
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("O-O").assertIsDisplayed()
-        composeRule.onNodeWithText("Be7").assertIsDisplayed()
+    }
+
+    private fun assertCanonicalSetupAndRuntime() {
+        composeRule.runOnIdle {
+            val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
+            val setup = requireNotNull(viewModel.uiState.value.resolvedSetup)
+            val coordinator = requireNotNull(viewModel.currentCoordinatorForTest())
+            val runtime = coordinator.state
+
+            assertEquals(Variant.STANDARD, setup.variant)
+            assertEquals(PlayEngine.STOCKFISH_18, setup.engine)
+            assertEquals(Color.WHITE, setup.humanSide)
+            assertEquals(EngineStrengthModel.HYBRID, setup.strength.model)
+            assertEquals(EngineStrengthTarget.Elo(1450), setup.strength.target)
+            assertEquals(600_000L, setup.clockConfig.initialMillis)
+            assertEquals(0L, setup.clockConfig.incrementMillis)
+            assertEquals(setup, coordinator.setup)
+            assertEquals(Variant.STANDARD, runtime.position.variant)
+            assertEquals(Color.WHITE, runtime.position.sideToMove)
+        }
     }
 
     private fun assertAuthoritativeOpeningState() {
@@ -231,6 +250,7 @@ class P5LiveScreenshotQaTest {
             }
         }
 
+        assertCancelledPressPreservesOpening()
         val visiblyChangedRatio = countVisiblyDifferentPixels(rest, pressed, threshold = 10).toFloat() /
             (rest.width * rest.height).toFloat()
         assertTrue("$label REST/PRESSED state must be perceptible; ratio=$visiblyChangedRatio", visiblyChangedRatio > 0.018f)
@@ -254,6 +274,18 @@ class P5LiveScreenshotQaTest {
         canvas.drawBitmap(rest, 0f, labelHeight.toFloat(), null)
         canvas.drawBitmap(pressed, (rest.width + gap).toFloat(), labelHeight.toFloat(), null)
         writeBitmap("03-live-press-state.png", comparison)
+    }
+
+    private fun assertCancelledPressPreservesOpening() {
+        composeRule.runOnIdle {
+            val runtime = requireNotNull(
+                ViewModelProvider(composeRule.activity)[PlayViewModel::class.java].currentCoordinatorForTest(),
+            ).state
+            assertTrue("cancelled press must not resign the game", runtime.terminal == null)
+            val mainline = runtime.gameTree.mainline()
+            assertEquals("cancelled press must retain the deterministic opening", 10, mainline.size)
+            assertEquals("f8e7", requireNotNull(mainline.last().move).uci)
+        }
     }
 
     private fun countVisiblyDifferentPixels(first: Bitmap, second: Bitmap, threshold: Int): Int {
