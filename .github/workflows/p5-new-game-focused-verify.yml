@@ -3,7 +3,7 @@ name: P5 New Game focused verification
 on:
   push:
     branches:
-      - p5-reference-fidelity-visual-identity
+      - tmp-file-upload-test-2
     paths:
       - '.github/workflows/p5-new-game-focused-verify.yml'
 
@@ -55,7 +55,7 @@ jobs:
           import hashlib
           path = Path('app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt')
           digest = hashlib.sha256(path.read_bytes()).hexdigest()
-          expected = 'a995fc4b3de6f86bdcc2e9130826f73c16f1d01b8f2d2bcf281057cae4eee727'
+          expected = '2cece5a310fb6733ce1ae1d1e152d82928a15276b826c8f2354641538c4bd3f9'
           if digest != expected:
               raise SystemExit(f'committed selector source hash mismatch: {digest}')
           print('committed_selector_sha256=' + digest)
