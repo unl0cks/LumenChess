@@ -3,12 +3,10 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import shlex
 import shutil
-import stat
 import subprocess
 import sys
-import urllib.request
-import zipfile
 from pathlib import Path
 
 from PIL import Image
@@ -23,12 +21,8 @@ SOURCE_SHA256 = {
 }
 APPROVED_PNG_SHA256 = "e07580cebf4579db9c06bebe44bcabd224cc3f3489a9a79bc18d2043ada1ab8e"
 APPROVED_RGB_SHA256 = "c95f60918335d222b60d9f6f98884be598948a751d3f496c3b1a56728775b357"
-PINNED_BROWSER_VERSION = "144.0.7559.96"
-PINNED_BROWSER_URL = (
-    "https://storage.googleapis.com/chrome-for-testing-public/"
-    f"{PINNED_BROWSER_VERSION}/linux64/chrome-linux64.zip"
-)
-PINNED_BROWSER_SHA256 = "ebb811eef0a0206b6f15dbd325840e39331a132399a4e7e0770cbc1624c3bff0"
+PINNED_ACTIONS_IMAGE = "debian:13.3-slim"
+PINNED_DEBIAN_CHROMIUM = "144.0.7559.96-1~deb13u1"
 
 
 def sha256(data: bytes) -> str:
@@ -46,7 +40,7 @@ def verify_frozen_source() -> tuple[str, str, str]:
     return tuple(parts)  # type: ignore[return-value]
 
 
-def ensure_inter_font() -> None:
+def ensure_inter_font() -> Path:
     fc_match = shutil.which("fc-match")
     if fc_match:
         family = subprocess.check_output(
@@ -54,8 +48,12 @@ def ensure_inter_font() -> None:
             text=True,
         ).strip()
         if family.split(",", 1)[0].strip() == "Inter":
+            font_file = subprocess.check_output(
+                [fc_match, "-f", "%{file}", "Inter"],
+                text=True,
+            ).strip()
             print(f"Resolved reference font: {family}")
-            return
+            return Path(font_file).resolve().parent
 
     if os.environ.get("GITHUB_ACTIONS") != "true":
         raise RuntimeError(
@@ -80,43 +78,15 @@ def ensure_inter_font() -> None:
     ).strip()
     if family.split(",", 1)[0].strip() != "Inter":
         raise RuntimeError(f"Pinned Inter did not resolve through fontconfig: {family!r}")
+    font_file = subprocess.check_output(
+        [fc_match, "-f", "%{file}", "Inter"],
+        text=True,
+    ).strip()
     print(f"Resolved reference font: {family}")
-
-
-def pinned_actions_browser() -> str:
-    runner_temp = Path(os.environ.get("RUNNER_TEMP", str(ROOT)))
-    install_root = runner_temp / f"p5-chrome-{PINNED_BROWSER_VERSION}"
-    archive = install_root / "chrome-linux64.zip"
-    executable = install_root / "chrome-linux64" / "chrome"
-
-    if not executable.exists():
-        install_root.mkdir(parents=True, exist_ok=True)
-        print(f"Downloading pinned New Game browser: {PINNED_BROWSER_VERSION}")
-        urllib.request.urlretrieve(PINNED_BROWSER_URL, archive)
-        archive_sha = sha256(archive.read_bytes())
-        if archive_sha != PINNED_BROWSER_SHA256:
-            raise AssertionError(
-                f"Pinned browser archive changed: {archive_sha}"
-            )
-        with zipfile.ZipFile(archive) as package:
-            for member in package.infolist():
-                package.extract(member, install_root)
-                mode = (member.external_attr >> 16) & 0o777
-                target = install_root / member.filename
-                if mode and target.exists():
-                    target.chmod(mode)
-
-    executable.chmod(executable.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    version = subprocess.check_output([str(executable), "--version"], text=True).strip()
-    if PINNED_BROWSER_VERSION not in version:
-        raise RuntimeError(f"Unexpected pinned browser version: {version!r}")
-    print(f"Resolved reference browser: {version}")
-    return str(executable)
+    return Path(font_file).resolve().parent
 
 
 def browser_executable() -> str:
-    if os.environ.get("GITHUB_ACTIONS") == "true":
-        return pinned_actions_browser()
     explicit = os.environ.get("P5_BROWSER")
     if explicit:
         return explicit
@@ -127,35 +97,53 @@ def browser_executable() -> str:
     raise RuntimeError("No system Chromium/Chrome executable found for frozen New Game reference rendering")
 
 
-def main() -> None:
-    output = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "new-game-approved-canonical.png"
-    output.parent.mkdir(parents=True, exist_ok=True)
+def render_in_pinned_actions_container(output: Path, font_dir: Path) -> None:
+    docker = shutil.which("docker")
+    if not docker:
+        raise RuntimeError("Docker is required for the pinned New Game reference renderer on GitHub Actions")
+    repo_root = ROOT.parents[3]
+    try:
+        output_relative = output.resolve().relative_to(repo_root.resolve())
+    except ValueError as exc:
+        raise RuntimeError(f"Reference output must stay inside the repository: {output}") from exc
 
-    html, css, js = verify_frozen_source()
-    ensure_inter_font()
-    document = re.sub(
-        r'<link rel="stylesheet" href="styles.css"\s*/?>',
-        f"<style>{css}</style>",
-        html,
-    ).replace(
-        '<script src="prototype.js"></script>',
-        f"<script>{js}</script>",
+    inner = " && ".join(
+        [
+            "apt-get update -qq",
+            (
+                "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "
+                f"chromium={shlex.quote(PINNED_DEBIAN_CHROMIUM)} python3 python3-pip fontconfig"
+            ),
+            "fc-cache -f",
+            "python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow playwright",
+            (
+                "P5_PINNED_CONTAINER=1 P5_BROWSER=/usr/bin/chromium "
+                "python3 docs/references/p5/new-game-approved/render_reference.py "
+                + shlex.quote(str(output_relative))
+            ),
+        ]
+    )
+    subprocess.run(
+        [
+            docker,
+            "run",
+            "--rm",
+            "-v",
+            f"{repo_root.resolve()}:/work",
+            "-v",
+            f"{font_dir.resolve()}:/usr/share/fonts/opentype/inter:ro",
+            "-w",
+            "/work",
+            PINNED_ACTIONS_IMAGE,
+            "bash",
+            "-lc",
+            inner,
+        ],
+        check=True,
     )
 
-    executable = browser_executable()
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(
-            headless=True,
-            executable_path=executable,
-            args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
-        )
-        page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
-        page.set_content(document, wait_until="load")
-        page.evaluate("document.body.classList.add('view-phone')")
-        page.screenshot(path=str(output), full_page=False)
-        page.close()
-        browser.close()
 
+def verify_rendered_output(output: Path) -> tuple[str, str]:
     png_bytes = output.read_bytes()
     png_sha = sha256(png_bytes)
     if png_sha != APPROVED_PNG_SHA256:
@@ -167,6 +155,45 @@ def main() -> None:
     rgb_sha = sha256(rendered.tobytes())
     if rgb_sha != APPROVED_RGB_SHA256:
         raise AssertionError(f"Approved New Game RGB pixels changed: {rgb_sha}")
+    return png_sha, rgb_sha
+
+
+def main() -> None:
+    output = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "new-game-approved-canonical.png"
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    html, css, js = verify_frozen_source()
+    font_dir = ensure_inter_font()
+
+    if os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("P5_PINNED_CONTAINER") != "1":
+        render_in_pinned_actions_container(output, font_dir)
+        png_sha, rgb_sha = verify_rendered_output(output)
+    else:
+        document = re.sub(
+            r'<link rel="stylesheet" href="styles.css"\s*/?>',
+            f"<style>{css}</style>",
+            html,
+        ).replace(
+            '<script src="prototype.js"></script>',
+            f"<script>{js}</script>",
+        )
+
+        executable = browser_executable()
+        version = subprocess.check_output([executable, "--version"], text=True).strip()
+        print(f"Resolved reference browser: {version}")
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(
+                headless=True,
+                executable_path=executable,
+                args=["--no-sandbox"],
+            )
+            page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+            page.set_content(document, wait_until="load")
+            page.evaluate("document.body.classList.add('view-phone')")
+            page.screenshot(path=str(output), full_page=False)
+            page.close()
+            browser.close()
+        png_sha, rgb_sha = verify_rendered_output(output)
 
     print(f"Approved New Game reference: {output}")
     for name, expected in SOURCE_SHA256.items():
