@@ -624,11 +624,44 @@ private fun NewGameChoiceBed(
         modifier
             .clip(shape)
             .drawWithCache {
-                val corner = CornerRadius(ref.dp(11f).toPx())
+                val cornerPx = ref.dp(11f).toPx()
+                val corner = CornerRadius(cornerPx)
+                val inset = ref.dp(1.25f).toPx()
+                val insetSize = Size(
+                    (size.width - inset * 2f).coerceAtLeast(0f),
+                    (size.height - inset * 2f).coerceAtLeast(0f),
+                )
+                val insetCorner = CornerRadius((cornerPx - inset).coerceAtLeast(0f))
+                val innerShadow = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Black.copy(alpha = .38f),
+                        .10f to Color.Black.copy(alpha = .24f),
+                        .28f to Color.Black.copy(alpha = .07f),
+                        .62f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = .05f),
+                    ),
+                )
                 onDrawBehind {
                     drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF0B1013), Color(0xFF0F1519))), cornerRadius = corner)
+                    drawRoundRect(innerShadow, cornerRadius = corner)
                     drawRoundRect(Color(0xFF77939D).copy(alpha = .07f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
-                    drawLine(Color.White.copy(alpha = .012f), Offset(ref.dp(8f).toPx(), ref.vdp(1f).toPx()), Offset(size.width - ref.dp(8f).toPx(), ref.vdp(1f).toPx()), ref.dp(.6f).toPx())
+                    drawRoundRect(
+                        Color.Black.copy(alpha = .22f),
+                        topLeft = Offset(inset, inset),
+                        size = insetSize,
+                        cornerRadius = insetCorner,
+                        style = Stroke(ref.dp(1.1f).toPx().coerceAtLeast(1f)),
+                    )
+                    drawRoundRect(
+                        Color.White.copy(alpha = .012f),
+                        topLeft = Offset(inset * 2f, inset * 2f),
+                        size = Size(
+                            (size.width - inset * 4f).coerceAtLeast(0f),
+                            (size.height - inset * 4f).coerceAtLeast(0f),
+                        ),
+                        cornerRadius = CornerRadius((cornerPx - inset * 2f).coerceAtLeast(0f)),
+                        style = Stroke(ref.dp(.65f).toPx().coerceAtLeast(.75f)),
+                    )
                 }
             }
             .padding(horizontal = ref.dp(3f), vertical = ref.vdp(3f)),
