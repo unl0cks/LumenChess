@@ -3,7 +3,7 @@ name: P5 New Game focused verification
 on:
   push:
     branches:
-      - p5-reference-fidelity-visual-identity
+      - p5-new-game-micro-calibration-diagnostic-20260821
     paths:
       - '.github/workflows/p5-new-game-focused-verify.yml'
 
@@ -48,14 +48,14 @@ jobs:
           rustup toolchain install 1.88.0 --profile minimal
           rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
       - uses: gradle/actions/setup-gradle@v4
-      - name: Verify committed selector source identity
+      - name: Verify committed micro-calibration source identity
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import hashlib
           path = Path('app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt')
           digest = hashlib.sha256(path.read_bytes()).hexdigest()
-          expected = 'a995fc4b3de6f86bdcc2e9130826f73c16f1d01b8f2d2bcf281057cae4eee727'
+          expected = '22ae6870c5a405ce152ffeff65c9803a6124caae961109bee5fd8123362c6dce'
           if digest != expected:
               raise SystemExit(f'committed selector source hash mismatch: {digest}')
           print('committed_selector_sha256=' + digest)
