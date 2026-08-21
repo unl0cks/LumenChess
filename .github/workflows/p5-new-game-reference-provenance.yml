@@ -84,7 +84,7 @@ jobs:
             fetch_snapshot_deb libfreetype6 "2.13.3+dfsg-1" amd64 /tmp/libfreetype6.deb
             fetch_snapshot_deb libharfbuzz0b "10.2.0-1+b1" amd64 /tmp/libharfbuzz0b.deb
             fetch_snapshot_deb libharfbuzz-subset0 "10.2.0-1+b1" amd64 /tmp/libharfbuzz-subset0.deb
-            fetch_snapshot_deb fonts-inter "4.0+ds-1" all /tmp/fonts-inter.deb
+            fetch_snapshot_deb fonts-inter "4.1+ds-1" all /tmp/fonts-inter.deb
             DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/chromium-common.deb /tmp/chromium.deb /tmp/fonts-inter.deb
             dpkg -i /tmp/libfreetype6.deb /tmp/libharfbuzz0b.deb /tmp/libharfbuzz-subset0.deb
             test "$(dpkg-query -W -f='"'"'${Version}'"'"' chromium)" = "$CHROMIUM_VERSION"
