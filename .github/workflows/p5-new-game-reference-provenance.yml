@@ -10,81 +10,83 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   reference-only:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Mark provenance pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state=pending -f context='P5 New Game reference provenance' -f description='Official Debian snapshot render running' -f target_url="$RUN_URL"
       - name: Render with official Debian snapshot provenance
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
-            -v "$PWD:/work" \
-            -w /work \
-            debian:13.3-slim \
-            bash -lc '
-              set -euo pipefail
-              apt-get update -qq
-              DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl python3 python3-pip fontconfig dpkg-dev
-
-              fetch_snapshot_deb() {
-                name="$1"; version="$2"; arch="$3"; out="$4"
-                enc_version="$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=\"\"))" "$version")"
-                api="https://snapshot.debian.org/mr/binary/${name}/${enc_version}/binfiles?fileinfo=1"
-                curl --fail --location --retry 3 --silent --show-error "$api" -o /tmp/info.json
-                file_hash="$(python3 - "$name" "$arch" <<"PY"
+          docker run --rm -v "$PWD:/work" -w /work debian:13.3-slim bash -lc '
+            set -euo pipefail
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl python3 python3-pip fontconfig dpkg-dev
+            fetch_snapshot_deb() {
+              name="$1"; version="$2"; arch="$3"; out="$4"
+              enc_version="$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=\"\"))" "$version")"
+              api="https://snapshot.debian.org/mr/binary/${name}/${enc_version}/binfiles?fileinfo=1"
+              curl --fail --location --retry 3 --silent --show-error "$api" -o /tmp/info.json
+              file_hash="$(python3 - "$name" "$arch" <<"PY"
 import json, sys
 name, arch = sys.argv[1:]
 data = json.load(open("/tmp/info.json"))
 matches = [r["hash"] for r in data["result"] if r["architecture"] == arch]
-if len(matches) != 1:
-    raise SystemExit(f"{name}: expected one {arch} file, got {matches}")
+if len(matches) != 1: raise SystemExit(f"{name}: expected one {arch} file, got {matches}")
 print(matches[0])
 PY
-                )"
-                python3 - "$file_hash" <<"PY"
+              )"
+              python3 - "$file_hash" <<"PY"
 import json, sys
-h = sys.argv[1]
-data = json.load(open("/tmp/info.json"))
-print("snapshot-file-sha1=" + h)
-for item in data.get("fileinfo", {}).get(h, []):
-    print("snapshot-first-seen=" + item["first_seen"])
-    print("snapshot-name=" + item["name"])
-    print("snapshot-path=" + item["path"])
+h=sys.argv[1]; data=json.load(open("/tmp/info.json"))
+print("snapshot-file-sha1="+h)
+for item in data.get("fileinfo",{}).get(h,[]):
+ print("snapshot-first-seen="+item["first_seen"]); print("snapshot-name="+item["name"]); print("snapshot-path="+item["path"])
 PY
-                curl --fail --location --retry 3 --silent --show-error "https://snapshot.debian.org/file/${file_hash}" -o "$out"
-                test "$(dpkg-deb -f "$out" Package)" = "$name"
-                test "$(dpkg-deb -f "$out" Version)" = "$version"
-                test "$(dpkg-deb -f "$out" Architecture)" = "$arch"
-                sha256sum "$out"
-              }
-
-              CHROMIUM_VERSION="144.0.7559.96-1~deb13u1"
-              fetch_snapshot_deb chromium-common "$CHROMIUM_VERSION" amd64 /tmp/chromium-common.deb
-              fetch_snapshot_deb chromium "$CHROMIUM_VERSION" amd64 /tmp/chromium.deb
-              fetch_snapshot_deb libfreetype6 "2.13.3+dfsg-1" amd64 /tmp/libfreetype6.deb
-              fetch_snapshot_deb libharfbuzz0b "10.2.0-1+b1" amd64 /tmp/libharfbuzz0b.deb
-              fetch_snapshot_deb libharfbuzz-subset0 "10.2.0-1+b1" amd64 /tmp/libharfbuzz-subset0.deb
-              fetch_snapshot_deb fonts-inter "4.0+ds-1" all /tmp/fonts-inter.deb
-
-              DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/chromium-common.deb /tmp/chromium.deb /tmp/fonts-inter.deb
-              dpkg -i /tmp/libfreetype6.deb /tmp/libharfbuzz0b.deb /tmp/libharfbuzz-subset0.deb
-
-              test "$(dpkg-query -W -f='"'"'${Version}'"'"' chromium)" = "$CHROMIUM_VERSION"
-              test "$(dpkg-query -W -f='"'"'${Version}'"'"' libfreetype6)" = "2.13.3+dfsg-1"
-              test "$(dpkg-query -W -f='"'"'${Version}'"'"' libharfbuzz0b)" = "10.2.0-1+b1"
-              test "$(dpkg-query -W -f='"'"'${Version}'"'"' libharfbuzz-subset0)" = "10.2.0-1+b1"
-              chromium --version
-              fc-cache -f
-              test "$(fc-match -f '"'"'%{family}'"'"' Inter | cut -d, -f1)" = Inter
-              INTER_FILE="$(fc-match -f '"'"'%{file}'"'"' Inter)"
-              echo "Inter file: $INTER_FILE"
-              echo "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799  $INTER_FILE" | sha256sum -c -
-
-              python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow playwright
-              rm -f /tmp/new-game-approved.png
-              P5_PINNED_CONTAINER=1 P5_BROWSER=/usr/bin/chromium \
-                python3 docs/references/p5/new-game-approved/render_reference.py /tmp/new-game-approved.png
-            '
+              curl --fail --location --retry 3 --silent --show-error "https://snapshot.debian.org/file/${file_hash}" -o "$out"
+              test "$(dpkg-deb -f "$out" Package)" = "$name"
+              test "$(dpkg-deb -f "$out" Version)" = "$version"
+              test "$(dpkg-deb -f "$out" Architecture)" = "$arch"
+              sha256sum "$out"
+            }
+            CHROMIUM_VERSION="144.0.7559.96-1~deb13u1"
+            fetch_snapshot_deb chromium-common "$CHROMIUM_VERSION" amd64 /tmp/chromium-common.deb
+            fetch_snapshot_deb chromium "$CHROMIUM_VERSION" amd64 /tmp/chromium.deb
+            fetch_snapshot_deb libfreetype6 "2.13.3+dfsg-1" amd64 /tmp/libfreetype6.deb
+            fetch_snapshot_deb libharfbuzz0b "10.2.0-1+b1" amd64 /tmp/libharfbuzz0b.deb
+            fetch_snapshot_deb libharfbuzz-subset0 "10.2.0-1+b1" amd64 /tmp/libharfbuzz-subset0.deb
+            fetch_snapshot_deb fonts-inter "4.0+ds-1" all /tmp/fonts-inter.deb
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/chromium-common.deb /tmp/chromium.deb /tmp/fonts-inter.deb
+            dpkg -i /tmp/libfreetype6.deb /tmp/libharfbuzz0b.deb /tmp/libharfbuzz-subset0.deb
+            test "$(dpkg-query -W -f='"'"'${Version}'"'"' chromium)" = "$CHROMIUM_VERSION"
+            test "$(dpkg-query -W -f='"'"'${Version}'"'"' libfreetype6)" = "2.13.3+dfsg-1"
+            test "$(dpkg-query -W -f='"'"'${Version}'"'"' libharfbuzz0b)" = "10.2.0-1+b1"
+            test "$(dpkg-query -W -f='"'"'${Version}'"'"' libharfbuzz-subset0)" = "10.2.0-1+b1"
+            chromium --version
+            fc-cache -f
+            test "$(fc-match -f '"'"'%{family}'"'"' Inter | cut -d, -f1)" = Inter
+            INTER_FILE="$(fc-match -f '"'"'%{file}'"'"' Inter)"
+            echo "Inter file: $INTER_FILE"
+            echo "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799  $INTER_FILE" | sha256sum -c -
+            python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow playwright
+            P5_PINNED_CONTAINER=1 P5_BROWSER=/usr/bin/chromium python3 docs/references/p5/new-game-approved/render_reference.py /tmp/new-game-approved.png
+          '
+      - name: Publish provenance result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          STATE=failure; DESC='Official snapshot reference render failed'
+          if [ "$JOB_STATUS" = success ]; then STATE=success; DESC='Official snapshot reproduced frozen New Game hashes'; fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$STATE" -f context='P5 New Game reference provenance' -f description="$DESC" -f target_url="$RUN_URL"
