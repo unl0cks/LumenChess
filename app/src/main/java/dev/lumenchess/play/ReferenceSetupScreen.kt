@@ -946,13 +946,38 @@ private fun NewGamePrimaryButton(
     val elevation by animateDpAsState(if (pressed) ref.dp(1f) else ref.dp(5f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-cta-shadow")
     val shape = RoundedCornerShape(ref.dp(10f))
     Box(modifier) {
+        val exposedBase = if (pressed) ref.vdp(1f) else ref.vdp(4f)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationY = (offset + exposedBase).toPx()
+                    alpha = if (enabled) 1f else .50f
+                    shadowElevation = elevation.toPx()
+                    this.shape = shape
+                    clip = true
+                }
+                .drawWithCache {
+                    val corner = CornerRadius(ref.dp(10f).toPx())
+                    onDrawBehind {
+                        drawRoundRect(
+                            Brush.verticalGradient(listOf(Color(0xFF2B5665), Color(0xFF244A58))),
+                            cornerRadius = corner,
+                        )
+                        drawRoundRect(
+                            Color(0xFF102F3B).copy(alpha = .42f),
+                            cornerRadius = corner,
+                            style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)),
+                        )
+                    }
+                },
+        )
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     translationY = offset.toPx()
                     alpha = if (enabled) 1f else .50f
-                    shadowElevation = elevation.toPx()
                     this.shape = shape
                     clip = true
                 }
@@ -979,10 +1004,8 @@ private fun NewGamePrimaryButton(
                             ),
                         )
                     }
-                    val lower = if (pressed) ref.vdp(1f).toPx() else ref.vdp(4f).toPx()
                     onDrawBehind {
                         drawRoundRect(face, cornerRadius = corner)
-                        drawRect(Color(0xFF244A58), Offset(0f, size.height - lower), Size(size.width, lower))
                         drawRoundRect(palette.cyan.copy(alpha = .18f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
                     }
                 }
