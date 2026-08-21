@@ -69,6 +69,15 @@ jobs:
               test "$(dpkg-deb -f "$out" Architecture)" = "$arch"
               sha256sum "$out"
             }
+            probe_inter_snapshot() {
+              version="$1"; slug="$(printf '%s' "$version" | tr -c 'A-Za-z0-9._-' '_')"
+              deb="/tmp/fonts-inter-${slug}.deb"; root="/tmp/fonts-inter-${slug}"
+              fetch_snapshot_deb fonts-inter "$version" all "$deb"
+              rm -rf "$root"; mkdir -p "$root"; dpkg-deb -x "$deb" "$root"
+              find "$root" -type f \( -name 'Inter-Regular.otf' -o -name 'Inter-Regular.ttf' \) -exec sha256sum {} +
+            }
+            probe_inter_snapshot "3.19+ds-1"
+            probe_inter_snapshot "3.19+ds-2"
             CHROMIUM_VERSION="144.0.7559.96-1~deb13u1"
             fetch_snapshot_deb chromium-common "$CHROMIUM_VERSION" amd64 /tmp/chromium-common.deb
             fetch_snapshot_deb chromium "$CHROMIUM_VERSION" amd64 /tmp/chromium.deb
