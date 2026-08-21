@@ -1229,8 +1229,8 @@ private fun NewGameIcon(glyph: NewGameGlyph, tint: Color, modifier: Modifier, re
                 val outline = Stroke(iconStroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
                 drawRoundRect(
                     color = tint,
-                    topLeft = point(5.4f, 6.6f),
-                    size = Size(13.2f * unit, 10.8f * unit),
+                    topLeft = point(8.1f, 6.6f),
+                    size = Size(7.8f * unit, 10.8f * unit),
                     cornerRadius = CornerRadius(2.7f * unit),
                     style = outline,
                 )

@@ -55,7 +55,7 @@ jobs:
           import hashlib
           path = Path('app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt')
           digest = hashlib.sha256(path.read_bytes()).hexdigest()
-          expected = '22ae6870c5a405ce152ffeff65c9803a6124caae961109bee5fd8123362c6dce'
+          expected = 'aebb42d9ee7067ffadeb3554f11ddd661ac01b7dfc8df0f1a0f9bf7b3e788ed1'
           if digest != expected:
               raise SystemExit(f'committed selector source hash mismatch: {digest}')
           print('committed_selector_sha256=' + digest)
