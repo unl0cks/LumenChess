@@ -74,6 +74,7 @@ jobs:
             chromium --version
             fc-cache -f
             test "$(fc-match -f '"'"'%{family}'"'"' Inter | cut -d, -f1)" = Inter
+            dpkg -L fonts-inter | while IFS= read -r path; do if [ -f "$path" ]; then sha256sum "$path"; fi; done
             INTER_FILE="$(fc-match -f '"'"'%{file}'"'"' Inter)"
             echo "Inter file: $INTER_FILE"
             echo "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799  $INTER_FILE" | sha256sum -c -
