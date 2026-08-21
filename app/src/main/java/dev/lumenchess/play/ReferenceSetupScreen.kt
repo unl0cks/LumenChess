@@ -813,7 +813,7 @@ private fun NewGameSelector(
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) .994f else 1f, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "selector-$title-scale")
     val offset by animateDpAsState(if (pressed) ref.vdp(2f) else 0.dp, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "selector-$title-y")
-    val elevation by animateDpAsState(if (pressed) ref.dp(1f) else ref.dp(4f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "selector-$title-shadow")
+    val elevation by animateDpAsState(if (pressed) ref.dp(2f) else ref.dp(6f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "selector-$title-shadow")
     val shape = RoundedCornerShape(ref.dp(10f))
     Row(
         modifier
@@ -822,6 +822,8 @@ private fun NewGameSelector(
                 scaleY = scale
                 translationY = offset.toPx()
                 shadowElevation = elevation.toPx()
+                ambientShadowColor = Color.Black.copy(alpha = if (pressed) .20f else .28f)
+                spotShadowColor = Color.Black.copy(alpha = if (pressed) .24f else .32f)
                 this.shape = shape
                 clip = true
             }
@@ -830,8 +832,17 @@ private fun NewGameSelector(
                 val face = Brush.verticalGradient(
                     if (pressed) listOf(Color(0xFF141A1D), Color(0xFF111619)) else listOf(Color(0xFF171D21), Color(0xFF12181B)),
                 )
+                val edgeDepth = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.White.copy(alpha = if (pressed) .012f else .026f),
+                        .20f to Color.Transparent,
+                        .72f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = if (pressed) .025f else .045f),
+                    ),
+                )
                 onDrawBehind {
                     drawRoundRect(face, cornerRadius = corner)
+                    drawRoundRect(edgeDepth, cornerRadius = corner)
                     if (expanded) drawRect(palette.cyan.copy(alpha = .48f), Offset(0f, ref.vdp(8f).toPx()), Size(ref.dp(2f).toPx(), size.height - ref.vdp(16f).toPx()))
                     drawRoundRect(Color(0xFF879FA8).copy(alpha = if (expanded) .14f else .12f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
                 }
@@ -928,12 +939,26 @@ private fun NewGameDisabledAction(ref: NewGameReferenceScale, modifier: Modifier
     val shape = RoundedCornerShape(ref.dp(9f))
     Row(
         modifier
-            .clip(shape)
+            .graphicsLayer {
+                shadowElevation = ref.dp(3f).toPx()
+                ambientShadowColor = Color.Black.copy(alpha = .14f)
+                spotShadowColor = Color.Black.copy(alpha = .19f)
+                this.shape = shape
+                clip = true
+            }
             .drawWithCache {
                 val corner = CornerRadius(ref.dp(9f).toPx())
+                val edgeDepth = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.White.copy(alpha = .018f),
+                        .24f to Color.Transparent,
+                        .76f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = .035f),
+                    ),
+                )
                 onDrawBehind {
                     drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF151B1E), Color(0xFF111619))), cornerRadius = corner)
-                    drawLine(Color.White.copy(alpha = .018f), Offset(ref.dp(8f).toPx(), ref.vdp(1f).toPx()), Offset(size.width - ref.dp(8f).toPx(), ref.vdp(1f).toPx()), ref.dp(.6f).toPx())
+                    drawRoundRect(edgeDepth, cornerRadius = corner)
                     drawRoundRect(Color(0xFF879FA8).copy(alpha = .08f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
                 }
             }
