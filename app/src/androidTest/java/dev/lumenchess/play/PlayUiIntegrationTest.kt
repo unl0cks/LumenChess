@@ -1,6 +1,7 @@
 package dev.lumenchess.play
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -93,6 +94,26 @@ class PlayUiIntegrationTest {
         }
         val afterEngineResult = boardBounds()
         assertStableBounds(before, afterEngineResult)
+    }
+
+    @Test
+    fun defaultHumanVsEngineLivePresentationIsBoardFirst() {
+        openSetup()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
+        waitForLiveScreen()
+
+        val liveRoot = composeRule.onNodeWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val board = boardBounds()
+        val actions = composeRule.onNodeWithTag("p5-live-action-strip").fetchSemanticsNode().boundsInRoot
+
+        assertTrue("default board must remain square: $board", abs(board.width - board.height) <= 1f)
+        assertTrue("default board width must remain P1-stable: $board in $liveRoot", board.width / liveRoot.width in 0.92f..1f)
+        val bottomInset = composeRule.activity.resources.displayMetrics.density * 6f
+        assertTrue("essential actions must be bottom-anchored to the Live root: actions=$actions, root=$liveRoot", liveRoot.bottom - actions.bottom <= bottomInset)
+
+        listOf("p5-live-lower-region", "p5-live-tabs", "p5-live-moves-rail").forEach { tag ->
+            composeRule.onNodeWithTag(tag).assertDoesNotExist()
+        }
     }
 
     @Test

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -197,6 +198,7 @@ internal fun BoardFirstReferenceLiveScreen(
         if (visibility.showMoves || visibility.showInfo || visibility.showEvaluation || visibility.showEngineLines) {
             ReferenceLiveScreen(ui, viewModel, Modifier.fillMaxSize())
         } else {
+            Spacer(Modifier.weight(1f))
             BoardFirstEssentialActions(
                 runtime = runtime,
                 hasPremove = queuedPremove != null,
