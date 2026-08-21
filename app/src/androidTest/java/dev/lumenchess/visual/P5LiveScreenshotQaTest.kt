@@ -7,6 +7,7 @@ import android.graphics.Typeface
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -56,6 +57,48 @@ class P5LiveScreenshotQaTest {
     fun requireExplicitScreenshotRun() {
         val enabled = InstrumentationRegistry.getArguments().getString("p5LiveQa") == "true"
         assumeTrue("P5 Live Game screenshot QA runs only from its dedicated workflow step", enabled)
+    }
+
+    @Test
+    fun captureBoardFirstLiveReferenceOnly() {
+        verifyInterTightRuntimeResource()
+        waitForTag("p5-play-overview")
+        selectDarkAppearance()
+        composeRule.onNodeWithTag("main-tab-play").performClick()
+        waitForTag("p5-play-overview")
+
+        composeRule.runOnIdle {
+            ViewModelProvider(composeRule.activity)[PlayViewModel::class.java].apply {
+                updateVariant(Variant.STANDARD)
+                updateEngine(PlayEngine.STOCKFISH_18)
+                updateSide(PlaySide.WHITE)
+                updateStrengthModel(EngineStrengthModel.HYBRID)
+                updateStrengthTarget(EngineStrengthTarget.Elo(1450))
+                updateTimeControl(PlayTimeControl(initialMillis = 600_000L, incrementMillis = 0L))
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("play-overview-vs-engine").performClick()
+        waitForTag(PLAY_SETUP_TEST_TAG)
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
+        waitForLiveReady()
+
+        composeRule.onNodeWithTag("main-tab-play").assertDoesNotExist()
+        composeRule.onNodeWithTag("p5-live-lower-region").assertDoesNotExist()
+        composeRule.onNodeWithTag("p5-live-tabs").assertDoesNotExist()
+        composeRule.onNodeWithTag("p5-live-moves-rail").assertDoesNotExist()
+        composeRule.onNodeWithTag("p5-live-action-pause").assertDoesNotExist()
+        composeRule.onNodeWithText("Moves").assertDoesNotExist()
+        composeRule.onNodeWithText("Info").assertDoesNotExist()
+
+        driveDeterministicOpening()
+        assertAuthoritativeOpeningState()
+        assertBoardFirstGeometry()
+        logBoardFirstMetrics()
+
+        capture("03-live-board-first.png")
+        captureBoardFirstPressState("p5-live-action-resign")
     }
 
     @Test
@@ -111,6 +154,12 @@ class P5LiveScreenshotQaTest {
 
     /** Drives the real serialized runtime through the legal 1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 4.Ba4 Nf6 5.O-O Be7 mainline. */
     private fun seedDeterministicOpening() {
+        driveDeterministicOpening()
+        composeRule.onNodeWithText("O-O").assertIsDisplayed()
+        composeRule.onNodeWithText("Be7").assertIsDisplayed()
+    }
+
+    private fun driveDeterministicOpening() {
         composeRule.runOnIdle {
             val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
             val coordinator = requireNotNull(viewModel.currentCoordinatorForTest())
@@ -149,8 +198,49 @@ class P5LiveScreenshotQaTest {
             viewModel.cancelPremove()
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("O-O").assertIsDisplayed()
-        composeRule.onNodeWithText("Be7").assertIsDisplayed()
+    }
+
+    private fun assertBoardFirstGeometry() {
+        val metrics = composeRule.activity.resources.displayMetrics
+        val screenWidth = metrics.widthPixels.toFloat()
+        val screenHeight = metrics.heightPixels.toFloat()
+        val board = bounds(CHESSBOARD_TEST_TAG)
+        val opponent = bounds("p5-live-opponent-row")
+        val player = bounds("p5-live-player-row")
+        val actions = bounds("p5-live-action-strip")
+
+        assertTrue("board must remain square: $board", abs(board.width - board.height) <= 1f)
+        assertTrue("board width ratio=${board.width / screenWidth}", board.width / screenWidth in 0.92f..0.97f)
+        assertTrue("opponent row must sit above board", opponent.bottom <= board.top + 1f)
+        assertTrue("player row must sit below board", player.top >= board.bottom - 1f)
+        assertTrue("essential actions must sit below player row", actions.top >= player.bottom - 1f)
+        assertTrue("board-first composition must fit the viewport", actions.bottom / screenHeight < 0.98f)
+
+        listOf(
+            "p5-live-shell",
+            "p5-live-opponent-row",
+            "p5-live-opponent-clock",
+            "p5-live-player-row",
+            "p5-live-player-clock",
+            "p5-live-action-resign",
+            "p5-live-action-exit",
+        ).forEach(::waitForTag)
+    }
+
+    private fun logBoardFirstMetrics() {
+        val metrics = composeRule.activity.resources.displayMetrics
+        println("P5_LIVE_BOARD_FIRST_METRIC viewport w=${metrics.widthPixels} h=${metrics.heightPixels}")
+        listOf(
+            "p5-live-shell",
+            "p5-live-opponent-row",
+            "p5-live-opponent-clock",
+            CHESSBOARD_TEST_TAG,
+            "p5-live-player-row",
+            "p5-live-player-clock",
+            "p5-live-action-strip",
+            "p5-live-action-resign",
+            "p5-live-action-exit",
+        ).forEach { tag -> println("P5_LIVE_BOARD_FIRST_METRIC $tag=${bounds(tag)}") }
     }
 
     private fun assertAuthoritativeOpeningState() {
@@ -296,6 +386,43 @@ class P5LiveScreenshotQaTest {
         canvas.drawBitmap(rest, 0f, labelHeight.toFloat(), null)
         canvas.drawBitmap(pressed, (rest.width + gap).toFloat(), labelHeight.toFloat(), null)
         writeBitmap("02-stockfish-live-press-state.png", comparison)
+    }
+
+    private fun captureBoardFirstPressState(tag: String) {
+        composeRule.waitForIdle()
+        val node = composeRule.onNodeWithTag(tag)
+        val rest = node.captureToImage().asAndroidBitmap()
+        node.performTouchInput { down(center); advanceEventTime(80L) }
+        composeRule.waitForIdle()
+        val pressed = node.captureToImage().asAndroidBitmap()
+        val visiblyChangedRatio = countVisiblyDifferentPixels(rest, pressed, threshold = 10).toFloat() /
+            (rest.width * rest.height).toFloat()
+        assertTrue(
+            "board-first action REST/PRESSED state must visibly compress; visiblyChangedRatio=$visiblyChangedRatio",
+            visiblyChangedRatio > 0.025f,
+        )
+        node.performTouchInput { cancel() }
+        composeRule.waitForIdle()
+
+        val labelHeight = 34
+        val gap = 10
+        val comparison = Bitmap.createBitmap(
+            rest.width + gap + pressed.width,
+            labelHeight + maxOf(rest.height, pressed.height),
+            Bitmap.Config.ARGB_8888,
+        )
+        val canvas = AndroidCanvas(comparison)
+        canvas.drawColor(android.graphics.Color.rgb(8, 8, 8))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(224, 228, 230)
+            textSize = 22f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        }
+        canvas.drawText("REST", 8f, 25f, paint)
+        canvas.drawText("PRESSED", (rest.width + gap + 8).toFloat(), 25f, paint)
+        canvas.drawBitmap(rest, 0f, labelHeight.toFloat(), null)
+        canvas.drawBitmap(pressed, (rest.width + gap).toFloat(), labelHeight.toFloat(), null)
+        writeBitmap("03-live-board-first-press-state.png", comparison)
     }
 
     private fun countVisiblyDifferentPixels(first: Bitmap, second: Bitmap, threshold: Int): Int {
