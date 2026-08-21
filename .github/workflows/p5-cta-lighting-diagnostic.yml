@@ -1,4 +1,4 @@
-name: P5 CTA lighting diagnostic
+name: P5 selector seam diagnostic
 
 on:
   push:
@@ -8,24 +8,24 @@ on:
       - '.github/workflows/p5-cta-lighting-diagnostic.yml'
 
 permissions:
-  contents: write
+  contents: read
   statuses: write
 
 jobs:
-  cta-lighting-diagnostic:
+  selector-seam-diagnostic:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Mark CTA diagnostic pending
+      - name: Mark selector diagnostic pending
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
-            -f context='P5 CTA lighting diagnostic' \
-            -f description='Face-wide CTA upper-light integration is running' \
+            -f context='P5 selector seam diagnostic' \
+            -f description='Selector top-light isolation is running' \
             -f target_url="$RUN_URL"
 
       - uses: actions/setup-java@v4
@@ -55,7 +55,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Apply single-variable CTA lighting diagnostic
+      - name: Remove only selector finite top-light line
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -63,57 +63,13 @@ jobs:
 
           path = Path('app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt')
           source = path.read_text()
-          start_token = 'val face = if (pressed) {'
-          lower_token = 'val lower = if (pressed) ref.vdp(1f).toPx() else ref.vdp(4f).toPx()'
-          draw_token = 'drawRoundRect(upperLight, cornerRadius = corner)'
-          if source.count(start_token) != 1:
-              raise SystemExit(f'expected exactly one CTA face token, found {source.count(start_token)}')
-          if source.count(lower_token) != 1:
-              raise SystemExit(f'expected exactly one CTA lower token, found {source.count(lower_token)}')
-          if source.count(draw_token) != 1:
-              raise SystemExit(f'expected exactly one CTA upperLight draw token, found {source.count(draw_token)}')
-
-          token_index = source.index(start_token)
-          block_start = source.rfind('\n', 0, token_index) + 1
-          indent = source[block_start:token_index]
-          lower_index = source.index(lower_token, token_index)
-          lower_line_start = source.rfind('\n', 0, lower_index) + 1
-
-          def line(level, text):
-              return indent + ('    ' * level) + text + '\n'
-
-          replacement = (
-              line(0, 'val face = if (pressed) {') +
-              line(1, 'Brush.verticalGradient(') +
-              line(2, 'colorStops = arrayOf(') +
-              line(3, '0f to Color(0xFF5A9AB1),') +
-              line(3, '.24f to Color(0xFF4E91A8),') +
-              line(3, '.52f to Color(0xFF498AA1),') +
-              line(3, '.78f to Color(0xFF438299),') +
-              line(3, '1f to Color(0xFF3F7F96),') +
-              line(2, '),') +
-              line(1, ')') +
-              line(0, '} else {') +
-              line(1, 'Brush.verticalGradient(') +
-              line(2, 'colorStops = arrayOf(') +
-              line(3, '0f to Color(0xFF6EACC1),') +
-              line(3, '.22f to Color(0xFF579CB4),') +
-              line(3, '.46f to Color(0xFF4789A1),') +
-              line(3, '.73f to Color(0xFF407F96),') +
-              line(3, '1f to Color(0xFF39758B),') +
-              line(2, '),') +
-              line(1, ')') +
-              line(0, '}')
-          )
-          patched = source[:block_start] + replacement + source[lower_line_start:]
-
-          draw_index = patched.index(draw_token)
-          draw_line_start = patched.rfind('\n', 0, draw_index) + 1
-          draw_line_end = patched.index('\n', draw_index) + 1
-          patched = patched[:draw_line_start] + patched[draw_line_end:]
-
-          if 'upperLight' in patched:
-              raise SystemExit('upperLight survived CTA diagnostic patch')
+          token = 'drawLine(Color.White.copy(alpha = if (pressed) .018f else .03f), Offset(ref.dp(9f).toPx(), ref.vdp(1f).toPx()), Offset(size.width - ref.dp(9f).toPx(), ref.vdp(1f).toPx()), ref.dp(.7f).toPx())'
+          if source.count(token) != 1:
+              raise SystemExit(f'expected exactly one NewGameSelector top-light line, found {source.count(token)}')
+          i = source.index(token)
+          start = source.rfind('\n', 0, i) + 1
+          end = source.index('\n', i) + 1
+          patched = source[:start] + source[end:]
           path.write_text(patched)
           print('patched_sha256=' + hashlib.sha256(patched.encode()).hexdigest())
           PY
@@ -122,9 +78,9 @@ jobs:
 
       - name: Boot Pixel 8 Pro sized Android 17 emulator
         run: |
-          echo "no" | avdmanager create avd --force --name p5-cta-lighting \
+          echo "no" | avdmanager create avd --force --name p5-selector-seam \
             --package "system-images;android-37.0;google_apis_ps16k;x86_64"
-          AVD_CONFIG="$HOME/.android/avd/p5-cta-lighting.avd/config.ini"
+          AVD_CONFIG="$HOME/.android/avd/p5-selector-seam.avd/config.ini"
           cat >> "$AVD_CONFIG" <<'AVDEOF'
           hw.lcd.width=1344
           hw.lcd.height=2992
@@ -132,9 +88,9 @@ jobs:
           showDeviceFrame=no
           AVDEOF
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
-          "$ANDROID_HOME/emulator/emulator" -avd p5-cta-lighting \
+          "$ANDROID_HOME/emulator/emulator" -avd p5-selector-seam \
             -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 \
-            > "$RUNNER_TEMP/p5-cta-emulator.log" 2>&1 &
+            > "$RUNNER_TEMP/p5-selector-emulator.log" 2>&1 &
           timeout 90 bash -c 'until adb devices | grep -Eq "^emulator-[0-9]+[[:space:]]+device$"; do sleep 2; done'
           timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
           adb shell wm size reset
@@ -147,7 +103,7 @@ jobs:
         run: |
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
-      - name: Capture CTA diagnostic
+      - name: Capture selector diagnostic
         run: |
           adb install -r app/build/outputs/apk/debug/app-debug.apk
           adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
@@ -156,36 +112,26 @@ jobs:
             -e p5SetupQa true \
             -e class 'dev.lumenchess.visual.P5SetupScreenshotQaTest#approvedStandardStateCapturesFrozenNewGameAndPressFamilies' \
             dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
-            | tee "$RUNNER_TEMP/p5-cta-instrumentation.txt"
-          mkdir -p p5-cta
-          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-cta/
-          test -f p5-cta/02-new-game.png
-          test -f p5-cta/02-new-game-press-state.png
+            | tee "$RUNNER_TEMP/p5-selector-instrumentation.txt"
+          mkdir -p p5-selector
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-selector/
+          test -f p5-selector/02-new-game.png
+          test -f p5-selector/02-new-game-press-state.png
 
-      - name: Commit validated CTA lighting fix
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt
-          test -n "$(git diff --cached --name-only)"
-          test "$(git diff --cached --name-only)" = 'app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt'
-          git commit -m 'fix(P5): integrate CTA face lighting'
-          git push origin HEAD:p5-reference-fidelity-visual-identity
-
-      - name: Upload CTA diagnostic
+      - name: Upload selector diagnostic
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: p5-cta-lighting-diagnostic-${{ github.sha }}
+          name: p5-selector-line-diagnostic-${{ github.sha }}
           path: |
-            p5-cta/
-            ${{ runner.temp }}/p5-cta-instrumentation.txt
-            ${{ runner.temp }}/p5-cta-emulator.log
+            p5-selector/
+            ${{ runner.temp }}/p5-selector-instrumentation.txt
+            ${{ runner.temp }}/p5-selector-emulator.log
             app/src/main/java/dev/lumenchess/play/ReferenceSetupScreen.kt
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Publish CTA diagnostic status
+      - name: Publish selector diagnostic status
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -193,13 +139,13 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           STATE=failure
-          DESCRIPTION='CTA lighting isolation failed'
+          DESCRIPTION='Selector top-light isolation failed'
           if [ "$JOB_STATUS" = 'success' ]; then
             STATE=success
-            DESCRIPTION='CTA lighting isolation captured successfully'
+            DESCRIPTION='Selector top-light isolation captured successfully'
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$STATE" \
-            -f context='P5 CTA lighting diagnostic' \
+            -f context='P5 selector seam diagnostic' \
             -f description="$DESCRIPTION" \
             -f target_url="$RUN_URL"
