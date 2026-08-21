@@ -23,6 +23,16 @@ APPROVED_PNG_SHA256 = "e07580cebf4579db9c06bebe44bcabd224cc3f3489a9a79bc18d2043a
 APPROVED_RGB_SHA256 = "c95f60918335d222b60d9f6f98884be598948a751d3f496c3b1a56728775b357"
 PINNED_ACTIONS_IMAGE = "debian:13.3-slim"
 PINNED_DEBIAN_CHROMIUM = "144.0.7559.96-1~deb13u1"
+PINNED_DEBIAN_CHROMIUM_MIRRORS = (
+    "https://mirror.batstateu.edu.ph/debian-security/pool/updates/main/c/chromium",
+    "https://ftp.riken.go.jp/Linux/debian/debian-security/pool/main/c/chromium",
+    "https://debian.sipwise.com/debian-security/pool/main/c/chromium",
+)
+PINNED_DEBIAN_CHROMIUM_PACKAGES = (
+    "chromium-common",
+    "chromium-sandbox",
+    "chromium",
+)
 
 
 def sha256(data: bytes) -> str:
@@ -107,13 +117,38 @@ def render_in_pinned_actions_container(output: Path, font_dir: Path) -> None:
     except ValueError as exc:
         raise RuntimeError(f"Reference output must stay inside the repository: {output}") from exc
 
+    package_paths: list[str] = []
+    package_steps: list[str] = []
+    for package in PINNED_DEBIAN_CHROMIUM_PACKAGES:
+        filename = f"{package}_{PINNED_DEBIAN_CHROMIUM}_amd64.deb"
+        destination = f"/tmp/{filename}"
+        package_paths.append(destination)
+        mirror_downloads = " || ".join(
+            f"curl --fail --location --retry 2 --silent --show-error {shlex.quote(mirror + '/' + filename)} -o {shlex.quote(destination)}"
+            for mirror in PINNED_DEBIAN_CHROMIUM_MIRRORS
+        )
+        package_steps.extend(
+            [
+                f"({mirror_downloads})",
+                f"test \"$(dpkg-deb -f {shlex.quote(destination)} Package)\" = {shlex.quote(package)}",
+                f"test \"$(dpkg-deb -f {shlex.quote(destination)} Version)\" = {shlex.quote(PINNED_DEBIAN_CHROMIUM)}",
+                f"test \"$(dpkg-deb -f {shlex.quote(destination)} Architecture)\" = amd64",
+                f"sha256sum {shlex.quote(destination)}",
+            ]
+        )
+
     inner = " && ".join(
         [
             "apt-get update -qq",
+            "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl python3 python3-pip fontconfig",
+            "test \"$(dpkg --print-architecture)\" = amd64",
+            *package_steps,
             (
                 "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "
-                f"chromium={shlex.quote(PINNED_DEBIAN_CHROMIUM)} python3 python3-pip fontconfig"
+                + " ".join(shlex.quote(path) for path in package_paths)
             ),
+            f"test \"$(dpkg-query -W -f='${{Version}}' chromium)\" = {shlex.quote(PINNED_DEBIAN_CHROMIUM)}",
+            "chromium --version",
             "fc-cache -f",
             "python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow playwright",
             (
