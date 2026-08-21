@@ -1124,16 +1124,31 @@ private fun NewGameIcon(glyph: NewGameGlyph, tint: Color, modifier: Modifier, re
         val stroke = ref.dp(1.45f).toPx().coerceAtLeast(1f)
         when (glyph) {
             NewGameGlyph.BOARD, NewGameGlyph.CHESS960 -> {
-                val left = size.width * .18f
-                val top = size.height * .18f
-                val board = size.minDimension * .64f
-                val half = board / 2f
-                drawRoundRect(tint.copy(alpha = .18f), Offset(left, top), Size(board, board), CornerRadius(ref.dp(1.6f).toPx()))
-                drawLine(tint, Offset(left + half, top), Offset(left + half, top + board), stroke)
-                drawLine(tint, Offset(left, top + half), Offset(left + board, top + half), stroke)
-                drawRect(tint.copy(alpha = .28f), Offset(left, top), Size(half, half))
-                drawRect(tint.copy(alpha = .28f), Offset(left + half, top + half), Size(half, half))
-                if (glyph == NewGameGlyph.CHESS960) drawLine(tint, Offset(size.width * .29f, size.height * .72f), Offset(size.width * .73f, size.height * .28f), stroke, StrokeCap.Round)
+                val unit = size.minDimension / 24f
+                val origin = Offset((size.width - 24f * unit) / 2f, (size.height - 24f * unit) / 2f)
+                fun point(x: Float, y: Float) = Offset(origin.x + x * unit, origin.y + y * unit)
+                val boardTopLeft = point(4.3f, 4.3f)
+                val boardSize = Size(15.4f * unit, 15.4f * unit)
+                val iconStroke = 1.6f * unit
+
+                drawRoundRect(
+                    color = tint,
+                    topLeft = boardTopLeft,
+                    size = boardSize,
+                    cornerRadius = CornerRadius(2f * unit),
+                    style = Stroke(iconStroke),
+                )
+                drawLine(tint, point(12f, 4.6f), point(12f, 19.6f), iconStroke)
+                drawLine(tint, point(4.6f, 12f), point(19.6f, 12f), iconStroke)
+
+                if (glyph == NewGameGlyph.BOARD) {
+                    drawRect(tint.copy(alpha = .28f), point(4.6f, 4.6f), Size(7.2f * unit, 7.2f * unit))
+                    drawRect(tint.copy(alpha = .28f), point(12.2f, 12.2f), Size(7.2f * unit, 7.2f * unit))
+                } else {
+                    drawLine(tint, point(6.6f, 16.8f), point(17.4f, 7.2f), iconStroke, StrokeCap.Round)
+                    drawLine(tint, point(14.9f, 7.2f), point(17.5f, 7.1f), iconStroke, StrokeCap.Round)
+                    drawLine(tint, point(17.5f, 7.1f), point(17.4f, 9.7f), iconStroke, StrokeCap.Round)
+                }
             }
             NewGameGlyph.ENGINE -> {
                 drawRoundRect(tint.copy(alpha = .15f), Offset(size.width * .20f, size.height * .25f), Size(size.width * .60f, size.height * .50f), CornerRadius(ref.dp(2f).toPx()), style = Stroke(stroke))
