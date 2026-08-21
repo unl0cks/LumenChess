@@ -625,10 +625,28 @@ private fun NewGameChoiceBed(
             .clip(shape)
             .drawWithCache {
                 val corner = CornerRadius(ref.dp(11f).toPx())
+                val inset = ref.dp(1f).toPx().coerceAtLeast(1f)
+                val innerCorner = CornerRadius((corner.x - inset).coerceAtLeast(0f))
+                val upperInset = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.Black.copy(alpha = .38f),
+                        .035f to Color.Black.copy(alpha = .30f),
+                        .075f to Color.Black.copy(alpha = .20f),
+                        .13f to Color.Black.copy(alpha = .08f),
+                        .20f to Color.Transparent,
+                    ),
+                )
                 onDrawBehind {
                     drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF0B1013), Color(0xFF0F1519))), cornerRadius = corner)
+                    drawRoundRect(upperInset, cornerRadius = corner)
+                    drawRoundRect(
+                        Color.Black.copy(alpha = .24f),
+                        topLeft = Offset(inset, inset),
+                        size = Size(size.width - inset * 2f, size.height - inset * 2f),
+                        cornerRadius = innerCorner,
+                        style = Stroke(inset),
+                    )
                     drawRoundRect(Color(0xFF77939D).copy(alpha = .07f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
-                    drawLine(Color.White.copy(alpha = .012f), Offset(ref.dp(8f).toPx(), ref.vdp(1f).toPx()), Offset(size.width - ref.dp(8f).toPx(), ref.vdp(1f).toPx()), ref.dp(.6f).toPx())
                 }
             }
             .padding(horizontal = ref.dp(3f), vertical = ref.vdp(3f)),
