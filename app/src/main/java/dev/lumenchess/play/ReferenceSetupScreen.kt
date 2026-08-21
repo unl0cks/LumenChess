@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -1221,27 +1222,63 @@ private fun NewGameIcon(glyph: NewGameGlyph, tint: Color, modifier: Modifier, re
                 }
             }
             NewGameGlyph.ENGINE -> {
-                drawRoundRect(tint.copy(alpha = .15f), Offset(size.width * .20f, size.height * .25f), Size(size.width * .60f, size.height * .50f), CornerRadius(ref.dp(2f).toPx()), style = Stroke(stroke))
-                drawCircle(tint, ref.dp(1.15f).toPx(), Offset(size.width * .38f, size.height * .47f))
-                drawCircle(tint, ref.dp(1.15f).toPx(), Offset(size.width * .62f, size.height * .47f))
-                drawLine(tint, Offset(size.width * .37f, size.height * .63f), Offset(size.width * .63f, size.height * .63f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .50f, size.height * .11f), Offset(size.width * .50f, size.height * .25f), stroke, StrokeCap.Round)
-                drawCircle(tint, ref.dp(1.2f).toPx(), Offset(size.width * .50f, size.height * .10f))
-            }
-            NewGameGlyph.WHITE, NewGameGlyph.BLACK -> {
-                val fill = if (glyph == NewGameGlyph.WHITE) Color(0xFFEEF3F5) else Color(0xFF606A6E)
-                drawCircle(fill, size.minDimension * .14f, Offset(center.x, size.height * .30f))
-                val piece = Path().apply {
-                    moveTo(size.width * .38f, size.height * .44f)
-                    lineTo(size.width * .62f, size.height * .44f)
-                    lineTo(size.width * .68f, size.height * .66f)
-                    lineTo(size.width * .78f, size.height * .76f)
-                    lineTo(size.width * .22f, size.height * .76f)
-                    lineTo(size.width * .32f, size.height * .66f)
+                val unit = size.minDimension / 24f
+                val origin = Offset((size.width - 24f * unit) / 2f, (size.height - 24f * unit) / 2f)
+                fun point(x: Float, y: Float) = origin + Offset(x * unit, y * unit)
+                val iconStroke = (1.55f * unit).coerceAtLeast(1f)
+                val outline = Stroke(iconStroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                drawRoundRect(
+                    color = tint,
+                    topLeft = point(5.4f, 6.6f),
+                    size = Size(13.2f * unit, 10.8f * unit),
+                    cornerRadius = CornerRadius(2.7f * unit),
+                    style = outline,
+                )
+                listOf(
+                    9f to (3.9f to 6.6f),
+                    15f to (3.9f to 6.6f),
+                    9f to (17.4f to 20.1f),
+                    15f to (17.4f to 20.1f),
+                ).forEach { (x, ys) -> drawLine(tint, point(x, ys.first), point(x, ys.second), iconStroke, StrokeCap.Round) }
+                listOf(
+                    10f to (3.1f to 5.4f),
+                    14f to (3.1f to 5.4f),
+                    10f to (18.6f to 20.9f),
+                    14f to (18.6f to 20.9f),
+                ).forEach { (y, xs) -> drawLine(tint, point(xs.first, y), point(xs.second, y), iconStroke, StrokeCap.Round) }
+                val star = Path().apply {
+                    moveTo(point(12f, 9.2f).x, point(12f, 9.2f).y)
+                    lineTo(point(12.7f, 10.7f).x, point(12.7f, 10.7f).y)
+                    lineTo(point(14.4f, 10.9f).x, point(14.4f, 10.9f).y)
+                    lineTo(point(13.2f, 12.1f).x, point(13.2f, 12.1f).y)
+                    lineTo(point(13.5f, 13.8f).x, point(13.5f, 13.8f).y)
+                    lineTo(point(12f, 13f).x, point(12f, 13f).y)
+                    lineTo(point(10.5f, 13.8f).x, point(10.5f, 13.8f).y)
+                    lineTo(point(10.8f, 12.1f).x, point(10.8f, 12.1f).y)
+                    lineTo(point(9.6f, 10.9f).x, point(9.6f, 10.9f).y)
+                    lineTo(point(11.3f, 10.7f).x, point(11.3f, 10.7f).y)
                     close()
                 }
-                drawPath(piece, fill)
-                drawLine(tint, Offset(size.width * .24f, size.height * .80f), Offset(size.width * .76f, size.height * .80f), stroke, StrokeCap.Round)
+                drawPath(star, tint, style = outline)
+            }
+            NewGameGlyph.WHITE, NewGameGlyph.BLACK -> {
+                val unit = size.minDimension / 24f
+                val origin = Offset((size.width - 24f * unit) / 2f, (size.height - 24f * unit) / 2f)
+                fun point(x: Float, y: Float) = origin + Offset(x * unit, y * unit)
+                val pieceStroke = (1.6f * unit).coerceAtLeast(1f)
+                val outline = Stroke(pieceStroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                drawCircle(tint, 3f * unit, point(12f, 7f), style = outline)
+                val piece = Path().apply {
+                    moveTo(point(9.5f, 10.4f).x, point(9.5f, 10.4f).y)
+                    lineTo(point(14.5f, 10.4f).x, point(14.5f, 10.4f).y)
+                    lineTo(point(15.3f, 14.4f).x, point(15.3f, 14.4f).y)
+                    lineTo(point(17.3f, 16.6f).x, point(17.3f, 16.6f).y)
+                    lineTo(point(6.7f, 16.6f).x, point(6.7f, 16.6f).y)
+                    lineTo(point(8.7f, 14.4f).x, point(8.7f, 14.4f).y)
+                    close()
+                }
+                drawPath(piece, tint, style = outline)
+                drawLine(tint, point(6.1f, 19f), point(17.9f, 19f), pieceStroke, StrokeCap.Round)
             }
             NewGameGlyph.RANDOM -> {
                 drawRoundRect(tint.copy(alpha = .40f), Offset(size.width * .20f, size.height * .30f), Size(size.width * .45f, size.height * .52f), CornerRadius(ref.dp(1.8f).toPx()), style = Stroke(stroke))
