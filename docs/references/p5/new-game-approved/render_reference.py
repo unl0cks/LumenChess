@@ -30,6 +30,7 @@ PINNED_DEBIAN_PACKAGES = (
     ("libfreetype6", "2.13.3+dfsg-1", "amd64"),
     ("libharfbuzz0b", "10.2.0-1+b1", "amd64"),
     ("libharfbuzz-subset0", "10.2.0-1+b1", "amd64"),
+    ("fonts-inter", "4.1+ds-1", "all"),
 )
 
 
@@ -84,7 +85,7 @@ def browser_executable() -> str:
     raise RuntimeError("No system Chromium/Chrome executable found for frozen New Game reference rendering")
 
 
-def render_in_pinned_actions_container(output: Path, font_dir: Path) -> None:
+def render_in_pinned_actions_container(output: Path) -> None:
     docker = shutil.which("docker")
     if not docker:
         raise RuntimeError("Docker is required for the pinned New Game reference renderer on GitHub Actions")
@@ -132,7 +133,7 @@ PY
   echo "Snapshot package SHA-256: $(sha256sum "$out" | cut -d' ' -f1) $name"
 }}
 while IFS='|' read -r name version arch; do fetch_snapshot_deb "$name" "$version" "$arch"; done </tmp/p5-package-specs
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/chromium-common.deb /tmp/chromium-sandbox.deb /tmp/chromium.deb
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/chromium-common.deb /tmp/chromium-sandbox.deb /tmp/chromium.deb /tmp/fonts-inter.deb
 dpkg -i /tmp/libfreetype6.deb /tmp/libharfbuzz0b.deb /tmp/libharfbuzz-subset0.deb
 while IFS='|' read -r name version arch; do test "$(dpkg-query -W -f='${{Version}}' "$name")" = "$version"; done </tmp/p5-package-specs
 test "$(dpkg --print-architecture)" = amd64
@@ -145,7 +146,7 @@ python3 -m pip install --quiet --disable-pip-version-check --break-system-packag
 P5_PINNED_CONTAINER=1 P5_BROWSER=/usr/bin/chromium python3 docs/references/p5/new-game-approved/render_reference.py {shlex.quote(str(output_relative))}
 """
     subprocess.run(
-        [docker, "run", "--rm", "-v", f"{repo_root.resolve()}:/work", "-v", f"{font_dir.resolve()}:/usr/share/fonts/opentype/inter:ro", "-w", "/work", PINNED_ACTIONS_IMAGE, "bash", "-lc", inner],
+        [docker, "run", "--rm", "-v", f"{repo_root.resolve()}:/work", "-w", "/work", PINNED_ACTIONS_IMAGE, "bash", "-lc", inner],
         check=True,
     )
 
@@ -168,12 +169,11 @@ def main() -> None:
     output = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "new-game-approved-canonical.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     html, css, js = verify_frozen_source()
-    font_dir = ensure_inter_font()
-
     if os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("P5_PINNED_CONTAINER") != "1":
-        render_in_pinned_actions_container(output, font_dir)
+        render_in_pinned_actions_container(output)
         png_sha, rgb_sha = verify_rendered_output(output)
     else:
+        ensure_inter_font()
         document = re.sub(r'<link rel="stylesheet" href="styles.css"\s*/?>', f"<style>{css}</style>", html).replace('<script src="prototype.js"></script>', f"<script>{js}</script>")
         executable = browser_executable()
         version = subprocess.check_output([executable, "--version"], text=True).strip()
