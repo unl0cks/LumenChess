@@ -21,17 +21,15 @@ SOURCE_SHA256 = {
 }
 APPROVED_PNG_SHA256 = "e07580cebf4579db9c06bebe44bcabd224cc3f3489a9a79bc18d2043ada1ab8e"
 APPROVED_RGB_SHA256 = "c95f60918335d222b60d9f6f98884be598948a751d3f496c3b1a56728775b357"
+APPROVED_INTER_REGULAR_SHA256 = "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799"
 PINNED_ACTIONS_IMAGE = "debian:13.3-slim"
-PINNED_DEBIAN_CHROMIUM = "144.0.7559.96-1~deb13u1"
-PINNED_DEBIAN_CHROMIUM_MIRRORS = (
-    "https://mirror.batstateu.edu.ph/debian-security/pool/updates/main/c/chromium",
-    "https://ftp.riken.go.jp/Linux/debian/debian-security/pool/main/c/chromium",
-    "https://debian.sipwise.com/debian-security/pool/main/c/chromium",
-)
-PINNED_DEBIAN_CHROMIUM_PACKAGES = (
-    "chromium-common",
-    "chromium-sandbox",
-    "chromium",
+PINNED_DEBIAN_PACKAGES = (
+    ("chromium-common", "144.0.7559.96-1~deb13u1", "amd64"),
+    ("chromium-sandbox", "144.0.7559.96-1~deb13u1", "amd64"),
+    ("chromium", "144.0.7559.96-1~deb13u1", "amd64"),
+    ("libfreetype6", "2.13.3+dfsg-1", "amd64"),
+    ("libharfbuzz0b", "10.2.0-1+b1", "amd64"),
+    ("libharfbuzz-subset0", "10.2.0-1+b1", "amd64"),
 )
 
 
@@ -53,47 +51,26 @@ def verify_frozen_source() -> tuple[str, str, str]:
 def ensure_inter_font() -> Path:
     fc_match = shutil.which("fc-match")
     if fc_match:
-        family = subprocess.check_output(
-            [fc_match, "-f", "%{family}", "Inter"],
-            text=True,
-        ).strip()
+        family = subprocess.check_output([fc_match, "-f", "%{family}", "Inter"], text=True).strip()
         if family.split(",", 1)[0].strip() == "Inter":
-            font_file = subprocess.check_output(
-                [fc_match, "-f", "%{file}", "Inter"],
-                text=True,
-            ).strip()
+            font_file = Path(
+                subprocess.check_output([fc_match, "-f", "%{file}", "Inter"], text=True).strip()
+            ).resolve()
+            actual = sha256(font_file.read_bytes())
+            if actual != APPROVED_INTER_REGULAR_SHA256:
+                raise RuntimeError(f"Inter Regular identity changed: {font_file}: {actual}")
             print(f"Resolved reference font: {family}")
-            return Path(font_file).resolve().parent
+            print(f"Resolved Inter Regular SHA-256: {actual}")
+            return font_file.parent
 
     if os.environ.get("GITHUB_ACTIONS") != "true":
-        raise RuntimeError(
-            "Frozen New Game reference requires the Inter font family used by the approved render"
-        )
+        raise RuntimeError("Frozen New Game reference requires the approved Inter Regular font")
 
     subprocess.run(["sudo", "apt-get", "update", "-qq"], check=True)
-    subprocess.run(
-        ["sudo", "apt-get", "install", "-y", "-qq", "fonts-inter=4.0+ds-1"],
-        check=True,
-    )
-    fc_cache = shutil.which("fc-cache")
-    if fc_cache:
-        subprocess.run([fc_cache, "-f"], check=True)
-
-    fc_match = shutil.which("fc-match")
-    if not fc_match:
-        raise RuntimeError("fontconfig fc-match unavailable after installing pinned Inter")
-    family = subprocess.check_output(
-        [fc_match, "-f", "%{family}", "Inter"],
-        text=True,
-    ).strip()
-    if family.split(",", 1)[0].strip() != "Inter":
-        raise RuntimeError(f"Pinned Inter did not resolve through fontconfig: {family!r}")
-    font_file = subprocess.check_output(
-        [fc_match, "-f", "%{file}", "Inter"],
-        text=True,
-    ).strip()
-    print(f"Resolved reference font: {family}")
-    return Path(font_file).resolve().parent
+    subprocess.run(["sudo", "apt-get", "install", "-y", "-qq", "fonts-inter=4.0+ds-1"], check=True)
+    if shutil.which("fc-cache"):
+        subprocess.run(["fc-cache", "-f"], check=True)
+    return ensure_inter_font()
 
 
 def browser_executable() -> str:
@@ -117,63 +94,58 @@ def render_in_pinned_actions_container(output: Path, font_dir: Path) -> None:
     except ValueError as exc:
         raise RuntimeError(f"Reference output must stay inside the repository: {output}") from exc
 
-    package_paths: list[str] = []
-    package_steps: list[str] = []
-    for package in PINNED_DEBIAN_CHROMIUM_PACKAGES:
-        filename = f"{package}_{PINNED_DEBIAN_CHROMIUM}_amd64.deb"
-        destination = f"/tmp/{filename}"
-        package_paths.append(destination)
-        mirror_downloads = " || ".join(
-            f"curl --fail --location --retry 2 --silent --show-error {shlex.quote(mirror + '/' + filename)} -o {shlex.quote(destination)}"
-            for mirror in PINNED_DEBIAN_CHROMIUM_MIRRORS
-        )
-        package_steps.extend(
-            [
-                f"({mirror_downloads})",
-                f"test \"$(dpkg-deb -f {shlex.quote(destination)} Package)\" = {shlex.quote(package)}",
-                f"test \"$(dpkg-deb -f {shlex.quote(destination)} Version)\" = {shlex.quote(PINNED_DEBIAN_CHROMIUM)}",
-                f"test \"$(dpkg-deb -f {shlex.quote(destination)} Architecture)\" = amd64",
-                f"sha256sum {shlex.quote(destination)}",
-            ]
-        )
-
-    inner = " && ".join(
-        [
-            "apt-get update -qq",
-            "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl python3 python3-pip fontconfig",
-            "test \"$(dpkg --print-architecture)\" = amd64",
-            *package_steps,
-            (
-                "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "
-                + " ".join(shlex.quote(path) for path in package_paths)
-            ),
-            f"test \"$(dpkg-query -W -f='${{Version}}' chromium)\" = {shlex.quote(PINNED_DEBIAN_CHROMIUM)}",
-            "chromium --version",
-            "fc-cache -f",
-            "python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow playwright",
-            (
-                "P5_PINNED_CONTAINER=1 P5_BROWSER=/usr/bin/chromium "
-                "python3 docs/references/p5/new-game-approved/render_reference.py "
-                + shlex.quote(str(output_relative))
-            ),
-        ]
-    )
+    specs = "\n".join("|".join(spec) for spec in PINNED_DEBIAN_PACKAGES)
+    inner = f"""
+set -euo pipefail
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ca-certificates curl python3 python3-pip fontconfig dpkg-dev
+cat >/tmp/p5-package-specs <<'SPECS'
+{specs}
+SPECS
+fetch_snapshot_deb() {{
+  name="$1"; version="$2"; arch="$3"; out="/tmp/${{name}}.deb"
+  enc_version="$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "$version")"
+  api="https://snapshot.debian.org/mr/binary/${{name}}/${{enc_version}}/binfiles?fileinfo=1"
+  curl --fail --location --retry 3 --silent --show-error "$api" -o /tmp/p5-info.json
+  file_hash="$(python3 - "$name" "$arch" <<'PY'
+import json, sys
+name, arch = sys.argv[1:]
+data = json.load(open('/tmp/p5-info.json'))
+matches = [r['hash'] for r in data['result'] if r['architecture'] == arch]
+if len(matches) != 1:
+    raise SystemExit(f'{{name}}: expected one {{arch}} snapshot file, got {{matches}}')
+print(matches[0])
+PY
+)"
+  echo "Snapshot package: $name $version $arch sha1=$file_hash"
+  python3 - "$file_hash" <<'PY'
+import json, sys
+h = sys.argv[1]
+data = json.load(open('/tmp/p5-info.json'))
+for item in data.get('fileinfo', {{}}).get(h, []):
+    print('Snapshot provenance: ' + item['archive_name'] + ' ' + item['first_seen'] + item['path'] + '/' + item['name'])
+PY
+  curl --fail --location --retry 3 --silent --show-error "https://snapshot.debian.org/file/${{file_hash}}" -o "$out"
+  test "$(dpkg-deb -f "$out" Package)" = "$name"
+  test "$(dpkg-deb -f "$out" Version)" = "$version"
+  test "$(dpkg-deb -f "$out" Architecture)" = "$arch"
+  echo "Snapshot package SHA-256: $(sha256sum "$out" | cut -d' ' -f1) $name"
+}}
+while IFS='|' read -r name version arch; do fetch_snapshot_deb "$name" "$version" "$arch"; done </tmp/p5-package-specs
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/chromium-common.deb /tmp/chromium-sandbox.deb /tmp/chromium.deb
+dpkg -i /tmp/libfreetype6.deb /tmp/libharfbuzz0b.deb /tmp/libharfbuzz-subset0.deb
+while IFS='|' read -r name version arch; do test "$(dpkg-query -W -f='${{Version}}' "$name")" = "$version"; done </tmp/p5-package-specs
+test "$(dpkg --print-architecture)" = amd64
+chromium --version
+fc-cache -f
+INTER_FILE="$(fc-match -f '%{{file}}' Inter)"
+test "$(fc-match -f '%{{family}}' Inter | cut -d, -f1)" = Inter
+echo "{APPROVED_INTER_REGULAR_SHA256}  $INTER_FILE" | sha256sum -c -
+python3 -m pip install --quiet --disable-pip-version-check --break-system-packages pillow playwright
+P5_PINNED_CONTAINER=1 P5_BROWSER=/usr/bin/chromium python3 docs/references/p5/new-game-approved/render_reference.py {shlex.quote(str(output_relative))}
+"""
     subprocess.run(
-        [
-            docker,
-            "run",
-            "--rm",
-            "-v",
-            f"{repo_root.resolve()}:/work",
-            "-v",
-            f"{font_dir.resolve()}:/usr/share/fonts/opentype/inter:ro",
-            "-w",
-            "/work",
-            PINNED_ACTIONS_IMAGE,
-            "bash",
-            "-lc",
-            inner,
-        ],
+        [docker, "run", "--rm", "-v", f"{repo_root.resolve()}:/work", "-v", f"{font_dir.resolve()}:/usr/share/fonts/opentype/inter:ro", "-w", "/work", PINNED_ACTIONS_IMAGE, "bash", "-lc", inner],
         check=True,
     )
 
@@ -183,7 +155,6 @@ def verify_rendered_output(output: Path) -> tuple[str, str]:
     png_sha = sha256(png_bytes)
     if png_sha != APPROVED_PNG_SHA256:
         raise AssertionError(f"Approved New Game PNG changed: {png_sha}")
-
     rendered = Image.open(output).convert("RGB")
     if rendered.size != (390, 844):
         raise AssertionError(f"Approved New Game reference must be 390x844, got {rendered.size}")
@@ -196,7 +167,6 @@ def verify_rendered_output(output: Path) -> tuple[str, str]:
 def main() -> None:
     output = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "new-game-approved-canonical.png"
     output.parent.mkdir(parents=True, exist_ok=True)
-
     html, css, js = verify_frozen_source()
     font_dir = ensure_inter_font()
 
@@ -204,24 +174,12 @@ def main() -> None:
         render_in_pinned_actions_container(output, font_dir)
         png_sha, rgb_sha = verify_rendered_output(output)
     else:
-        document = re.sub(
-            r'<link rel="stylesheet" href="styles.css"\s*/?>',
-            f"<style>{css}</style>",
-            html,
-        ).replace(
-            '<script src="prototype.js"></script>',
-            f"<script>{js}</script>",
-        )
-
+        document = re.sub(r'<link rel="stylesheet" href="styles.css"\s*/?>', f"<style>{css}</style>", html).replace('<script src="prototype.js"></script>', f"<script>{js}</script>")
         executable = browser_executable()
         version = subprocess.check_output([executable, "--version"], text=True).strip()
         print(f"Resolved reference browser: {version}")
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(
-                headless=True,
-                executable_path=executable,
-                args=["--no-sandbox"],
-            )
+            browser = playwright.chromium.launch(headless=True, executable_path=executable, args=["--no-sandbox"])
             page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
             page.set_content(document, wait_until="load")
             page.evaluate("document.body.classList.add('view-phone')")
