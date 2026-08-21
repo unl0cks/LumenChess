@@ -15,6 +15,7 @@ import dev.lumenchess.MainActivity
 import dev.lumenchess.board.CHESSBOARD_TEST_TAG
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Variant
+import dev.lumenchess.runtime.RuntimeTerminal
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -114,6 +115,31 @@ class PlayUiIntegrationTest {
         listOf("p5-live-lower-region", "p5-live-tabs", "p5-live-moves-rail").forEach { tag ->
             composeRule.onNodeWithTag(tag).assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun resignDispatchesTerminalThroughRuntimeOwnerAndExitReturnsToSetup() {
+        openSetup()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
+        waitForLiveScreen()
+
+        val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
+        composeRule.onNodeWithTag("p5-live-action-resign").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000L) {
+            viewModel.currentCoordinatorForTest()?.state?.terminal == RuntimeTerminal.Resignation(Color.WHITE)
+        }
+        assertEquals(
+            RuntimeTerminal.Resignation(Color.WHITE),
+            requireNotNull(viewModel.currentCoordinatorForTest()).state.terminal,
+        )
+        composeRule.onNodeWithTag("p5-live-action-resign").assertDoesNotExist()
+
+        composeRule.onNodeWithTag("p5-live-action-exit").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000L) {
+            composeRule.onAllNodesWithTag(PLAY_SETUP_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(PLAY_SETUP_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(PLAY_LIVE_TEST_TAG).assertDoesNotExist()
     }
 
     @Test

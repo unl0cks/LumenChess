@@ -1,4 +1,4 @@
-name: P5 New Game + Play + Settings reference
+name: P5 New Game + Play + Live + Settings reference
 
 on:
   push:
@@ -9,6 +9,7 @@ on:
       - 'docs/references/p5/.settings-iter3-approved-lossless*.b64'
       - 'docs/references/p5/play-overview-iter2/**'
       - 'docs/references/p5/new-game-approved/**'
+      - 'docs/references/p5/live-approved/**'
       - '.github/workflows/p5-reference.yml'
   workflow_dispatch:
 
@@ -33,7 +34,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context='P5 reference/API37' \
-            -f description='Approved New Game, Play and Settings translations and focused regressions are running' \
+            -f description='Approved New Game, Play, Live and Settings translations and focused regressions are running' \
             -f target_url="$RUN_URL"
       - uses: actions/setup-java@v4
         with:
@@ -91,7 +92,11 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest \
-            --tests 'dev.lumenchess.play.PlaySetupConfigTest' --stacktrace \
+            --tests 'dev.lumenchess.play.PlaySetupConfigTest' \
+            --tests 'dev.lumenchess.play.PlayRuntimeCoordinatorTest' \
+            --tests 'dev.lumenchess.play.PlaySnapshotCodecTest' \
+            --tests 'dev.lumenchess.feedback.GameFeedbackProjectorTest' \
+            --stacktrace \
             2>&1 | tee "$RUNNER_TEMP/p5-gradle-build.txt"
       - name: Surface P5 build failure
         if: steps.verify.outcome != 'success'
@@ -99,7 +104,7 @@ jobs:
         run: |
           echo "::error title=P5 reference build::Screenshot APK build or focused setup tests failed"
           tail -n 180 "$RUNNER_TEMP/p5-gradle-build.txt" || true
-      - name: Capture approved Settings, Play, New Game, press states and regressions
+      - name: Capture approved Settings, Play, New Game, Live, press states and regressions
         id: screenshots
         if: steps.verify.outcome == 'success'
         continue-on-error: true
@@ -114,11 +119,31 @@ jobs:
 
           adb shell am instrument -w -r \
             -e p5SettingsQa true \
-            -e class 'dev.lumenchess.visual.P5SettingsScreenshotQaTest,dev.lumenchess.play.PlayUiIntegrationTest#boardBoundsStayStableAcrossHumanMoveEngineThinkingAndEngineResult,dev.lumenchess.play.PlayUiIntegrationTest#defaultHumanVsEngineLivePresentationIsBoardFirst' \
+            -e class 'dev.lumenchess.visual.P5SettingsScreenshotQaTest#captureSettingsRootReferenceOnly' \
             dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
             | tee "$RUNNER_TEMP/p5-settings-instrumentation.txt"
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
 
+          # The P1 lane intentionally starts a game. Clear it so the frozen board-first Live
+          # reference always begins from the default Human-vs-Engine setup.
+          adb shell pm clear dev.lumenchess
+
+          adb shell am instrument -w -r \
+            -e p5LiveQa true \
+            -e class 'dev.lumenchess.visual.P5LiveScreenshotQaTest' \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p5-live-instrumentation.txt"
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
+
+          # Behavioral coverage gets its own fresh state; it must not affect deterministic
+          # reference pixels captured above or the Play Overview capture below.
+          adb shell pm clear dev.lumenchess
+          adb shell am instrument -w -r \
+            -e class 'dev.lumenchess.play.PlayUiIntegrationTest,dev.lumenchess.play.PlayM19IntegrationTest' \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p5-live-runtime-instrumentation.txt"
+
+          adb shell pm clear dev.lumenchess
           adb shell am instrument -w -r \
             -e p5PlayOverviewQa true \
             -e class 'dev.lumenchess.visual.P5PlayOverviewScreenshotQaTest' \
@@ -138,8 +163,8 @@ jobs:
 
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
           COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$COUNT" != "6" ]; then
-            echo "::error title=P5 screenshots::Expected exactly 6 device screenshots, found $COUNT"
+          if [ "$COUNT" != "8" ]; then
+            echo "::error title=P5 screenshots::Expected exactly 8 device screenshots, found $COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
@@ -149,6 +174,8 @@ jobs:
           test -f p5-screenshots/01-play-overview-press-state.png
           test -f p5-screenshots/02-new-game.png
           test -f p5-screenshots/02-new-game-press-state.png
+          test -f p5-screenshots/03-live.png
+          test -f p5-screenshots/03-live-press-state.png
 
           python3 -m pip install --quiet --disable-pip-version-check pillow playwright
 
@@ -224,17 +251,27 @@ jobs:
 
           compare('p5-reference-render/01-play-overview-approved-reference.png', 'p5-screenshots/01-play-overview.png', 'p5-screenshots/01-play-overview-approved-comparison.png')
           compare('p5-reference-render/02-new-game-approved-reference.png', 'p5-screenshots/02-new-game.png', 'p5-screenshots/02-new-game-approved-comparison.png')
+
+          live_reference_path = root / 'docs/references/p5/live-approved/03-live-board-first-approved.png'
+          live_reference_bytes = live_reference_path.read_bytes()
+          import hashlib
+          assert hashlib.sha256(live_reference_bytes).hexdigest() == 'ae30bd1dc538416d742a22190cce731ccaed3ef9d624dfcda224bf3b3572f157'
+          live_reference = Image.open(live_reference_path).convert('RGB')
+          assert live_reference.size == (390, 844), live_reference.size
+          assert hashlib.sha256(live_reference.tobytes()).hexdigest() == '2511adbe04c860cb5cffa2077336fbe029b35e54a33d8d942d8c86cb03136c37'
+          compare('docs/references/p5/live-approved/03-live-board-first-approved.png', 'p5-screenshots/03-live.png', 'p5-screenshots/03-live-approved-comparison.png')
           PY
           test -f p5-screenshots/01-play-overview-approved-comparison.png
           test -f p5-screenshots/02-new-game-approved-comparison.png
+          test -f p5-screenshots/03-live-approved-comparison.png
 
           FINAL_COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$FINAL_COUNT" != "9" ]; then
-            echo "::error title=P5 artifacts::Expected exactly 9 final screenshot PNGs, found $FINAL_COUNT"
+          if [ "$FINAL_COUNT" != "12" ]; then
+            echo "::error title=P5 artifacts::Expected exactly 12 final screenshot PNGs, found $FINAL_COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
-          printf 'Captured approved Settings + Play + New Game REST/PRESSED states and focused Play/Live/P1 regressions\n'
+          printf 'Captured approved Settings + Play + New Game + Live REST/PRESSED states and focused Play/Live/P1 regressions\n'
       - name: Upload Settings screenshot artifact
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -268,6 +305,17 @@ jobs:
             p5-screenshots/02-new-game-press-state.png
           if-no-files-found: error
           retention-days: 14
+      - name: Upload Live screenshot artifact
+        if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: p5-live-${{ github.sha }}
+          path: |
+            p5-screenshots/03-live.png
+            p5-screenshots/03-live-approved-comparison.png
+            p5-screenshots/03-live-press-state.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload P5 diagnostics on failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         uses: actions/upload-artifact@v4
@@ -277,6 +325,8 @@ jobs:
             ${{ runner.temp }}/p5-emulator.log
             ${{ runner.temp }}/p5-gradle-build.txt
             ${{ runner.temp }}/p5-settings-instrumentation.txt
+            ${{ runner.temp }}/p5-live-instrumentation.txt
+            ${{ runner.temp }}/p5-live-runtime-instrumentation.txt
             ${{ runner.temp }}/p5-play-instrumentation.txt
             ${{ runner.temp }}/p5-setup-instrumentation.txt
             ${{ runner.temp }}/p5-play-reference.txt
@@ -294,7 +344,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='Approved New Game + Play + Settings, setup behavior/press QA, Live board-first and P1 geometry passed' \
+            -f description='Approved New Game + Play + Live + Settings, setup behavior/press QA, Live board-first and P1 geometry passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
@@ -305,7 +355,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='Approved New Game/Play/Settings build, screenshot QA, behavior, Live presentation or geometry failed' \
+            -f description='Approved New Game/Play/Live/Settings build, screenshot QA, behavior, Live presentation or geometry failed' \
             -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')

@@ -1,5 +1,20 @@
 # P5 approved references
 
+## Live — board-first
+
+The approved board-first Live source is retained byte-for-byte at
+`live-approved/03-live-board-first-approved.png`. Its PNG SHA-256 is
+`ae30bd1dc538416d742a22190cce731ccaed3ef9d624dfcda224bf3b3572f157`;
+it is `390 × 844`, with decoded RGB SHA-256
+`2511adbe04c860cb5cffa2077336fbe029b35e54a33d8d942d8c86cb03136c37`.
+
+The integrated API-37 workflow verifies both hashes before normalizing the native
+Live capture with the same visible-content crop and Lanczos resize used for the
+other canonical P5 comparisons. It uploads `03-live.png`,
+`03-live-approved-comparison.png`, and `03-live-press-state.png` as the dedicated
+`p5-live-${{ github.sha }}` artifact. This reference is QA material only and must
+not be rewritten to match a native capture.
+
 ## Settings — Iteration 3
 
 The approved Iteration 3 Settings reference is stored as one deterministic lossless transport split across these active Base64 chunks:

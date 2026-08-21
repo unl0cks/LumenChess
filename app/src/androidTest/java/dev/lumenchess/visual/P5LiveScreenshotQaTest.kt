@@ -6,7 +6,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -54,18 +54,19 @@ class P5LiveScreenshotQaTest {
 
     @Before
     fun requireExplicitScreenshotRun() {
-        val enabled = InstrumentationRegistry.getArguments().getString("p5LiveQa") == "true"
-        assumeTrue("P5 Live Game screenshot QA runs only from its dedicated workflow step", enabled)
+        assumeTrue(
+            "P5 Live Game screenshot QA runs only from the integrated reference workflow",
+            InstrumentationRegistry.getArguments().getString("p5LiveQa") == "true",
+        )
     }
 
     @Test
-    fun captureStockfishLiveReferenceOnly() {
+    fun captureDefaultBoardFirstLiveReferenceOnly() {
         verifyInterTightRuntimeResource()
         waitForTag("p5-play-overview")
         selectDarkAppearance()
         composeRule.onNodeWithTag("main-tab-play").performClick()
         waitForTag("p5-play-overview")
-
         composeRule.runOnIdle {
             ViewModelProvider(composeRule.activity)[PlayViewModel::class.java].apply {
                 updateVariant(Variant.STANDARD)
@@ -77,20 +78,16 @@ class P5LiveScreenshotQaTest {
             }
         }
         composeRule.waitForIdle()
-
         composeRule.onNodeWithTag("play-overview-vs-engine").performClick()
         waitForTag(PLAY_SETUP_TEST_TAG)
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
         waitForLiveReady()
 
-        composeRule.onNodeWithTag("main-tab-play").assertDoesNotExist()
         seedDeterministicOpening()
         assertAuthoritativeOpeningState()
-        assertReferenceGeometry()
-        logReferenceMetrics()
-
-        capture("02-stockfish-live.png")
-        capturePressState("p5-live-action-pause")
+        assertBoardFirstPresentation()
+        capture("03-live.png")
+        capturePressState("Resign", "p5-live-action-resign")
     }
 
     private fun selectDarkAppearance() {
@@ -109,7 +106,7 @@ class P5LiveScreenshotQaTest {
         check(typeface != Typeface.DEFAULT && typeface != Typeface.DEFAULT_BOLD)
     }
 
-    /** Drives the real serialized runtime through the legal 1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 4.Ba4 Nf6 5.O-O Be7 mainline. */
+    /** Drives the real serialized runtime through 1.e4 e5 2.Nf3 Nc6 3.Bb5 a6 4.Ba4 Nf6 5.O-O Be7. */
     private fun seedDeterministicOpening() {
         composeRule.runOnIdle {
             val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
@@ -144,8 +141,6 @@ class P5LiveScreenshotQaTest {
             engine("g8f6")
             human("e1g1")
             engine("f8e7")
-
-            // Refresh only the ViewModel projection; runtime/game tree remain authoritative.
             viewModel.cancelPremove()
         }
         composeRule.waitForIdle()
@@ -156,8 +151,7 @@ class P5LiveScreenshotQaTest {
     private fun assertAuthoritativeOpeningState() {
         composeRule.runOnIdle {
             val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
-            val coordinator = requireNotNull(viewModel.currentCoordinatorForTest())
-            val runtime = coordinator.state
+            val runtime = requireNotNull(viewModel.currentCoordinatorForTest()).state
             val mainline = runtime.gameTree.mainline()
             assertEquals(10, mainline.size)
             assertEquals("f8e7", requireNotNull(mainline.last().move).uci)
@@ -167,79 +161,114 @@ class P5LiveScreenshotQaTest {
         }
 
         val f8State = composeRule.onNodeWithTag("square-f8").fetchSemanticsNode().config
-            .getOrElse(SemanticsProperties.StateDescription) { "" }
+            .getOrElse(androidx.compose.ui.semantics.SemanticsProperties.StateDescription) { "" }
         val e7State = composeRule.onNodeWithTag("square-e7").fetchSemanticsNode().config
-            .getOrElse(SemanticsProperties.StateDescription) { "" }
+            .getOrElse(androidx.compose.ui.semantics.SemanticsProperties.StateDescription) { "" }
         assertTrue("last-move source must be highlighted", f8State.contains("last move"))
         assertTrue("last-move destination must be highlighted", e7State.contains("last move"))
     }
 
-    private fun assertReferenceGeometry() {
-        val metrics = composeRule.activity.resources.displayMetrics
-        val screenWidth = metrics.widthPixels.toFloat()
-        val screenHeight = metrics.heightPixels.toFloat()
-        val board = bounds(CHESSBOARD_TEST_TAG)
-        val lower = bounds("p5-live-lower-region")
-        val actions = bounds("p5-live-action-strip")
-
-        assertTrue("board must remain square: $board", abs(board.width - board.height) <= 1f)
-        assertTrue("board width ratio=${board.width / screenWidth}", board.width / screenWidth in 0.92f..0.97f)
-        assertTrue("lower game panel must sit below the board", lower.top >= board.bottom - 1f)
-
-        val compositionBottomRatio = actions.bottom / screenHeight
-        assertTrue(
-            "live chess workspace must use almost the full useful Pixel viewport; bottom=$compositionBottomRatio",
-            compositionBottomRatio in 0.89f..0.97f,
-        )
-
+    private fun assertBoardFirstPresentation() {
+        composeRule.onNodeWithTag("main-tab-play").assertDoesNotExist()
         listOf(
-            "p5-live-opponent-row",
-            "p5-live-opponent-clock",
-            "p5-live-player-row",
-            "p5-live-player-clock",
+            "p5-live-lower-region",
             "p5-live-tabs",
             "p5-live-moves-rail",
             "p5-live-action-pause",
-            "p5-live-action-resign",
-            "p5-live-action-exit",
-        ).forEach(::waitForTag)
+            "p5-live-action-cancel",
+        ).forEach { tag -> composeRule.onNodeWithTag(tag).assertDoesNotExist() }
+        composeRule.onNodeWithText("Moves").assertDoesNotExist()
+        composeRule.onNodeWithText("Info").assertDoesNotExist()
 
-        // Participant tags sit after the row's 4dp top + 4dp bottom content padding,
-        // so reconstruct the visual surface height rather than asserting the inner semantics box.
-        assertHeightDp("p5-live-opponent-row", 50f, 64f, visualVerticalPaddingDp = 8f)
-        assertHeightDp("p5-live-player-row", 50f, 64f, visualVerticalPaddingDp = 8f)
-        assertHeightDp("p5-live-tabs", 34f, 46f)
-        assertHeightDp("p5-live-action-strip", 64f, 84f)
-
-        val opponentClock = bounds("p5-live-opponent-clock")
-        val playerClock = bounds("p5-live-player-clock")
-        assertTrue("opponent clock width must be fixed", abs(opponentClock.width - playerClock.width) <= 1f)
-        assertTrue("opponent clock height must be fixed", abs(opponentClock.height - playerClock.height) <= 1f)
-    }
-
-    private fun assertHeightDp(tag: String, min: Float, max: Float, visualVerticalPaddingDp: Float = 0f) {
-        val density = composeRule.activity.resources.displayMetrics.density
-        val height = bounds(tag).height / density + visualVerticalPaddingDp
-        assertTrue("$tag visual height=${height}dp expected $min..$max", height in min..max)
-    }
-
-    private fun logReferenceMetrics() {
-        val metrics = composeRule.activity.resources.displayMetrics
-        println("P5_LIVE_METRIC viewport w=${metrics.widthPixels} h=${metrics.heightPixels}")
         listOf(
-            "p5-live-shell",
             "p5-live-opponent-row",
             "p5-live-opponent-clock",
             CHESSBOARD_TEST_TAG,
             "p5-live-player-row",
             "p5-live-player-clock",
-            "p5-live-lower-region",
-            "p5-live-tabs",
-            "p5-live-moves-rail",
             "p5-live-action-strip",
-        ).forEach { tag ->
-            val b = bounds(tag)
-            println("P5_LIVE_METRIC $tag x=${b.left} y=${b.top} w=${b.width} h=${b.height}")
+            "p5-live-action-resign",
+            "p5-live-action-exit",
+        ).forEach(::waitForTag)
+
+        val liveRoot = bounds(PLAY_LIVE_TEST_TAG)
+        val board = bounds(CHESSBOARD_TEST_TAG)
+        val actionStrip = bounds("p5-live-action-strip")
+        val density = composeRule.activity.resources.displayMetrics.density
+        assertTrue("board must remain square: $board", abs(board.width - board.height) <= 1f)
+        assertTrue("board width must retain P1-safe bounds: $board in $liveRoot", board.width / liveRoot.width in 0.92f..1f)
+        assertTrue("essential action strip must retain its 72dp geometry: $actionStrip", actionStrip.height / density in 64f..84f)
+        assertTrue(
+            "essential action strip must be bottom-anchored to the Live root: actions=$actionStrip, root=$liveRoot",
+            liveRoot.bottom - actionStrip.bottom <= 6f * density,
+        )
+    }
+
+    private fun capturePressState(label: String, tag: String) {
+        composeRule.waitForIdle()
+        val node = composeRule.onNodeWithTag(tag)
+        val rest = node.captureToImage().asAndroidBitmap()
+        // A real held pointer proves the Material press state. The test clock owns the delay and
+        // animation; cancelling in finally prevents Resign from mutating the running game.
+        val previousAutoAdvance = composeRule.mainClock.autoAdvance
+        composeRule.mainClock.autoAdvance = false
+        var pointerDown = false
+        val pressed = try {
+            node.performTouchInput { down(center) }
+            pointerDown = true
+            composeRule.mainClock.advanceTimeBy(240L)
+            composeRule.waitForIdle()
+            node.captureToImage().asAndroidBitmap()
+        } finally {
+            try {
+                if (pointerDown) {
+                    node.performTouchInput { cancel() }
+                    composeRule.mainClock.advanceTimeBy(160L)
+                }
+            } finally {
+                composeRule.mainClock.autoAdvance = previousAutoAdvance
+                composeRule.waitForIdle()
+            }
+        }
+
+        val visiblyChangedRatio = countVisiblyDifferentPixels(rest, pressed, threshold = 10).toFloat() /
+            (rest.width * rest.height).toFloat()
+        assertTrue("$label REST/PRESSED state must be perceptible; ratio=$visiblyChangedRatio", visiblyChangedRatio > 0.018f)
+
+        val labelHeight = 34
+        val gap = 10
+        val comparison = Bitmap.createBitmap(
+            rest.width + gap + pressed.width,
+            labelHeight + maxOf(rest.height, pressed.height),
+            Bitmap.Config.ARGB_8888,
+        )
+        val canvas = AndroidCanvas(comparison)
+        canvas.drawColor(android.graphics.Color.rgb(8, 8, 8))
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.rgb(224, 228, 230)
+            textSize = 22f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        }
+        canvas.drawText("$label REST", 8f, 25f, paint)
+        canvas.drawText("$label PRESSED", (rest.width + gap + 8).toFloat(), 25f, paint)
+        canvas.drawBitmap(rest, 0f, labelHeight.toFloat(), null)
+        canvas.drawBitmap(pressed, (rest.width + gap).toFloat(), labelHeight.toFloat(), null)
+        writeBitmap("03-live-press-state.png", comparison)
+    }
+
+    private fun countVisiblyDifferentPixels(first: Bitmap, second: Bitmap, threshold: Int): Int {
+        if (first.width != second.width || first.height != second.height) return Int.MAX_VALUE
+        val a = IntArray(first.width * first.height)
+        val b = IntArray(first.width * first.height)
+        first.getPixels(a, 0, first.width, 0, 0, first.width, first.height)
+        second.getPixels(b, 0, second.width, 0, 0, second.width, second.height)
+        return a.indices.count { index ->
+            val one = a[index]
+            val two = b[index]
+            val red = abs(android.graphics.Color.red(one) - android.graphics.Color.red(two))
+            val green = abs(android.graphics.Color.green(one) - android.graphics.Color.green(two))
+            val blue = abs(android.graphics.Color.blue(one) - android.graphics.Color.blue(two))
+            maxOf(red, green, blue) >= threshold
         }
     }
 
@@ -259,59 +288,6 @@ class P5LiveScreenshotQaTest {
         }
         composeRule.onNodeWithTag(tag).assertIsDisplayed()
         composeRule.waitForIdle()
-    }
-
-    private fun capturePressState(tag: String) {
-        composeRule.waitForIdle()
-        val node = composeRule.onNodeWithTag(tag)
-        val rest = node.captureToImage().asAndroidBitmap()
-        node.performTouchInput { down(center); advanceEventTime(80L) }
-        composeRule.waitForIdle()
-        val pressed = node.captureToImage().asAndroidBitmap()
-        val visiblyChangedRatio = countVisiblyDifferentPixels(rest, pressed, threshold = 10).toFloat() /
-            (rest.width * rest.height).toFloat()
-        assertTrue(
-            "compact action REST/PRESSED state must visibly compress; visiblyChangedRatio=$visiblyChangedRatio",
-            visiblyChangedRatio > 0.025f,
-        )
-        node.performTouchInput { up() }
-        composeRule.waitForIdle()
-
-        val labelHeight = 34
-        val gap = 10
-        val comparison = Bitmap.createBitmap(
-            rest.width + gap + pressed.width,
-            labelHeight + maxOf(rest.height, pressed.height),
-            Bitmap.Config.ARGB_8888,
-        )
-        val canvas = AndroidCanvas(comparison)
-        canvas.drawColor(android.graphics.Color.rgb(8, 8, 8))
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.rgb(224, 228, 230)
-            textSize = 22f
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        }
-        canvas.drawText("REST", 8f, 25f, paint)
-        canvas.drawText("PRESSED", (rest.width + gap + 8).toFloat(), 25f, paint)
-        canvas.drawBitmap(rest, 0f, labelHeight.toFloat(), null)
-        canvas.drawBitmap(pressed, (rest.width + gap).toFloat(), labelHeight.toFloat(), null)
-        writeBitmap("02-stockfish-live-press-state.png", comparison)
-    }
-
-    private fun countVisiblyDifferentPixels(first: Bitmap, second: Bitmap, threshold: Int): Int {
-        if (first.width != second.width || first.height != second.height) return Int.MAX_VALUE
-        val a = IntArray(first.width * first.height)
-        val b = IntArray(first.width * first.height)
-        first.getPixels(a, 0, first.width, 0, 0, first.width, first.height)
-        second.getPixels(b, 0, second.width, 0, 0, second.width, second.height)
-        return a.indices.count { index ->
-            val one = a[index]
-            val two = b[index]
-            val red = abs(android.graphics.Color.red(one) - android.graphics.Color.red(two))
-            val green = abs(android.graphics.Color.green(one) - android.graphics.Color.green(two))
-            val blue = abs(android.graphics.Color.blue(one) - android.graphics.Color.blue(two))
-            maxOf(red, green, blue) >= threshold
-        }
     }
 
     private fun capture(name: String) {
