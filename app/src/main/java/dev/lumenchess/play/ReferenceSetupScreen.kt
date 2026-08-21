@@ -957,17 +957,35 @@ private fun NewGamePrimaryButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val offset by animateDpAsState(if (pressed) ref.vdp(4f) else 0.dp, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-cta-y")
-    val elevation by animateDpAsState(if (pressed) ref.dp(1f) else ref.dp(5f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-cta-shadow")
+    val faceOffset by animateDpAsState(if (pressed) ref.vdp(4f) else 0.dp, if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-cta-face-y")
+    val baseOffset by animateDpAsState(if (pressed) ref.vdp(5f) else ref.vdp(4f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-cta-base-y")
+    val contactElevation by animateDpAsState(if (pressed) ref.dp(3f) else ref.dp(7f), if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(), label = "new-game-cta-contact-shadow")
     val shape = RoundedCornerShape(ref.dp(10f))
+    val enabledAlpha = if (enabled) 1f else .50f
     Box(modifier) {
         Box(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    translationY = offset.toPx()
-                    alpha = if (enabled) 1f else .50f
-                    shadowElevation = elevation.toPx()
+                    translationY = baseOffset.toPx()
+                    alpha = enabledAlpha
+                    shadowElevation = contactElevation.toPx()
+                    ambientShadowColor = Color.Black.copy(alpha = if (pressed) .22f else .31f)
+                    spotShadowColor = Color.Black.copy(alpha = if (pressed) .26f else .34f)
+                    this.shape = shape
+                    clip = true
+                }
+                .drawWithCache {
+                    val corner = CornerRadius(ref.dp(10f).toPx())
+                    onDrawBehind { drawRoundRect(Color(0xFF244A58), cornerRadius = corner) }
+                },
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationY = faceOffset.toPx()
+                    alpha = enabledAlpha
                     this.shape = shape
                     clip = true
                 }
@@ -994,10 +1012,8 @@ private fun NewGamePrimaryButton(
                             ),
                         )
                     }
-                    val lower = if (pressed) ref.vdp(1f).toPx() else ref.vdp(4f).toPx()
                     onDrawBehind {
                         drawRoundRect(face, cornerRadius = corner)
-                        drawRect(Color(0xFF244A58), Offset(0f, size.height - lower), Size(size.width, lower))
                         drawRoundRect(palette.cyan.copy(alpha = .18f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
                     }
                 }
