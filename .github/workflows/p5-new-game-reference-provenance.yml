@@ -37,21 +37,21 @@ jobs:
               api="https://snapshot.debian.org/mr/binary/${name}/${enc_version}/binfiles?fileinfo=1"
               curl --fail --location --retry 3 --silent --show-error "$api" -o /tmp/info.json
               file_hash="$(python3 - "$name" "$arch" <<"PY"
-import json, sys
-name, arch = sys.argv[1:]
-data = json.load(open("/tmp/info.json"))
-matches = [r["hash"] for r in data["result"] if r["architecture"] == arch]
-if len(matches) != 1: raise SystemExit(f"{name}: expected one {arch} file, got {matches}")
-print(matches[0])
-PY
+          import json, sys
+          name, arch = sys.argv[1:]
+          data = json.load(open("/tmp/info.json"))
+          matches = [r["hash"] for r in data["result"] if r["architecture"] == arch]
+          if len(matches) != 1: raise SystemExit(f"{name}: expected one {arch} file, got {matches}")
+          print(matches[0])
+          PY
               )"
               python3 - "$file_hash" <<"PY"
-import json, sys
-h=sys.argv[1]; data=json.load(open("/tmp/info.json"))
-print("snapshot-file-sha1="+h)
-for item in data.get("fileinfo",{}).get(h,[]):
- print("snapshot-first-seen="+item["first_seen"]); print("snapshot-name="+item["name"]); print("snapshot-path="+item["path"])
-PY
+          import json, sys
+          h=sys.argv[1]; data=json.load(open("/tmp/info.json"))
+          print("snapshot-file-sha1="+h)
+          for item in data.get("fileinfo",{}).get(h,[]):
+           print("snapshot-first-seen="+item["first_seen"]); print("snapshot-name="+item["name"]); print("snapshot-path="+item["path"])
+          PY
               curl --fail --location --retry 3 --silent --show-error "https://snapshot.debian.org/file/${file_hash}" -o "$out"
               test "$(dpkg-deb -f "$out" Package)" = "$name"
               test "$(dpkg-deb -f "$out" Version)" = "$version"
