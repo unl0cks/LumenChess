@@ -17,6 +17,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Identify host Inter payload used to freeze approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          HOST_INTER="$(fc-match -f '%{file}' Inter)"
+          HOST_FAMILY="$(fc-match -f '%{family}' Inter)"
+          printf 'host-inter-family=%s\nhost-inter-file=%s\n' "$HOST_FAMILY" "$HOST_INTER"
+          sha256sum "$HOST_INTER"
+          dpkg-query -S "$HOST_INTER" || true
+          OWNER="$(dpkg-query -S "$HOST_INTER" 2>/dev/null | head -n1 | cut -d: -f1 || true)"
+          if [ -n "$OWNER" ]; then dpkg-query -W -f='host-inter-package=${Package} ${Version} ${Architecture}\n' "$OWNER"; fi
       - name: Mark provenance pending
         env:
           GH_TOKEN: ${{ github.token }}
