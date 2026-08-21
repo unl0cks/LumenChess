@@ -695,7 +695,12 @@ private fun NewGameChoiceFace(
             NewGameIcon(
                 glyph,
                 if (selected) palette.text else Color(0xFF8F999E),
-                Modifier.size(ref.dp(19f)).offset(y = ref.vdp(2.5f)),
+                Modifier
+                    .size(ref.dp(19f))
+                    .offset(
+                        x = ref.dp(if (glyph == NewGameGlyph.CHESS960) -1f else 0f),
+                        y = ref.vdp(2.5f),
+                    ),
                 ref,
             )
             Text(
@@ -830,7 +835,7 @@ private fun NewGameSelector(
                 )
                 val upperLift = Brush.verticalGradient(
                     colorStops = arrayOf(
-                        0f to Color.White.copy(alpha = .038f),
+                        0f to Color.White.copy(alpha = .025f),
                         .16f to Color.Transparent,
                     ),
                 )
