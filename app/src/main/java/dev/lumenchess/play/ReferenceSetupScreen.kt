@@ -686,8 +686,17 @@ private fun NewGameChoiceFace(
             .semantics { this.selected = selected },
         contentAlignment = Alignment.Center,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(ref.dp(7f))) {
-            NewGameIcon(glyph, if (selected) palette.text else Color(0xFF8F999E), Modifier.size(ref.dp(19f)), ref)
+        Row(
+            Modifier.offset(x = ref.dp(-1.5f)),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(ref.dp(7f)),
+        ) {
+            NewGameIcon(
+                glyph,
+                if (selected) palette.text else Color(0xFF8F999E),
+                Modifier.size(ref.dp(19f)).offset(y = ref.vdp(2.5f)),
+                ref,
+            )
             Text(
                 label,
                 color = if (selected) Color(0xFFE6F6FB) else Color(0xFF8F999E),
@@ -818,8 +827,15 @@ private fun NewGameSelector(
                 val face = Brush.verticalGradient(
                     if (pressed) listOf(Color(0xFF141A1D), Color(0xFF111619)) else listOf(Color(0xFF171D21), Color(0xFF12181B)),
                 )
+                val upperLift = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0f to Color.White.copy(alpha = .038f),
+                        .16f to Color.Transparent,
+                    ),
+                )
                 onDrawBehind {
                     drawRoundRect(face, cornerRadius = corner)
+                    drawRoundRect(upperLift, cornerRadius = corner)
                     if (expanded) drawRect(palette.cyan.copy(alpha = .48f), Offset(0f, ref.vdp(8f).toPx()), Size(ref.dp(2f).toPx(), size.height - ref.vdp(16f).toPx()))
                     drawRoundRect(
                         Color.Black.copy(alpha = if (pressed) .08f else .11f),
