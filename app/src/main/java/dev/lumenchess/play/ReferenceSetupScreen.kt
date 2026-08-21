@@ -1020,18 +1020,18 @@ private fun NewGamePrimaryButton(
                     val face = if (pressed) {
                         Brush.verticalGradient(
                             colorStops = arrayOf(
-                                0f to Color(0xFF5A9AB1),
-                                .24f to Color(0xFF4E91A8),
-                                .52f to Color(0xFF498AA1),
-                                .78f to Color(0xFF438299),
+                                0f to Color(0xFF4E93AB),
+                                .24f to Color(0xFF4A8EA6),
+                                .52f to Color(0xFF4689A0),
+                                .78f to Color(0xFF42839B),
                                 1f to Color(0xFF3F7F96),
                             ),
                         )
                     } else {
                         Brush.verticalGradient(
                             colorStops = arrayOf(
-                                0f to Color(0xFF6EACC1),
-                                .22f to Color(0xFF579CB4),
+                                0f to Color(0xFF589FB7),
+                                .22f to Color(0xFF5094AC),
                                 .46f to Color(0xFF4789A1),
                                 .73f to Color(0xFF407F96),
                                 1f to Color(0xFF39758B),
