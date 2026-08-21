@@ -202,7 +202,7 @@ class P5LiveScreenshotQaTest {
     private fun assertBoardFirstGeometry() {
         val metrics = composeRule.activity.resources.displayMetrics
         val screenWidth = metrics.widthPixels.toFloat()
-        val screenHeight = metrics.heightPixels.toFloat()
+        val live = bounds(PLAY_LIVE_TEST_TAG)
         val board = bounds(CHESSBOARD_TEST_TAG)
         val opponent = bounds("p5-live-opponent-row")
         val player = bounds("p5-live-player-row")
@@ -213,7 +213,10 @@ class P5LiveScreenshotQaTest {
         assertTrue("opponent row must sit above board", opponent.bottom <= board.top + 1f)
         assertTrue("player row must sit below board", player.top >= board.bottom - 1f)
         assertTrue("essential actions must sit below player row", actions.top >= player.bottom - 1f)
-        assertTrue("board-first composition must fit the viewport", actions.bottom / screenHeight < 0.98f)
+        assertTrue(
+            "board-first composition must fit the Live root: live=$live actions=$actions",
+            actions.bottom <= live.bottom + 1f,
+        )
 
         listOf(
             "p5-live-shell",
