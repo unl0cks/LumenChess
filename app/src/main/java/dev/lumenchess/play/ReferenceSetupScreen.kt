@@ -835,7 +835,7 @@ private fun NewGameSelector(
                 )
                 val edgeDepth = Brush.verticalGradient(
                     colorStops = arrayOf(
-                        0f to Color.White.copy(alpha = if (pressed) .012f else .026f),
+                        0f to Color.Transparent,
                         .20f to Color.Transparent,
                         .72f to Color.Transparent,
                         1f to Color.Black.copy(alpha = if (pressed) .025f else .045f),
