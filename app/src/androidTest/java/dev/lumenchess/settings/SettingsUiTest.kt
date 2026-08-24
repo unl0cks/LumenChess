@@ -26,7 +26,7 @@ class SettingsUiTest {
         composeRule.onNodeWithTag("board-preview").assertIsDisplayed()
         composeRule.onNodeWithTag("derivative-board-preview-frame").assertIsDisplayed()
         composeRule.onNodeWithTag("derivative-tabs-bed").assertIsDisplayed()
-        composeRule.onNodeWithTag("derivative-catalog-selected").assertIsDisplayed()
+        composeRule.onNodeWithTag("derivative-catalog-selected").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("board-preview-board", useUnmergedTree = true).assertIsDisplayed()
 
         composeRule.onNodeWithTag("customization-tab-3").performClick()
