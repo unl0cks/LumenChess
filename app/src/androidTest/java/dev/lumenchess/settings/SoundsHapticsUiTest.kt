@@ -23,11 +23,17 @@ class SoundsHapticsUiTest {
         composeRule.onNodeWithTag("settings-sounds-haptics").performScrollTo().performClick()
 
         composeRule.onNodeWithTag("sounds-haptics-screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("derivative-feedback-screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("derivative-feedback-master-tray").assertIsDisplayed()
+        composeRule.onNodeWithTag("derivative-sound-pack-row").assertIsDisplayed()
         composeRule.onNodeWithTag("feedback-sounds-master").assertIsDisplayed()
         composeRule.onNodeWithTag("feedback-haptics-master").assertIsDisplayed()
         composeRule.onNodeWithTag("feedback-import-pack").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("p5-feedback-event-move").performScrollTo().performClick()
         composeRule.onNodeWithTag("p5-feedback-event-detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("derivative-feedback-detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("derivative-feedback-detail-tray").assertIsDisplayed()
+        composeRule.onNodeWithTag("derivative-feedback-actions").assertIsDisplayed()
         composeRule.onNodeWithTag("feedback-preview-move").assertIsDisplayed()
         composeRule.onNodeWithTag("feedback-import-move").assertIsDisplayed()
     }
