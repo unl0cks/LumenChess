@@ -74,8 +74,9 @@ class P5PlayOverviewScreenshotQaTest {
         waitForTag("p5-play-overview")
 
         composeRule.onNodeWithTag("play-overview-arena").performClick()
+        composeRule.onNodeWithTag("derivative-arena-preview").assertIsDisplayed()
         composeRule.onNodeWithText(
-            "Arena setup will arrive with its engine-battle runtime. The Play shell is already reserved for it.",
+            "Set up engine battles, opening positions, and takeover play from the dedicated Arena tab.",
         ).assertIsDisplayed()
     }
 

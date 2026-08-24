@@ -14,6 +14,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -53,8 +54,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.lumenchess.design.LumenColors
+import dev.lumenchess.design.DerivativeSurfaceRole
+import dev.lumenchess.design.LumenDerivativePage
+import dev.lumenchess.design.LumenDerivativeSurface
+import dev.lumenchess.design.LumenDerivativeTopBar
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTypography
+import dev.lumenchess.design.lumenP5IdentityPalette
 import dev.lumenchess.engine.api.EngineStrengthTarget
 import kotlin.math.PI
 import kotlin.math.cos
@@ -698,33 +704,38 @@ private fun QuickStartGlyph(kind: QuickGlyph, modifier: Modifier = Modifier) {
 
 @Composable
 internal fun ReferenceArenaPreviewScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(LumenColors.BackgroundLift, LumenColors.Background),
-                ),
-            )
-            .padding(horizontal = 13.dp, vertical = 3.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    val palette = lumenP5IdentityPalette()
+    LumenDerivativePage(
+        modifier = modifier.fillMaxSize(),
+        testTag = "derivative-arena-preview",
+        horizontalPadding = 18,
+        spacing = 12,
     ) {
-        dev.lumenchess.design.LumenTopBar("Engine Arena", onBack = onBack)
-        dev.lumenchess.design.LumenPanel(Modifier.fillMaxWidth()) {
-            Column(
-                Modifier.fillMaxWidth().padding(vertical = 9.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+        LumenDerivativeTopBar(title = "Engine Arena", onBack = onBack)
+        LumenDerivativeSurface(
+            role = DerivativeSurfaceRole.PREVIEW_PANEL,
+            modifier = Modifier.fillMaxWidth().height(132.dp),
+            testTag = "derivative-preview-panel",
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+        ) {
+            Row(
+                Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(15.dp),
             ) {
-                Text(
-                    "Engine Arena",
-                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    "Arena setup will arrive with its engine-battle runtime. The Play shell is already reserved for it.",
-                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    color = LumenColors.OnSurfaceMuted,
-                )
+                PlayModeArtwork(kind = PlayOverviewArtwork.ARENA, modifier = Modifier.size(78.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        text = "Engine Arena",
+                        style = LumenTypography.ModeTitle,
+                        color = palette.text,
+                    )
+                    Text(
+                        text = "Set up engine battles, opening positions, and takeover play from the dedicated Arena tab.",
+                        style = LumenTypography.ModeSubtitle,
+                        color = palette.muted,
+                    )
+                }
             }
         }
     }

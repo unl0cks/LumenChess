@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,6 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.lumenchess.design.LumenColors
+import dev.lumenchess.design.DerivativeSurfaceRole
+import dev.lumenchess.design.LumenDerivativePage
+import dev.lumenchess.design.LumenDerivativeSurface
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenP5IdentityPalette
 import dev.lumenchess.design.LumenP5SettingsGeometry
@@ -357,26 +361,54 @@ private fun LumenNavGlyph(tab: MainTab, tint: Color, modifier: Modifier = Modifi
 
 @Composable
 internal fun FutureSurfacePreview(tab: MainTab) {
-    Box(
-        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift,LumenColors.Background)))
-            .padding(horizontal=15.dp,vertical=16.dp),
+    val palette = lumenP5IdentityPalette()
+    LumenDerivativePage(
+        modifier = Modifier.fillMaxSize(),
+        testTag = "derivative-future-preview",
+        horizontalPadding = 18,
+        verticalPadding = 22,
+        spacing = 18,
     ) {
-        Column(verticalArrangement=Arrangement.spacedBy(9.dp)) {
-            Text(tab.label,style=MaterialTheme.typography.headlineMedium,color=LumenColors.OnSurface)
-            Box(
-                Modifier.fillMaxWidth().background(LumenColors.Surface,RoundedCornerShape(LumenRadii.Panel))
-                    .border(1.dp,LumenColors.Outline,RoundedCornerShape(LumenRadii.Panel)).padding(horizontal=11.dp,vertical=10.dp),
+        Text(
+            text = tab.label,
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontSize = 24.sp,
+                lineHeight = 29.sp,
+                fontWeight = FontWeight.SemiBold,
+            ),
+            color = palette.text,
+        )
+        LumenDerivativeSurface(
+            role = DerivativeSurfaceRole.PREVIEW_PANEL,
+            modifier = Modifier.fillMaxWidth().height(96.dp),
+            testTag = "derivative-preview-panel",
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+        ) {
+            Row(
+                Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
             ) {
-                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) {
-                    Box(
-                        Modifier.size(31.dp).background(LumenColors.AccentBlueGhost,RoundedCornerShape(LumenRadii.Control))
-                            .border(1.dp,LumenColors.AccentBlue.copy(alpha=.45f),RoundedCornerShape(LumenRadii.Control)),
-                        contentAlignment=Alignment.Center,
-                    ) { LegacyPreviewTabIcon(tab,LumenColors.AccentBlueBright,Modifier.size(18.dp)) }
-                    Column(verticalArrangement=Arrangement.spacedBy(1.dp)) {
-                        Text(tab.label,style=MaterialTheme.typography.titleMedium,color=LumenColors.OnSurface)
-                        Text(tab.previewCopy,style=MaterialTheme.typography.bodySmall,color=LumenColors.OnSurfaceMuted)
-                    }
+                LumenDerivativeSurface(
+                    role = DerivativeSurfaceRole.SELECTED_FACE,
+                    modifier = Modifier.size(48.dp),
+                    contentPadding = PaddingValues(10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LegacyPreviewTabIcon(tab, palette.cyanMicro, Modifier.fillMaxSize())
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = tab.label,
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
+                        color = palette.text,
+                    )
+                    Text(
+                        text = tab.previewCopy,
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                        color = palette.muted,
+                        maxLines = 2,
+                    )
                 }
             }
         }

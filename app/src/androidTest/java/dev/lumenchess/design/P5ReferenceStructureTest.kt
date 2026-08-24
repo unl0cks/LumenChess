@@ -47,6 +47,14 @@ class P5ReferenceStructureTest {
     }
 
     @Test
+    fun arenaPreviewUsesIntentionalDerivativeShellWithoutRuntimeCopy() {
+        composeRule.onNodeWithTag("play-overview-arena").performClick()
+        composeRule.onNodeWithTag("derivative-arena-preview").assertIsDisplayed()
+        composeRule.onNodeWithTag("derivative-preview-panel").assertIsDisplayed()
+        composeRule.onAllNodesWithText("will arrive with its engine-battle runtime", substring = true).assertCountEquals(0)
+    }
+
+    @Test
     fun playSetupUsesCompactFramedReferenceHierarchy() {
         openSetup()
         val frame = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot
