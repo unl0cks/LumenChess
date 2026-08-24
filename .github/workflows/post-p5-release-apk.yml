@@ -48,7 +48,7 @@ jobs:
         run: ./gradlew clean :app:assembleRelease --no-daemon
       - name: Verify and package unsigned release APK
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           apk="$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' | head -n 1)"
           test -n "$apk"
 
