@@ -335,7 +335,7 @@ internal fun LumenDerivativeRow(
         testTag = testTag,
     ) {
         Row(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
@@ -496,7 +496,7 @@ internal fun LumenDerivativeToggleRow(
         enabled = enabled,
         testTag = testTag,
     ) {
-        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = title,
