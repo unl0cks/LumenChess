@@ -1,11 +1,11 @@
 # P5 — Reference-Fidelity Visual Identity & Motion Pass
 
-**Status:** Approved corrective design contract; implementation pending  
-**Date:** 2026-08-17  
-**Base:** `de2fe5e7c3d4096527a4e24602f68144c4b2d67c`  
-**Branch:** `p5-reference-fidelity-visual-identity`  
-**Scope:** presentation-only unless a genuine regression requires otherwise  
-**Blocked:** M20  
+**Status:** Approved corrective design contract; implementation pending
+**Date:** 2026-08-17
+**Base:** `de2fe5e7c3d4096527a4e24602f68144c4b2d67c`
+**Branch:** `p5-reference-fidelity-visual-identity`
+**Scope:** presentation-only unless a genuine regression requires otherwise
+**Blocked:** M20
 **Promotion policy:** never promote P5 automatically; physical visual approval is mandatory
 
 ## 1. Goal
