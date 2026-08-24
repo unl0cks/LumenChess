@@ -70,10 +70,11 @@ class P5ReferenceStructureTest {
         composeRule.onNodeWithTag("p5-inc-delay").performScrollTo().assertIsDisplayed()
 
         val choice = composeRule.onNodeWithTag("p5-setup-standard").fetchSemanticsNode().boundsInRoot
-        val nav = composeRule.onNodeWithTag("main-tab-play").fetchSemanticsNode().boundsInRoot
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        composeRule.onAllNodesWithTag("main-tab-play").assertCountEquals(0)
         assertTrue(
-            "Reference game-mode tiles should be more compact than the bottom-navigation item",
-            choice.height < nav.height * 0.92f,
+            "Approved game-mode tiles should remain compact within the full-screen setup route",
+            choice.height / root.height in 0.05f..0.08f,
         )
     }
 
