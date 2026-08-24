@@ -1,4 +1,4 @@
-name: P5 New Game + Play + Live + Settings reference
+name: P5 primary + derivative reference
 
 on:
   push:
@@ -96,6 +96,7 @@ jobs:
             --tests 'dev.lumenchess.play.PlayRuntimeCoordinatorTest' \
             --tests 'dev.lumenchess.play.PlaySnapshotCodecTest' \
             --tests 'dev.lumenchess.feedback.GameFeedbackProjectorTest' \
+            --tests 'dev.lumenchess.design.LumenDerivativeSurfaceModelTest' \
             --stacktrace \
             2>&1 | tee "$RUNNER_TEMP/p5-gradle-build.txt"
       - name: Surface P5 build failure
@@ -104,7 +105,7 @@ jobs:
         run: |
           echo "::error title=P5 reference build::Screenshot APK build or focused setup tests failed"
           tail -n 180 "$RUNNER_TEMP/p5-gradle-build.txt" || true
-      - name: Capture approved Settings, Play, New Game, Live, press states and regressions
+      - name: Capture approved primary and derivative screens, press states and regressions
         id: screenshots
         if: steps.verify.outcome == 'success'
         continue-on-error: true
@@ -162,6 +163,40 @@ jobs:
             | tee "$RUNNER_TEMP/p5-setup-instrumentation.txt"
 
           adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
+
+          # Derivative/customization screenshots share the same frozen primary vocabulary but
+          # remain isolated from deterministic primary captures and their persisted route state.
+          adb shell pm clear dev.lumenchess
+          rm -rf p5-derivative-screenshots p5-derivative-comparisons
+          mkdir -p p5-derivative-screenshots p5-derivative-comparisons
+          adb shell am instrument -w -r \
+            -e p5DerivativeQa true \
+            -e class 'dev.lumenchess.visual.P5DerivativeScreenshotQaTest' \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p5-derivative-instrumentation.txt"
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-derivative-screenshots/. p5-derivative-screenshots/
+          DERIVATIVE_COUNT="$(find p5-derivative-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
+          if [ "$DERIVATIVE_COUNT" != "15" ]; then
+            echo "::error title=P5 derivative screenshots::Expected exactly 15 derivative screenshots, found $DERIVATIVE_COUNT"
+            find p5-derivative-screenshots -maxdepth 2 -type f -print || true
+            exit 1
+          fi
+          test -f p5-derivative-screenshots/05-play-settings.png
+          test -f p5-derivative-screenshots/05-play-settings-press-state.png
+          test -f p5-derivative-screenshots/06-board.png
+          test -f p5-derivative-screenshots/06-board-press-state.png
+          test -f p5-derivative-screenshots/07-pieces.png
+          test -f p5-derivative-screenshots/08-background.png
+          test -f p5-derivative-screenshots/09-presets.png
+          test -f p5-derivative-screenshots/10-sounds-haptics.png
+          test -f p5-derivative-screenshots/10-sounds-haptics-press-state.png
+          test -f p5-derivative-screenshots/11-feedback-detail.png
+          test -f p5-derivative-screenshots/11-feedback-detail-press-state.png
+          test -f p5-derivative-screenshots/12-arena-preview.png
+          test -f p5-derivative-screenshots/13-arena-tab.png
+          test -f p5-derivative-screenshots/14-games-tab.png
+          test -f p5-derivative-screenshots/15-insights-tab.png
+
           COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
           if [ "$COUNT" != "8" ]; then
             echo "::error title=P5 screenshots::Expected exactly 8 device screenshots, found $COUNT"
@@ -207,6 +242,7 @@ jobs:
           reference = Image.open(io.BytesIO(reference_bytes)).convert('RGB')
           assert reference.size == (390, 844), reference.size
           assert hashlib.sha256(reference.tobytes()).hexdigest() == '791a5d6cac599e83a3083d369b42e2c39b09099cc59033255d6360b0ad906452'
+          reference.save(root / 'p5-reference-render/04-settings-approved-reference.png', optimize=True)
           candidate = Image.open(candidate_path).convert('RGB')
           target_aspect = reference.width / reference.height
           crop_height = round(candidate.width / target_aspect)
@@ -265,13 +301,90 @@ jobs:
           test -f p5-screenshots/02-new-game-approved-comparison.png
           test -f p5-screenshots/03-live-approved-comparison.png
 
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+
+          root = Path('.')
+          output = root / 'p5-derivative-comparisons'
+          output.mkdir(parents=True, exist_ok=True)
+          target_size = (390, 844)
+          gap = 10
+          label_height = 28
+
+          def normalized(path):
+              image = Image.open(root / path).convert('RGB')
+              if image.size == target_size:
+                  return image
+              target_aspect = target_size[0] / target_size[1]
+              crop_height = round(image.width / target_aspect)
+              assert crop_height <= image.height, (path, image.size, crop_height)
+              return image.crop((0, image.height - crop_height, image.width, image.height)).resize(
+                  target_size,
+                  Image.Resampling.LANCZOS,
+              )
+
+          def sheet(name, panels):
+              images = [(label, normalized(path)) for label, path in panels]
+              width = len(images) * target_size[0] + (len(images) - 1) * gap
+              canvas = Image.new('RGB', (width, target_size[1] + label_height), (5, 7, 9))
+              draw = ImageDraw.Draw(canvas)
+              for index, (label, image) in enumerate(images):
+                  x = index * (target_size[0] + gap)
+                  draw.text((x + 8, 8), label, fill=(190, 205, 212))
+                  canvas.paste(image, (x, label_height))
+              canvas.save(output / name, optimize=True)
+
+          settings = 'p5-reference-render/04-settings-approved-reference.png'
+          new_game = 'p5-reference-render/02-new-game-approved-reference.png'
+          play = 'p5-reference-render/01-play-overview-approved-reference.png'
+          sheet('05-play-settings-vocabulary-comparison.png', [
+              ('SETTINGS VOCABULARY', settings),
+              ('NEW GAME VOCABULARY', new_game),
+              ('PLAY SETTINGS NATIVE', 'p5-derivative-screenshots/05-play-settings.png'),
+          ])
+          sheet('06-board-vocabulary-comparison.png', [
+              ('SETTINGS VOCABULARY', settings),
+              ('NEW GAME VOCABULARY', new_game),
+              ('BOARD NATIVE', 'p5-derivative-screenshots/06-board.png'),
+          ])
+          sheet('10-sounds-haptics-vocabulary-comparison.png', [
+              ('SETTINGS VOCABULARY', settings),
+              ('NEW GAME VOCABULARY', new_game),
+              ('SOUNDS NATIVE', 'p5-derivative-screenshots/10-sounds-haptics.png'),
+          ])
+          sheet('11-feedback-detail-vocabulary-comparison.png', [
+              ('SETTINGS VOCABULARY', settings),
+              ('FEEDBACK DETAIL NATIVE', 'p5-derivative-screenshots/11-feedback-detail.png'),
+          ])
+          sheet('12-arena-preview-vocabulary-comparison.png', [
+              ('PLAY VOCABULARY', play),
+              ('SETTINGS VOCABULARY', settings),
+              ('ARENA PREVIEW NATIVE', 'p5-derivative-screenshots/12-arena-preview.png'),
+          ])
+          sheet('13-15-future-tabs-vocabulary-comparison.png', [
+              ('SETTINGS VOCABULARY', settings),
+              ('PLAY VOCABULARY', play),
+              ('ARENA NATIVE', 'p5-derivative-screenshots/13-arena-tab.png'),
+              ('GAMES NATIVE', 'p5-derivative-screenshots/14-games-tab.png'),
+              ('INSIGHTS NATIVE', 'p5-derivative-screenshots/15-insights-tab.png'),
+          ])
+          PY
+
+          DERIVATIVE_COMPARISON_COUNT="$(find p5-derivative-comparisons -type f -name '*.png' | wc -l | tr -d ' ')"
+          if [ "$DERIVATIVE_COMPARISON_COUNT" != "6" ]; then
+            echo "::error title=P5 derivative comparisons::Expected exactly 6 vocabulary comparisons, found $DERIVATIVE_COMPARISON_COUNT"
+            find p5-derivative-comparisons -maxdepth 2 -type f -print || true
+            exit 1
+          fi
+
           FINAL_COUNT="$(find p5-screenshots -type f -name '*.png' | wc -l | tr -d ' ')"
           if [ "$FINAL_COUNT" != "12" ]; then
             echo "::error title=P5 artifacts::Expected exactly 12 final screenshot PNGs, found $FINAL_COUNT"
             find p5-screenshots -maxdepth 2 -type f -print || true
             exit 1
           fi
-          printf 'Captured approved Settings + Play + New Game + Live REST/PRESSED states and focused Play/Live/P1 regressions\n'
+          printf 'Captured approved Settings + Play + New Game + Live and derivative/customization REST/PRESSED states with focused regressions\n'
       - name: Upload Settings screenshot artifact
         if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -316,6 +429,16 @@ jobs:
             p5-screenshots/03-live-press-state.png
           if-no-files-found: error
           retention-days: 14
+      - name: Upload derivative and customization screenshot artifact
+        if: steps.verify.outcome == 'success' && steps.screenshots.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: p5-derivative-${{ github.sha }}
+          path: |
+            p5-derivative-screenshots/*.png
+            p5-derivative-comparisons/*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload P5 diagnostics on failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
         uses: actions/upload-artifact@v4
@@ -329,10 +452,13 @@ jobs:
             ${{ runner.temp }}/p5-live-runtime-instrumentation.txt
             ${{ runner.temp }}/p5-play-instrumentation.txt
             ${{ runner.temp }}/p5-setup-instrumentation.txt
+            ${{ runner.temp }}/p5-derivative-instrumentation.txt
             ${{ runner.temp }}/p5-play-reference.txt
             ${{ runner.temp }}/p5-new-game-reference.txt
             p5-screenshots/
             p5-reference-render/
+            p5-derivative-screenshots/
+            p5-derivative-comparisons/
           if-no-files-found: warn
           retention-days: 7
       - name: Publish P5 reference verification success
@@ -344,7 +470,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context='P5 reference/API37' \
-            -f description='Approved New Game + Play + Live + Settings, setup behavior/press QA, Live board-first and P1 geometry passed' \
+            -f description='Approved primary screens plus derivative/customization inheritance, press QA, Live board-first and P1 geometry passed' \
             -f target_url="$RUN_URL"
       - name: Publish P5 reference verification failure
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
@@ -355,7 +481,7 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context='P5 reference/API37' \
-            -f description='Approved New Game/Play/Live/Settings build, screenshot QA, behavior, Live presentation or geometry failed' \
+            -f description='Primary or derivative P5 build, screenshot QA, behavior, Live presentation or geometry failed' \
             -f target_url="$RUN_URL"
       - name: Fail workflow when P5 verification failed
         if: always() && (steps.verify.outcome != 'success' || steps.screenshots.outcome != 'success')
