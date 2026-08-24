@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.lumenchess.MainActivity
 import dev.lumenchess.play.PLAY_LIVE_TEST_TAG
+import dev.lumenchess.play.PLAY_SETUP_TEST_TAG
 import dev.lumenchess.play.PLAY_START_TEST_TAG
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
@@ -55,11 +56,15 @@ class P5ReferenceStructureTest {
     }
 
     @Test
-    fun playSetupUsesCompactFramedReferenceHierarchy() {
+    fun playSetupUsesDedicatedFramedReferenceHierarchy() {
         openSetup()
+        val route = composeRule.onNodeWithTag(PLAY_SETUP_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val frame = composeRule.onNodeWithTag("p5-setup-shell").fetchSemanticsNode().boundsInRoot
-        val title = composeRule.onNodeWithTag("lumen-topbar-title").fetchSemanticsNode().boundsInRoot
-        assertTrue("New Game header must live inside the reference setup frame", title.top >= frame.top && title.bottom <= frame.bottom)
+        val title = composeRule.onAllNodesWithText("New Game").fetchSemanticsNodes().single().boundsInRoot
+        val back = composeRule.onNodeWithTag("p5-setup-back").fetchSemanticsNode().boundsInRoot
+        assertTrue("New Game title must live inside its full-screen route", title.top >= route.top && title.bottom <= route.bottom)
+        assertTrue("New Game back control must live inside its full-screen route", back.top >= route.top && back.bottom <= route.bottom)
+        assertTrue("The approved setup plane must begin below the dedicated New Game header", frame.top > title.bottom)
         composeRule.onNodeWithTag("p5-setup-content").assertIsDisplayed()
     }
 
