@@ -292,29 +292,26 @@ internal fun LumenDerivativeSurface(
         )
     }
 
-    Box(outer) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    translationY = offset.toPx()
-                }
-                .shadow(elevation, shape, clip = false)
-                .derivativeSurfaceFace(
-                    spec = spec,
-                    top = top,
-                    middle = middle,
-                    bottom = bottom,
-                    outline = outline,
-                    illumination = colors.illumination,
-                )
-                .padding(contentPadding),
-            contentAlignment = contentAlignment,
-            content = content,
-        )
-    }
+    Box(
+        outer
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = offset.toPx()
+            }
+            .shadow(elevation, shape, clip = false)
+            .derivativeSurfaceFace(
+                spec = spec,
+                top = top,
+                middle = middle,
+                bottom = bottom,
+                outline = outline,
+                illumination = colors.illumination,
+            )
+            .padding(contentPadding),
+        contentAlignment = contentAlignment,
+        content = content,
+    )
 }
 
 @Composable
