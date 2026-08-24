@@ -81,6 +81,13 @@ jobs:
       - name: Run cumulative instrumentation tests on Android 17
         run: |
           echo "no" | avdmanager create avd --force --name gate-p --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          AVD_CONFIG="$HOME/.android/avd/gate-p.avd/config.ini"
+          cat >> "$AVD_CONFIG" <<'AVDEOF'
+          hw.lcd.width=1344
+          hw.lcd.height=2992
+          hw.lcd.density=489
+          showDeviceFrame=no
+          AVDEOF
           emulator_bin="$ANDROID_HOME/emulator/emulator"
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
           "$emulator_bin" -accel-check || true
@@ -95,6 +102,13 @@ jobs:
           done
           if [ "$device_ready" -ne 1 ]; then cat "$RUNNER_TEMP/gate-p-emulator.log"; exit 1; fi
           timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell wm size reset
+          adb shell wm density reset
+          size="$(adb shell wm size | tr -d '\r')"
+          density="$(adb shell wm density | tr -d '\r')"
+          printf '%s\n%s\n' "$size" "$density"
+          grep -q 'Physical size: 1344x2992' <<< "$size"
+          grep -q 'Physical density: 489' <<< "$density"
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
