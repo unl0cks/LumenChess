@@ -70,6 +70,7 @@ jobs:
           test -x "$readelf"
 
           "$aapt" dump badging "$out/$name" > "$out/aapt-badging.txt"
+          cat "$out/aapt-badging.txt"
           grep -q "package: name='dev.lumenchess' versionCode='1' versionName='0.1.0-dev'" "$out/aapt-badging.txt"
           grep -q "sdkVersion:'37'" "$out/aapt-badging.txt"
           grep -q "targetSdkVersion:'37'" "$out/aapt-badging.txt"
