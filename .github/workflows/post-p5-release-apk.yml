@@ -74,7 +74,7 @@ jobs:
           grep -q "package: name='dev.lumenchess' versionCode='1' versionName='0.1.0-dev'" "$out/aapt-badging.txt"
           grep -q "sdkVersion:'37'" "$out/aapt-badging.txt"
           grep -q "targetSdkVersion:'37'" "$out/aapt-badging.txt"
-          grep -q "native-code: 'arm64-v8a' 'x86_64'" "$out/aapt-badging.txt"
+          grep -q "native-code: 'arm64-v8a' 'armeabi-v7a' 'x86' 'x86_64'" "$out/aapt-badging.txt"
           if grep -q 'application-debuggable' "$out/aapt-badging.txt"; then
             echo 'Release APK is unexpectedly debuggable'
             exit 1
@@ -93,8 +93,16 @@ jobs:
           printf 'status=unsigned\napksigner_exit=%s\n' "$signer_status" > "$out/signing-status.txt"
 
           cat > "$out/expected-native.txt" <<'EOF'
+          lib/arm64-v8a/libandroidx.graphics.path.so
+          lib/arm64-v8a/libdatastore_shared_counter.so
           lib/arm64-v8a/liblumen_reckless09.so
           lib/arm64-v8a/liblumen_stockfish18.so
+          lib/armeabi-v7a/libandroidx.graphics.path.so
+          lib/armeabi-v7a/libdatastore_shared_counter.so
+          lib/x86/libandroidx.graphics.path.so
+          lib/x86/libdatastore_shared_counter.so
+          lib/x86_64/libandroidx.graphics.path.so
+          lib/x86_64/libdatastore_shared_counter.so
           lib/x86_64/liblumen_reckless09.so
           lib/x86_64/liblumen_stockfish18.so
           EOF
