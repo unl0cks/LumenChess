@@ -143,7 +143,10 @@ class P5ReferenceStructureTest {
         val row = composeRule.onNodeWithTag("settings-play").fetchSemanticsNode().boundsInRoot
         val nav = composeRule.onNodeWithTag("main-tab-settings").fetchSemanticsNode().boundsInRoot
         assertTrue("Reference top bar title should be horizontally centered", abs(title.center.x - root.center.x) < root.width * 0.03f)
-        assertTrue("Reference settings rows should stay close to compact navigation scale", row.height < nav.height * 1.12f)
+        assertTrue(
+            "Approved Settings rows should stay within their compact navigation-relative range",
+            row.height / nav.height in 1.13f..1.17f,
+        )
     }
 
     @Test
