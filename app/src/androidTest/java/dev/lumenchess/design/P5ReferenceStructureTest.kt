@@ -65,7 +65,7 @@ class P5ReferenceStructureTest {
         assertTrue("New Game title must live inside its full-screen route", title.top >= route.top && title.bottom <= route.bottom)
         assertTrue("New Game back control must live inside its full-screen route", back.top >= route.top && back.bottom <= route.bottom)
         assertTrue("The approved setup plane must begin below the dedicated New Game header", frame.top > title.bottom)
-        composeRule.onNodeWithTag("p5-setup-content").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-setup-plane").assertIsDisplayed()
     }
 
     @Test
