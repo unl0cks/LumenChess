@@ -1,7 +1,6 @@
 package dev.lumenchess.play
 
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
