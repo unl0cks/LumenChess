@@ -348,6 +348,24 @@ jobs:
               ('NEW GAME VOCABULARY', new_game),
               ('BOARD NATIVE', 'p5-derivative-screenshots/06-board.png'),
           ])
+          sheet('07-pieces-vocabulary-comparison.png', [
+              ('SETTINGS VOCABULARY', settings),
+              ('NEW GAME VOCABULARY', new_game),
+              ('APPROVED BOARD TAB', 'p5-derivative-screenshots/06-board.png'),
+              ('PIECES NATIVE', 'p5-derivative-screenshots/07-pieces.png'),
+          ])
+          sheet('08-background-vocabulary-comparison.png', [
+              ('SETTINGS VOCABULARY', settings),
+              ('NEW GAME VOCABULARY', new_game),
+              ('APPROVED BOARD TAB', 'p5-derivative-screenshots/06-board.png'),
+              ('BACKGROUND NATIVE', 'p5-derivative-screenshots/08-background.png'),
+          ])
+          sheet('09-presets-vocabulary-comparison.png', [
+              ('SETTINGS VOCABULARY', settings),
+              ('NEW GAME VOCABULARY', new_game),
+              ('APPROVED BOARD TAB', 'p5-derivative-screenshots/06-board.png'),
+              ('PRESETS NATIVE', 'p5-derivative-screenshots/09-presets.png'),
+          ])
           sheet('10-sounds-haptics-vocabulary-comparison.png', [
               ('SETTINGS VOCABULARY', settings),
               ('NEW GAME VOCABULARY', new_game),
@@ -371,9 +389,13 @@ jobs:
           ])
           PY
 
+          test -f p5-derivative-comparisons/07-pieces-vocabulary-comparison.png
+          test -f p5-derivative-comparisons/08-background-vocabulary-comparison.png
+          test -f p5-derivative-comparisons/09-presets-vocabulary-comparison.png
+
           DERIVATIVE_COMPARISON_COUNT="$(find p5-derivative-comparisons -type f -name '*.png' | wc -l | tr -d ' ')"
-          if [ "$DERIVATIVE_COMPARISON_COUNT" != "6" ]; then
-            echo "::error title=P5 derivative comparisons::Expected exactly 6 vocabulary comparisons, found $DERIVATIVE_COMPARISON_COUNT"
+          if [ "$DERIVATIVE_COMPARISON_COUNT" != "9" ]; then
+            echo "::error title=P5 derivative comparisons::Expected exactly 9 vocabulary comparisons, found $DERIVATIVE_COMPARISON_COUNT"
             find p5-derivative-comparisons -maxdepth 2 -type f -print || true
             exit 1
           fi
