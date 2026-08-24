@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,9 +48,12 @@ import dev.lumenchess.customization.BackgroundCatalog
 import dev.lumenchess.customization.BoardThemeCatalog
 import dev.lumenchess.customization.LumenPreset
 import dev.lumenchess.customization.LumenPresetCatalog
-import dev.lumenchess.design.LumenColors
-import dev.lumenchess.design.LumenTabs
-import dev.lumenchess.design.LumenTopBar
+import dev.lumenchess.design.DerivativeSurfaceRole
+import dev.lumenchess.design.LumenDerivativePage
+import dev.lumenchess.design.LumenDerivativeSurface
+import dev.lumenchess.design.LumenDerivativeTabs
+import dev.lumenchess.design.LumenDerivativeTopBar
+import dev.lumenchess.design.lumenP5IdentityPalette
 
 private enum class CustomizationTab(val label: String) { BOARD("Board"), PIECES("Pieces"), BACKGROUND("Background"), PRESETS("Presets") }
 
@@ -57,18 +65,29 @@ fun BoardAppearanceScreen(
     modifier: Modifier = Modifier,
 ) {
     var tab by remember { mutableStateOf(CustomizationTab.BOARD) }
-    Column(
-        modifier.fillMaxSize().background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
-            .padding(horizontal = 13.dp, vertical = 3.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    LumenDerivativePage(
+        modifier = modifier.fillMaxSize(),
+        testTag = "derivative-board-appearance",
+        horizontalPadding = 16,
+        spacing = 7,
     ) {
-        LumenTopBar("Board & Pieces", onBack = onBack, backTestTag = "customization-back")
-        Box(
-            Modifier.fillMaxWidth().background(LumenColors.Surface, RoundedCornerShape(8.dp))
-                .border(1.dp, LumenColors.Outline, RoundedCornerShape(8.dp)).padding(5.dp),
-        ) { BoardPreview(settings, Modifier.fillMaxWidth().height(258.dp)) }
+        LumenDerivativeTopBar("Board & Pieces", onBack = onBack, backTestTag = "customization-back")
+        LumenDerivativeSurface(
+            role = DerivativeSurfaceRole.RECESSED_TRAY,
+            modifier = Modifier.fillMaxWidth().height(274.dp),
+            testTag = "derivative-board-preview-frame",
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(7.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            BoardPreview(settings, Modifier.fillMaxWidth().height(258.dp))
+        }
 
-        LumenTabs(CustomizationTab.entries.map { it.label }, tab.ordinal, { tab = CustomizationTab.entries[it] }, testTagPrefix = "customization-tab")
+        LumenDerivativeTabs(
+            labels = CustomizationTab.entries.map { it.label },
+            selectedIndex = tab.ordinal,
+            onSelected = { tab = CustomizationTab.entries[it] },
+            testTagPrefix = "customization-tab",
+        )
 
         Column(
             Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).testTag("customization-options-grid"),
@@ -128,34 +147,64 @@ private fun VisualOptionRow(
     preview: @Composable () -> Unit,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(7.dp)
-    Row(
-        Modifier.fillMaxWidth().height(72.dp)
-            .background(if (selected) LumenColors.AccentBlueGhost else LumenColors.Surface, shape)
-            .border(1.dp, if (selected) LumenColors.AccentBlueBright else LumenColors.Outline, shape)
-            .clickable(onClick = onClick).testTag(tag).padding(horizontal = 7.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    val palette = lumenP5IdentityPalette()
+    LumenDerivativeSurface(
+        role = if (selected) DerivativeSurfaceRole.SELECTED_FACE else DerivativeSurfaceRole.NEUTRAL_ROW,
+        modifier = Modifier.fillMaxWidth().height(78.dp),
+        onClick = onClick,
+        testTag = tag,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 7.dp),
     ) {
-        Box(
-            Modifier.width(84.dp).height(58.dp).background(LumenColors.Background.copy(alpha = .58f), RoundedCornerShape(5.dp)).padding(4.dp),
-            contentAlignment = Alignment.Center,
-        ) { preview() }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (selected) Box(Modifier.matchParentSize().testTag("derivative-catalog-selected"))
+        Row(
+            Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(11.dp),
+        ) {
+            LumenDerivativeSurface(
+                role = DerivativeSurfaceRole.RECESSED_TRAY,
+                modifier = Modifier.width(88.dp).height(62.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp),
+                contentAlignment = Alignment.Center,
+            ) { preview() }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        title,
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (selected) palette.cyanMicro else palette.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (selected) SelectedCheck(palette.cyanMicro)
+                }
                 Text(
-                    title,
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (selected) LumenColors.AccentBlueBright else LumenColors.OnSurface,
-                    maxLines = 1,
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.muted,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (selected) Text("✓", style = MaterialTheme.typography.labelLarge, color = LumenColors.AccentBlueBright)
             }
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = LumenColors.OnSurfaceMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+@Composable
+private fun SelectedCheck(tint: Color) {
+    Canvas(Modifier.size(20.dp)) {
+        val path = Path().apply {
+            moveTo(size.width * .20f, size.height * .53f)
+            lineTo(size.width * .42f, size.height * .73f)
+            lineTo(size.width * .80f, size.height * .28f)
+        }
+        drawPath(
+            path = path,
+            color = tint,
+            style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+        )
     }
 }
 
