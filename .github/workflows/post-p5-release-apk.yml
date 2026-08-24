@@ -1,0 +1,156 @@
+name: Post-P5 release APK verification
+
+on:
+  push:
+    branches:
+      - codex/post-p5-release-apk-build
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-release-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out approved post-P5 main
+        uses: actions/checkout@v4
+        with:
+          ref: 54ff48fcc05e97e61b7a4075806c8c512bc5a9b7
+      - name: Verify immutable source identity
+        run: |
+          test "$(git rev-parse HEAD)" = "54ff48fcc05e97e61b7a4075806c8c512bc5a9b7"
+          test "$(git rev-parse HEAD:app)" = "771d61627fdd6c5ed2e18119e27fd066f67b9843"
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools
+      - name: Install Android 17 SDK and pinned native toolchain
+        run: |
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+          rustup run 1.88.0 rustc --version
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build clean universal release APK
+        run: ./gradlew clean :app:assembleRelease --no-daemon
+      - name: Verify and package unsigned release APK
+        run: |
+          set -euo pipefail
+          apk="$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' | head -n 1)"
+          test -n "$apk"
+
+          out="$RUNNER_TEMP/post-p5-release"
+          name="LumenChess-post-P5-54ff48fc-release-unsigned.apk"
+          mkdir -p "$out"
+          cp "$apk" "$out/$name"
+
+          unzip -t "$out/$name" > "$out/zip-integrity.txt"
+          unzip -Z1 "$out/$name" | sort > "$out/apk-entries.txt"
+
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          zipalign="$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$aapt"
+          test -x "$apksigner"
+          test -x "$zipalign"
+          test -x "$readelf"
+
+          "$aapt" dump badging "$out/$name" > "$out/aapt-badging.txt"
+          grep -q "package: name='dev.lumenchess' versionCode='1' versionName='0.1.0-dev'" "$out/aapt-badging.txt"
+          grep -q "sdkVersion:'37'" "$out/aapt-badging.txt"
+          grep -q "targetSdkVersion:'37'" "$out/aapt-badging.txt"
+          grep -q "native-code: 'arm64-v8a' 'x86_64'" "$out/aapt-badging.txt"
+          if grep -q 'application-debuggable' "$out/aapt-badging.txt"; then
+            echo 'Release APK is unexpectedly debuggable'
+            exit 1
+          fi
+
+          "$zipalign" -c -P 16 -v 4 "$out/$name" > "$out/zipalign.txt"
+
+          set +e
+          "$apksigner" verify --verbose --print-certs "$out/$name" > "$out/apksigner.txt" 2>&1
+          signer_status=$?
+          set -e
+          if [ "$signer_status" -eq 0 ]; then
+            echo 'APK unexpectedly acquired a signing identity'
+            exit 1
+          fi
+          printf 'status=unsigned\napksigner_exit=%s\n' "$signer_status" > "$out/signing-status.txt"
+
+          cat > "$out/expected-native.txt" <<'EOF'
+          lib/arm64-v8a/liblumen_reckless09.so
+          lib/arm64-v8a/liblumen_stockfish18.so
+          lib/x86_64/liblumen_reckless09.so
+          lib/x86_64/liblumen_stockfish18.so
+          EOF
+          grep -E '^lib/[^/]+/[^/]+\.so$' "$out/apk-entries.txt" > "$out/native-entries.txt"
+          diff -u "$out/expected-native.txt" "$out/native-entries.txt"
+
+          grep -q '^assets/play-overview/lumen_engine_arena_hero.png$' "$out/apk-entries.txt"
+          grep -q '^assets/play-overview/lumen_play_vs_engine_hero.png$' "$out/apk-entries.txt"
+          if grep -Ei '^assets/(local-assets|chesscom|chess\.com|boards|pieces|private|scraped)(/|$)|^assets/.*\.zip$' "$out/apk-entries.txt"; then
+            echo 'Private or scraped asset path found in release APK'
+            exit 1
+          fi
+
+          mkdir -p "$out/extracted"
+          unzip -q "$out/$name" 'lib/*/*.so' -d "$out/extracted"
+          : > "$out/elf-alignment.txt"
+          while IFS= read -r entry; do
+            lib="$out/extracted/$entry"
+            echo "Verifying $entry" | tee -a "$out/elf-alignment.txt"
+            python - "$readelf" "$lib" "$entry" <<'PY' | tee -a "$out/elf-alignment.txt"
+          import subprocess
+          import sys
+
+          readelf, library, entry = sys.argv[1:]
+          output = subprocess.check_output([readelf, "-lW", library], text=True)
+          aligns = [
+              int(line.split()[-1], 0)
+              for line in output.splitlines()
+              if line.lstrip().startswith("LOAD")
+          ]
+          if not aligns:
+              raise SystemExit(f"No PT_LOAD segments found in {entry}")
+          if any(align < 0x4000 for align in aligns):
+              raise SystemExit(f"{entry} has LOAD alignment below 16 KiB: {aligns}")
+          print(f"LOAD alignments: {aligns}")
+          PY
+          done < "$out/expected-native.txt"
+
+          sha256sum "$out/$name" > "$out/SHA256SUMS.txt"
+          stat --printf='bytes=%s\n' "$out/$name" > "$out/file-size.txt"
+          printf '%s\n' \
+            'source_sha=54ff48fcc05e97e61b7a4075806c8c512bc5a9b7' \
+            'app_tree=771d61627fdd6c5ed2e18119e27fd066f67b9843' \
+            'variant=release' \
+            'signing=unsigned' \
+            'personal_assets=false' \
+            'build_command=./gradlew clean :app:assembleRelease --no-daemon' \
+            > "$out/build-metadata.txt"
+
+          python scripts/report-apk-size.py "$out/$name" \
+            --json-output "$out/release-size.json" \
+            --markdown-output "$out/release-size.md"
+          rm -rf "$out/extracted"
+      - name: Upload verified unsigned release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumenchess-post-p5-release-54ff48fcc05e97e61b7a4075806c8c512bc5a9b7
+          path: ${{ runner.temp }}/post-p5-release
+          if-no-files-found: error
+          retention-days: 30
