@@ -78,24 +78,36 @@ class P5ReferenceStructureTest {
     }
 
     @Test
-    fun liveGameUsesCohesiveLowerFrameWithMovesInfoAndAttachedActions() {
+    fun liveGameKeepsSparseBoardFirstFrameWithBottomAnchoredActions() {
         openSetup()
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 12_000L) {
             composeRule.onAllNodesWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag("p5-live-shell").assertIsDisplayed()
-        composeRule.onNodeWithTag("p5-live-lower-region").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-opponent-row").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-opponent-clock").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-player-row").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-player-clock").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-action-strip").assertIsDisplayed()
-        composeRule.onNodeWithTag("p5-live-tab-moves").assertIsDisplayed()
-        composeRule.onNodeWithTag("p5-live-tab-info").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-action-resign").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-action-exit").assertIsDisplayed()
+        listOf(
+            "p5-live-lower-region",
+            "p5-live-tabs",
+            "p5-live-moves-rail",
+            "p5-live-action-pause",
+        ).forEach { tag ->
+            composeRule.onAllNodesWithTag(tag).assertCountEquals(0)
+        }
 
-        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
-        val shell = composeRule.onNodeWithTag("p5-live-shell").fetchSemanticsNode().boundsInRoot
-        val lower = composeRule.onNodeWithTag("p5-live-lower-region").fetchSemanticsNode().boundsInRoot
+        val liveRoot = composeRule.onNodeWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val actions = composeRule.onNodeWithTag("p5-live-action-strip").fetchSemanticsNode().boundsInRoot
-        assertTrue("Live upper frame should stay compact around players and board", shell.height < root.height * 0.72f)
-        assertTrue("Action strip must be attached inside the lower game frame", actions.top >= lower.top && actions.bottom <= lower.bottom)
+        val bottomInset = composeRule.activity.resources.displayMetrics.density * 6f
+        assertTrue(
+            "Essential actions must stay bottom-anchored to the sparse Live root",
+            liveRoot.bottom - actions.bottom <= bottomInset,
+        )
     }
 
     @Test
