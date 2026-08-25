@@ -1,0 +1,687 @@
+{
+  "physicalSquarePx": 160,
+  "normalizedSquarePx": 47,
+  "paintedBoundsIncludeRestrainedEdge": true,
+  "variants": {
+    "CURRENT": {
+      "pawn": {
+        "physical": {
+          "width": 52,
+          "height": 99,
+          "widthPct": 32.5,
+          "heightPct": 61.88,
+          "margins": {
+            "left": 54,
+            "right": 54,
+            "top": 49,
+            "bottom": 12
+          },
+          "minimumMargin": 12
+        },
+        "normalized": {
+          "width": 17,
+          "height": 30,
+          "widthPct": 36.17,
+          "heightPct": 63.83,
+          "margins": {
+            "left": 15,
+            "right": 15,
+            "top": 14,
+            "bottom": 3
+          },
+          "minimumMargin": 3
+        }
+      },
+      "rook": {
+        "physical": {
+          "width": 62,
+          "height": 108,
+          "widthPct": 38.75,
+          "heightPct": 67.5,
+          "margins": {
+            "left": 49,
+            "right": 49,
+            "top": 40,
+            "bottom": 12
+          },
+          "minimumMargin": 12
+        },
+        "normalized": {
+          "width": 19,
+          "height": 33,
+          "widthPct": 40.43,
+          "heightPct": 70.21,
+          "margins": {
+            "left": 14,
+            "right": 14,
+            "top": 11,
+            "bottom": 3
+          },
+          "minimumMargin": 3
+        }
+      },
+      "knight": {
+        "physical": {
+          "width": 53,
+          "height": 115,
+          "widthPct": 33.13,
+          "heightPct": 71.88,
+          "margins": {
+            "left": 56,
+            "right": 51,
+            "top": 33,
+            "bottom": 12
+          },
+          "minimumMargin": 12
+        },
+        "normalized": {
+          "width": 16,
+          "height": 35,
+          "widthPct": 34.04,
+          "heightPct": 74.47,
+          "margins": {
+            "left": 16,
+            "right": 15,
+            "top": 9,
+            "bottom": 3
+          },
+          "minimumMargin": 3
+        }
+      },
+      "bishop": {
+        "physical": {
+          "width": 54,
+          "height": 119,
+          "widthPct": 33.75,
+          "heightPct": 74.38,
+          "margins": {
+            "left": 53,
+            "right": 53,
+            "top": 29,
+            "bottom": 12
+          },
+          "minimumMargin": 12
+        },
+        "normalized": {
+          "width": 17,
+          "height": 36,
+          "widthPct": 36.17,
+          "heightPct": 76.6,
+          "margins": {
+            "left": 15,
+            "right": 15,
+            "top": 8,
+            "bottom": 3
+          },
+          "minimumMargin": 3
+        }
+      },
+      "queen": {
+        "physical": {
+          "width": 59,
+          "height": 124,
+          "widthPct": 36.88,
+          "heightPct": 77.5,
+          "margins": {
+            "left": 51,
+            "right": 50,
+            "top": 24,
+            "bottom": 12
+          },
+          "minimumMargin": 12
+        },
+        "normalized": {
+          "width": 18,
+          "height": 37,
+          "widthPct": 38.3,
+          "heightPct": 78.72,
+          "margins": {
+            "left": 15,
+            "right": 14,
+            "top": 7,
+            "bottom": 3
+          },
+          "minimumMargin": 3
+        }
+      },
+      "king": {
+        "physical": {
+          "width": 56,
+          "height": 130,
+          "widthPct": 35,
+          "heightPct": 81.25,
+          "margins": {
+            "left": 52,
+            "right": 52,
+            "top": 18,
+            "bottom": 12
+          },
+          "minimumMargin": 12
+        },
+        "normalized": {
+          "width": 17,
+          "height": 39,
+          "widthPct": 36.17,
+          "heightPct": 82.98,
+          "margins": {
+            "left": 15,
+            "right": 15,
+            "top": 5,
+            "bottom": 3
+          },
+          "minimumMargin": 3
+        }
+      }
+    },
+    "S1": {
+      "pawn": {
+        "physical": {
+          "width": 66,
+          "height": 108,
+          "widthPct": 41.25,
+          "heightPct": 67.5,
+          "margins": {
+            "left": 47,
+            "right": 47,
+            "top": 45,
+            "bottom": 7
+          },
+          "minimumMargin": 7
+        },
+        "normalized": {
+          "width": 21,
+          "height": 32,
+          "widthPct": 44.68,
+          "heightPct": 68.09,
+          "margins": {
+            "left": 13,
+            "right": 13,
+            "top": 13,
+            "bottom": 2
+          },
+          "minimumMargin": 2
+        }
+      },
+      "rook": {
+        "physical": {
+          "width": 80,
+          "height": 117,
+          "widthPct": 50,
+          "heightPct": 73.13,
+          "margins": {
+            "left": 40,
+            "right": 40,
+            "top": 36,
+            "bottom": 7
+          },
+          "minimumMargin": 7
+        },
+        "normalized": {
+          "width": 25,
+          "height": 35,
+          "widthPct": 53.19,
+          "heightPct": 74.47,
+          "margins": {
+            "left": 11,
+            "right": 11,
+            "top": 10,
+            "bottom": 2
+          },
+          "minimumMargin": 2
+        }
+      },
+      "knight": {
+        "physical": {
+          "width": 74,
+          "height": 123,
+          "widthPct": 46.25,
+          "heightPct": 76.88,
+          "margins": {
+            "left": 45,
+            "right": 41,
+            "top": 30,
+            "bottom": 7
+          },
+          "minimumMargin": 7
+        },
+        "normalized": {
+          "width": 22,
+          "height": 37,
+          "widthPct": 46.81,
+          "heightPct": 78.72,
+          "margins": {
+            "left": 13,
+            "right": 12,
+            "top": 8,
+            "bottom": 2
+          },
+          "minimumMargin": 2
+        }
+      },
+      "bishop": {
+        "physical": {
+          "width": 72,
+          "height": 127,
+          "widthPct": 45,
+          "heightPct": 79.38,
+          "margins": {
+            "left": 44,
+            "right": 44,
+            "top": 26,
+            "bottom": 7
+          },
+          "minimumMargin": 7
+        },
+        "normalized": {
+          "width": 23,
+          "height": 38,
+          "widthPct": 48.94,
+          "heightPct": 80.85,
+          "margins": {
+            "left": 12,
+            "right": 12,
+            "top": 7,
+            "bottom": 2
+          },
+          "minimumMargin": 2
+        }
+      },
+      "queen": {
+        "physical": {
+          "width": 80,
+          "height": 133,
+          "widthPct": 50,
+          "heightPct": 83.13,
+          "margins": {
+            "left": 40,
+            "right": 40,
+            "top": 20,
+            "bottom": 7
+          },
+          "minimumMargin": 7
+        },
+        "normalized": {
+          "width": 25,
+          "height": 40,
+          "widthPct": 53.19,
+          "heightPct": 85.11,
+          "margins": {
+            "left": 11,
+            "right": 11,
+            "top": 5,
+            "bottom": 2
+          },
+          "minimumMargin": 2
+        }
+      },
+      "king": {
+        "physical": {
+          "width": 78,
+          "height": 139,
+          "widthPct": 48.75,
+          "heightPct": 86.88,
+          "margins": {
+            "left": 41,
+            "right": 41,
+            "top": 14,
+            "bottom": 7
+          },
+          "minimumMargin": 7
+        },
+        "normalized": {
+          "width": 23,
+          "height": 41,
+          "widthPct": 48.94,
+          "heightPct": 87.23,
+          "margins": {
+            "left": 12,
+            "right": 12,
+            "top": 4,
+            "bottom": 2
+          },
+          "minimumMargin": 2
+        }
+      }
+    },
+    "S2": {
+      "pawn": {
+        "physical": {
+          "width": 76,
+          "height": 116,
+          "widthPct": 47.5,
+          "heightPct": 72.5,
+          "margins": {
+            "left": 42,
+            "right": 42,
+            "top": 38,
+            "bottom": 6
+          },
+          "minimumMargin": 6
+        },
+        "normalized": {
+          "width": 23,
+          "height": 35,
+          "widthPct": 48.94,
+          "heightPct": 74.47,
+          "margins": {
+            "left": 12,
+            "right": 12,
+            "top": 11,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "rook": {
+        "physical": {
+          "width": 94,
+          "height": 126,
+          "widthPct": 58.75,
+          "heightPct": 78.75,
+          "margins": {
+            "left": 33,
+            "right": 33,
+            "top": 28,
+            "bottom": 6
+          },
+          "minimumMargin": 6
+        },
+        "normalized": {
+          "width": 29,
+          "height": 38,
+          "widthPct": 61.7,
+          "heightPct": 80.85,
+          "margins": {
+            "left": 9,
+            "right": 9,
+            "top": 8,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "knight": {
+        "physical": {
+          "width": 86,
+          "height": 133,
+          "widthPct": 53.75,
+          "heightPct": 83.13,
+          "margins": {
+            "left": 39,
+            "right": 35,
+            "top": 21,
+            "bottom": 6
+          },
+          "minimumMargin": 6
+        },
+        "normalized": {
+          "width": 26,
+          "height": 40,
+          "widthPct": 55.32,
+          "heightPct": 85.11,
+          "margins": {
+            "left": 11,
+            "right": 10,
+            "top": 6,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "bishop": {
+        "physical": {
+          "width": 84,
+          "height": 137,
+          "widthPct": 52.5,
+          "heightPct": 85.63,
+          "margins": {
+            "left": 38,
+            "right": 38,
+            "top": 17,
+            "bottom": 6
+          },
+          "minimumMargin": 6
+        },
+        "normalized": {
+          "width": 25,
+          "height": 41,
+          "widthPct": 53.19,
+          "heightPct": 87.23,
+          "margins": {
+            "left": 11,
+            "right": 11,
+            "top": 5,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "queen": {
+        "physical": {
+          "width": 92,
+          "height": 143,
+          "widthPct": 57.5,
+          "heightPct": 89.38,
+          "margins": {
+            "left": 34,
+            "right": 34,
+            "top": 11,
+            "bottom": 6
+          },
+          "minimumMargin": 6
+        },
+        "normalized": {
+          "width": 27,
+          "height": 43,
+          "widthPct": 57.45,
+          "heightPct": 91.49,
+          "margins": {
+            "left": 10,
+            "right": 10,
+            "top": 3,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "king": {
+        "physical": {
+          "width": 90,
+          "height": 146,
+          "widthPct": 56.25,
+          "heightPct": 91.25,
+          "margins": {
+            "left": 35,
+            "right": 35,
+            "top": 8,
+            "bottom": 6
+          },
+          "minimumMargin": 6
+        },
+        "normalized": {
+          "width": 27,
+          "height": 44,
+          "widthPct": 57.45,
+          "heightPct": 93.62,
+          "margins": {
+            "left": 10,
+            "right": 10,
+            "top": 2,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      }
+    },
+    "S3": {
+      "pawn": {
+        "physical": {
+          "width": 88,
+          "height": 124,
+          "widthPct": 55,
+          "heightPct": 77.5,
+          "margins": {
+            "left": 36,
+            "right": 36,
+            "top": 32,
+            "bottom": 4
+          },
+          "minimumMargin": 4
+        },
+        "normalized": {
+          "width": 27,
+          "height": 37,
+          "widthPct": 57.45,
+          "heightPct": 78.72,
+          "margins": {
+            "left": 10,
+            "right": 10,
+            "top": 9,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "rook": {
+        "physical": {
+          "width": 110,
+          "height": 134,
+          "widthPct": 68.75,
+          "heightPct": 83.75,
+          "margins": {
+            "left": 25,
+            "right": 25,
+            "top": 22,
+            "bottom": 4
+          },
+          "minimumMargin": 4
+        },
+        "normalized": {
+          "width": 33,
+          "height": 40,
+          "widthPct": 70.21,
+          "heightPct": 85.11,
+          "margins": {
+            "left": 7,
+            "right": 7,
+            "top": 6,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "knight": {
+        "physical": {
+          "width": 100,
+          "height": 141,
+          "widthPct": 62.5,
+          "heightPct": 88.13,
+          "margins": {
+            "left": 31,
+            "right": 29,
+            "top": 15,
+            "bottom": 4
+          },
+          "minimumMargin": 4
+        },
+        "normalized": {
+          "width": 30,
+          "height": 42,
+          "widthPct": 63.83,
+          "heightPct": 89.36,
+          "margins": {
+            "left": 9,
+            "right": 8,
+            "top": 4,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "bishop": {
+        "physical": {
+          "width": 98,
+          "height": 145,
+          "widthPct": 61.25,
+          "heightPct": 90.63,
+          "margins": {
+            "left": 31,
+            "right": 31,
+            "top": 11,
+            "bottom": 4
+          },
+          "minimumMargin": 4
+        },
+        "normalized": {
+          "width": 29,
+          "height": 43,
+          "widthPct": 61.7,
+          "heightPct": 91.49,
+          "margins": {
+            "left": 9,
+            "right": 9,
+            "top": 3,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "queen": {
+        "physical": {
+          "width": 106,
+          "height": 150,
+          "widthPct": 66.25,
+          "heightPct": 93.75,
+          "margins": {
+            "left": 27,
+            "right": 27,
+            "top": 6,
+            "bottom": 4
+          },
+          "minimumMargin": 4
+        },
+        "normalized": {
+          "width": 33,
+          "height": 45,
+          "widthPct": 70.21,
+          "heightPct": 95.74,
+          "margins": {
+            "left": 7,
+            "right": 7,
+            "top": 1,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      },
+      "king": {
+        "physical": {
+          "width": 104,
+          "height": 151,
+          "widthPct": 65,
+          "heightPct": 94.38,
+          "margins": {
+            "left": 28,
+            "right": 28,
+            "top": 5,
+            "bottom": 4
+          },
+          "minimumMargin": 4
+        },
+        "normalized": {
+          "width": 31,
+          "height": 45,
+          "widthPct": 65.96,
+          "heightPct": 95.74,
+          "margins": {
+            "left": 8,
+            "right": 8,
+            "top": 1,
+            "bottom": 1
+          },
+          "minimumMargin": 1
+        }
+      }
+    }
+  }
+}

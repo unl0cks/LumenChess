@@ -1,0 +1,153 @@
+name: P6 static piece reference
+
+on:
+  push:
+    branches:
+      - codex/p6-static-piece-renderer
+    paths:
+      - 'app/**'
+      - 'docs/references/p6/**'
+      - '.github/workflows/p6-piece-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p6-piece-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api37-piece-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools emulator
+      - name: Install Android 17 emulator and pinned native toolchain
+        run: |
+          sdkmanager \
+            "platforms;android-37.0" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.22.1" \
+            "system-images;android-37.0;google_apis_ps16k;x86_64" \
+            --channel=3
+      - name: Install pinned Rust toolchain for Reckless 0.9.0
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build P6 screenshot APKs and focused static-piece checks
+        run: |
+          ./gradlew \
+            :app:assembleDebug \
+            :app:assembleDebugAndroidTest \
+            :app:testDebugUnitTest \
+            --tests 'dev.lumenchess.board.LumenPieceGeometryTest' \
+            --tests 'dev.lumenchess.customization.CustomizationModelTest' \
+            --tests 'dev.lumenchess.settings.AppearanceSettingsCodecTest' \
+            --stacktrace
+      - name: Boot canonical Pixel 8 Pro sized Android 17 emulator
+        run: |
+          echo "no" | avdmanager create avd --force --name p6-piece-reference \
+            --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          AVD_CONFIG="$HOME/.android/avd/p6-piece-reference.avd/config.ini"
+          cat >> "$AVD_CONFIG" <<'AVDEOF'
+          hw.lcd.width=1344
+          hw.lcd.height=2992
+          hw.lcd.density=489
+          showDeviceFrame=no
+          AVDEOF
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          "$ANDROID_HOME/emulator/emulator" -avd p6-piece-reference \
+            -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 \
+            > "$RUNNER_TEMP/p6-emulator.log" 2>&1 &
+          timeout 90 bash -c 'until adb devices | grep -Eq "^emulator-[0-9]+[[:space:]]+device$"; do sleep 2; done'
+          timeout 240 bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell wm size reset
+          adb shell wm density reset
+          SIZE="$(adb shell wm size | tr -d '\r')"
+          DENSITY="$(adb shell wm density | tr -d '\r')"
+          printf '%s\n%s\n' "$SIZE" "$DENSITY"
+          grep -q 'Physical size: 1344x2992' <<< "$SIZE"
+          grep -q 'Physical density: 489' <<< "$DENSITY"
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+      - name: Capture native A-S2 renderer and focused regressions
+        run: |
+          set -o pipefail
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+          adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          adb shell pm clear dev.lumenchess
+          rm -rf p6-piece-screenshots p5-screenshots p6-piece-review
+          mkdir -p p6-piece-screenshots p5-screenshots p6-piece-review
+
+          adb shell am instrument -w -r \
+            -e p6PieceQa true \
+            -e class 'dev.lumenchess.visual.P6PieceRendererScreenshotQaTest' \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p6-piece-instrumentation.txt"
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p6-piece-screenshots/. p6-piece-screenshots/
+
+          adb shell pm clear dev.lumenchess
+          adb shell am instrument -w -r \
+            -e p5LiveQa true \
+            -e class 'dev.lumenchess.visual.P5LiveScreenshotQaTest' \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p6-live-instrumentation.txt"
+          adb pull /sdcard/Android/data/dev.lumenchess/files/p5-screenshots/. p5-screenshots/
+
+          adb shell pm clear dev.lumenchess
+          adb shell am instrument -w -r \
+            -e class 'dev.lumenchess.board.LumenChessboardTest,dev.lumenchess.board.ChessboardPresentationTest,dev.lumenchess.play.PlayUiIntegrationTest,dev.lumenchess.play.PlayM19IntegrationTest' \
+            dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee "$RUNNER_TEMP/p6-regression-instrumentation.txt"
+
+          test -f p6-piece-screenshots/p6-contact-sheet.png
+          test -f p6-piece-screenshots/p6-white-light-critical.png
+          test -f p6-piece-screenshots/p6-black-midnight-critical.png
+          test -f p6-piece-screenshots/p6-rounding-matrix.png
+          test -f p6-piece-screenshots/p6-starting-position.png
+          test -f p6-piece-screenshots/p6-representative-position.png
+          test -f p6-piece-screenshots/p6-production-board-preview.png
+          test -f p5-screenshots/03-live.png
+
+          python3 -m pip install --quiet --disable-pip-version-check pillow
+          python3 docs/references/p6/analyze_native_piece_raster.py \
+            --captures p6-piece-screenshots \
+            --reference docs/references/p6/piece-direction-exploration/occupancy-calibration/02-a-s2-actual-size.png \
+            --output p6-piece-review
+          cp p5-screenshots/03-live.png p6-piece-review/p6-live.png
+      - name: Upload P6 static piece review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: p6-static-pieces-${{ github.sha }}
+          path: |
+            p6-piece-screenshots/*.png
+            p6-piece-review/*
+            docs/references/p6/piece-direction-exploration/occupancy-calibration/02-a-s2-actual-size.png
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p6-static-piece-diagnostics-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/p6-emulator.log
+            ${{ runner.temp }}/p6-piece-instrumentation.txt
+            ${{ runner.temp }}/p6-live-instrumentation.txt
+            ${{ runner.temp }}/p6-regression-instrumentation.txt
+            p6-piece-screenshots/
+            p5-screenshots/
+            p6-piece-review/
+          if-no-files-found: warn
+          retention-days: 7
