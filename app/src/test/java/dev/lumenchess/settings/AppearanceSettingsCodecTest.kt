@@ -69,6 +69,17 @@ class AppearanceSettingsCodecTest {
     }
 
     @Test
+    fun `namespaced private piece id survives persistence for temporary fallback`() {
+        val privateId = "private.chesscom.3d_plastic"
+
+        val decoded = AppearanceSettingsCodec.decode(
+            AppearanceSettingsCodec.encode(AppearanceSettings(pieceSetId = privateId)),
+        )
+
+        assertEquals(privateId, decoded.pieceSetId)
+    }
+
+    @Test
     fun `feedback controls and selected sound pack round trip deterministically`() {
         val customized = AppearanceSettings(
             feedbackSoundsEnabled = false,

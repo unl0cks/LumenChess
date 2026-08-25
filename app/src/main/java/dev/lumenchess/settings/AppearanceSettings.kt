@@ -65,7 +65,7 @@ internal object AppearanceSettingsCodec {
     const val SOUND_PACK = "feedback_sound_pack"
     private const val NO_PRESET = "__none__"
     private const val NO_EVENTS = "__none__"
-    private val stableId = Regex("[a-z0-9][a-z0-9_-]{0,127}")
+    private val stableId = Regex("[a-z0-9][a-z0-9._-]{0,127}")
 
     fun encode(settings: AppearanceSettings): Map<String, String> = buildMap {
         put(APPEARANCE, settings.appearance.name)

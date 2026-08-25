@@ -5,7 +5,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import dev.lumenchess.BuildConfig
 import dev.lumenchess.core.chess.Piece
-import dev.lumenchess.settings.AppearanceSettings
 
 interface PieceSet {
     val id: String
@@ -16,34 +15,24 @@ interface PieceSet {
 }
 
 object PieceSetCatalog {
-    private val PersonalTournament = AssetPieceSet(
-        id = AppearanceSettings.DEFAULT_PIECE_SET_ID,
-        displayName = "Tournament",
-        assetDirectory = "pieces/tournament",
-    )
-    private val PersonalClassic = AssetPieceSet("personal-classic", "Classic", "pieces/classic")
-    private val PersonalClub = AssetPieceSet("personal-club", "Club", "pieces/club")
-    private val PersonalBases = AssetPieceSet("personal-bases", "Bases", "pieces/bases")
-    private val PersonalStaunton3d = AssetPieceSet("personal-3d-staunton", "3D Staunton", "pieces/3d_staunton")
-    private val PersonalWood = AssetPieceSet("personal-wood", "Wood", "pieces/wood")
-    private val PersonalGameRoom = AssetPieceSet("personal-game-room", "Game Room", "pieces/game_room")
-    private val PersonalMarble = AssetPieceSet("personal-marble", "Marble", "pieces/marble")
-
     private val publicBuiltIns: List<PieceSet> = listOf(LumenVectorPieceSet, LumenOutlinePieceSet)
-    private val personalBuiltIns: List<PieceSet> = listOf(
-        PersonalTournament,
-        PersonalClassic,
-        PersonalClub,
-        PersonalBases,
-        PersonalStaunton3d,
-        PersonalWood,
-        PersonalGameRoom,
-        PersonalMarble,
-        LumenOutlinePieceSet,
-    )
+    private val personalBuiltIns: List<PieceSet> = PersonalPieceMetadataCodec
+        .decode(BuildConfig.LUMEN_PERSONAL_PIECE_STYLES)
+        .map { metadata ->
+            AssetPieceSet(
+                id = metadata.id,
+                displayName = metadata.displayName,
+                assetDirectory = metadata.assetDirectory,
+                assetFingerprint = BuildConfig.LUMEN_PERSONAL_ASSET_FINGERPRINT,
+            )
+        }
 
-    val builtIns: List<PieceSet> = if (BuildConfig.LUMEN_PERSONAL_ASSETS) personalBuiltIns else publicBuiltIns
+    val builtIns: List<PieceSet> = publicBuiltIns + personalBuiltIns
 
-    fun definition(id: String): PieceSet = builtIns.firstOrNull { it.id == id }
-        ?: if (BuildConfig.LUMEN_PERSONAL_ASSETS) PersonalTournament else LumenVectorPieceSet
+    fun effectiveId(id: String): String = PieceSelectionResolver.effectiveId(id, builtIns.map(PieceSet::id))
+
+    fun definition(id: String): PieceSet {
+        val effectiveId = effectiveId(id)
+        return builtIns.firstOrNull { it.id == effectiveId } ?: LumenVectorPieceSet
+    }
 }

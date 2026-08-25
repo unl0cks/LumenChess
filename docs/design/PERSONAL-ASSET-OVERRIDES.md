@@ -41,7 +41,10 @@ or:
 ./gradlew :app:assembleDebug -Plumen.personalAssetsDir=/path/to/private/assets
 ```
 
-When the property is absent, public CI and normal builds package only project-owned fallback assets.
-When present, the build exposes the local board/piece entries through the normal `BoardTheme` / `PieceSet` catalogs. The default IDs retain public fallbacks so a personal selection degrades cleanly when the private pack is unavailable.
+The external directory is never registered as an Android asset source. A Gradle staging task discovers complete piece directories, copies only the twelve canonical piece PNGs (`bb`, `bk`, `bn`, `bp`, `bq`, `br`, `wb`, `wk`, `wn`, `wp`, `wq`, and `wr`), and copies only the known board PNGs used by the existing personal-board catalog. Scripts, archives, virtual environments, metadata, symlinks, and unexpected files are ignored. The disposable output lives under `app/build/generated/lumenPersonalAssets/` and is not tracked.
+
+When the property is absent, the staging output is cleaned and public CI/normal builds package only project-owned fallback assets. When present, complete local piece collections are exposed through the normal `PieceSet` catalog with stable IDs of the form `private.chesscom.<source-directory>`. Incomplete collections are omitted. Stored private IDs are preserved when assets are temporarily unavailable, while rendering falls back visibly to the public Lumen set; restoring the same private pack restores the selection.
+
+Decoded raster pieces use a bounded application cache and alpha-bound, isotropic fitting. Source artwork is not recolored, stretched, traced, sharpened, or otherwise modified.
 
 Do not configure `lumen.personalAssetsDir` in public GitHub Actions unless redistribution rights for the supplied assets have been established.
