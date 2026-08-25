@@ -94,23 +94,25 @@ class P6PersonalPieceScreenshotQaTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val repository = DataStoreAppearanceSettingsRepository.from(context)
         val privateId = "private.chesscom.ejgfv"
-        runBlocking { repository.update { it.withPieceSet("lumen-vector") } }
 
         openPieceSelector()
+        val initialPieceId = runBlocking {
+            withTimeout(5_000L) { repository.settings.first().pieceSetId }
+        }
+        if (initialPieceId != "lumen-vector") {
+            composeRule.onNodeWithTag("customization-piece-lumen-vector").performScrollTo().performClick()
+            awaitStoredPieceId(repository, "lumen-vector")
+        }
         composeRule.onNodeWithTag("customization-piece-$privateId").performScrollTo().performClick()
         waitForPiece("piece-a8-$privateId")
-        runBlocking {
-            withTimeout(5_000L) { repository.settings.first { it.pieceSetId == privateId } }
-        }
+        awaitStoredPieceId(repository, privateId)
 
         composeRule.activityRule.scenario.recreate()
         openPieceSelector()
         waitForPiece("piece-a8-$privateId")
 
         composeRule.onNodeWithTag("customization-piece-lumen-vector").performScrollTo().performClick()
-        runBlocking {
-            withTimeout(5_000L) { repository.settings.first { it.pieceSetId == "lumen-vector" } }
-        }
+        awaitStoredPieceId(repository, "lumen-vector")
     }
 
     @Test
@@ -210,6 +212,15 @@ class P6PersonalPieceScreenshotQaTest {
     private fun waitForPiece(tag: String, timeoutMillis: Long = 8_000L) {
         composeRule.waitUntil(timeoutMillis = timeoutMillis) {
             composeRule.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun awaitStoredPieceId(
+        repository: dev.lumenchess.settings.AppearanceSettingsRepository,
+        expectedId: String,
+    ) {
+        runBlocking {
+            withTimeout(5_000L) { repository.settings.first { it.pieceSetId == expectedId } }
         }
     }
 
