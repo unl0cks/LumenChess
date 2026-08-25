@@ -316,7 +316,7 @@ fun LumenChessboard(
                     resolvedPieceSet.Piece(
                         piece = activeDragPiece,
                         tint = if (activeDragPiece.color == Color.WHITE) resolvedPalette.whitePiece else resolvedPalette.blackPiece,
-                        modifier = Modifier.fillMaxSize(0.90f),
+                        modifier = Modifier.fillMaxSize(resolvedPieceSet.boardSlotFraction),
                     )
                 }
             }
@@ -336,7 +336,7 @@ fun LumenChessboard(
                             palette = resolvedPalette,
                             pieceSet = resolvedPieceSet,
                             alpha = alpha,
-                            scale = 0.90f,
+                            scale = resolvedPieceSet.boardSlotFraction,
                             modifier = Modifier.testTag("captured-piece-fade"),
                         )
                     }
@@ -349,7 +349,7 @@ fun LumenChessboard(
                     palette = resolvedPalette,
                     pieceSet = resolvedPieceSet,
                     alpha = 1f,
-                    scale = 0.91f,
+                    scale = (resolvedPieceSet.boardSlotFraction + .01f).coerceAtMost(1f),
                     modifier = Modifier.testTag("traveling-piece"),
                 )
             }
@@ -460,7 +460,7 @@ private fun ChessboardSquare(
             pieceSet.Piece(
                 piece = piece,
                 tint = if (piece.color == Color.WHITE) palette.whitePiece else palette.blackPiece,
-                modifier = Modifier.fillMaxSize(0.90f).testTag("piece-${square.algebraic}-${pieceSet.id}"),
+                modifier = Modifier.fillMaxSize(pieceSet.boardSlotFraction).testTag("piece-${square.algebraic}-${pieceSet.id}"),
             )
         }
     }

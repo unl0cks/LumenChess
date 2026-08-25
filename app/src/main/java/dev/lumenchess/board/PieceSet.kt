@@ -10,6 +10,7 @@ import dev.lumenchess.settings.AppearanceSettings
 interface PieceSet {
     val id: String
     val displayName: String
+    val boardSlotFraction: Float get() = 0.90f
 
     @Composable
     fun Piece(piece: Piece, tint: Color, modifier: Modifier = Modifier)

@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import dev.lumenchess.core.chess.Color as ChessColor
@@ -28,10 +31,60 @@ import kotlin.math.min
 object LumenVectorPieceSet : PieceSet {
     override val id: String = "lumen-vector"
     override val displayName: String = "Lumen"
+    override val boardSlotFraction: Float = 1f
 
     @Composable
     override fun Piece(piece: Piece, tint: Color, modifier: Modifier) {
-        LumenPieceArtwork(piece, tint, outlined = false, modifier)
+        LumenRefinedPieceArtwork(piece, modifier)
+    }
+}
+
+@Composable
+private fun LumenRefinedPieceArtwork(piece: Piece, modifier: Modifier) {
+    val spec = LumenPieceGeometry.spec(LumenPieceGeometry.kind(piece.type))
+    val white = piece.color == ChessColor.WHITE
+    val fill = if (white) Color(0xFFFCF9EC) else Color(0xFF1D2123)
+    val edge = if (white) Color(0xFF676D6D).copy(alpha = .88f) else Color(0xFF7B878A).copy(alpha = .74f)
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawWithCache {
+                    val square = min(size.width, size.height)
+                    val opticsScale = square / 160f
+                    val fillWidth = spec.optics.fillWidthAt160 * opticsScale
+                    val fillHeight = spec.optics.fillHeightAt160 * opticsScale
+                    val left = (size.width - fillWidth) / 2f + spec.optics.xOffsetAt160 * opticsScale
+                    val top = (spec.optics.baselineAt160 - spec.optics.fillHeightAt160) * opticsScale +
+                        (size.height - square) / 2f
+                    val renderedPath = Path().apply {
+                        fillType = PathFillType.EvenOdd
+                        spec.contours.forEach { contour ->
+                            if (contour.size < 2) return@forEach
+                            moveTo(left + contour[0] * fillWidth, top + contour[1] * fillHeight)
+                            var index = 2
+                            while (index < contour.size) {
+                                lineTo(left + contour[index] * fillWidth, top + contour[index + 1] * fillHeight)
+                                index += 2
+                            }
+                            close()
+                        }
+                    }
+                    val edgeWidth = 2f * opticsScale
+                    onDrawBehind {
+                        drawPath(
+                            path = renderedPath,
+                            color = edge,
+                            style = Stroke(width = edgeWidth, join = StrokeJoin.Round),
+                        )
+                        drawPath(path = renderedPath, color = fill)
+                    }
+                },
+        )
     }
 }
 
