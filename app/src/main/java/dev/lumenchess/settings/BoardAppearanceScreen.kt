@@ -105,8 +105,12 @@ fun BoardAppearanceScreen(
                 CustomizationTab.PIECES -> PieceSetCatalog.builtIns.forEach { d ->
                     VisualOptionRow(
                         title = d.displayName,
-                        subtitle = if (d.id == AppearanceSettings.DEFAULT_PIECE_SET_ID) "Classical Lumen set" else "Alternative piece style",
-                        selected = settings.pieceSetId == d.id,
+                        subtitle = when {
+                            d.id == AppearanceSettings.DEFAULT_PIECE_SET_ID -> "Classical Lumen set"
+                            d.id.startsWith("private.chesscom.") -> "Personal local piece style"
+                            else -> "Alternative piece style"
+                        },
+                        selected = PieceSetCatalog.effectiveId(settings.pieceSetId) == d.id,
                         tag = "customization-piece-${d.id}",
                         preview = { PieceMiniatures(d) },
                     ) { onSettingsChange(settings.withPieceSet(d.id)) }
