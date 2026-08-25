@@ -1,9 +1,9 @@
 package dev.lumenchess.board
 
 import kotlin.math.abs
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class LumenPieceGeometryTest {
     private val approvedPaintedBoundsAt160 = mapOf(
@@ -19,10 +19,10 @@ class LumenPieceGeometryTest {
     fun approvedAS2MastersProduceTheApprovedPaintedBounds() {
         approvedPaintedBoundsAt160.forEach { (kind, expected) ->
             val bounds = LumenPieceGeometry.spec(kind).paintedBounds(squarePx = 160f)
-            assertTrue("$kind width should reproduce A-S2: $bounds", abs(bounds.width - expected.first) <= 2f)
-            assertTrue("$kind height should reproduce A-S2: $bounds", abs(bounds.height - expected.second) <= 2f)
-            assertTrue("$kind must remain inside its square: $bounds", bounds.left >= 0f && bounds.top >= 0f)
-            assertTrue("$kind must remain inside its square: $bounds", bounds.right <= 160f && bounds.bottom <= 160f)
+            assertTrue(abs(bounds.width - expected.first) <= 2f, "$kind width should reproduce A-S2: $bounds")
+            assertTrue(abs(bounds.height - expected.second) <= 2f, "$kind height should reproduce A-S2: $bounds")
+            assertTrue(bounds.left >= 0f && bounds.top >= 0f, "$kind must remain inside its square: $bounds")
+            assertTrue(bounds.right <= 160f && bounds.bottom <= 160f, "$kind must remain inside its square: $bounds")
         }
     }
 
@@ -31,10 +31,10 @@ class LumenPieceGeometryTest {
         listOf(159f, 160f, 161f).forEach { squarePx ->
             LumenPieceKind.entries.forEach { kind ->
                 val bounds = LumenPieceGeometry.spec(kind).paintedBounds(squarePx)
-                assertTrue("$kind left overflow at $squarePx px: $bounds", bounds.left >= 0f)
-                assertTrue("$kind top overflow at $squarePx px: $bounds", bounds.top >= 0f)
-                assertTrue("$kind right overflow at $squarePx px: $bounds", bounds.right <= squarePx)
-                assertTrue("$kind bottom overflow at $squarePx px: $bounds", bounds.bottom <= squarePx)
+                assertTrue(bounds.left >= 0f, "$kind left overflow at $squarePx px: $bounds")
+                assertTrue(bounds.top >= 0f, "$kind top overflow at $squarePx px: $bounds")
+                assertTrue(bounds.right <= squarePx, "$kind right overflow at $squarePx px: $bounds")
+                assertTrue(bounds.bottom <= squarePx, "$kind bottom overflow at $squarePx px: $bounds")
             }
         }
     }
@@ -55,7 +55,7 @@ class LumenPieceGeometryTest {
     fun knightCarriesOnlyTheApprovedSmallOpticalOffset() {
         assertEquals(2f, LumenPieceGeometry.spec(LumenPieceKind.KNIGHT).optics.xOffsetAt160, 0.001f)
         LumenPieceKind.entries.filterNot { it == LumenPieceKind.KNIGHT }.forEach { kind ->
-            assertEquals("$kind should stay mathematically centered", 0f, LumenPieceGeometry.spec(kind).optics.xOffsetAt160, 0.001f)
+            assertEquals(0f, LumenPieceGeometry.spec(kind).optics.xOffsetAt160, 0.001f, "$kind should stay mathematically centered")
         }
     }
 
@@ -63,12 +63,12 @@ class LumenPieceGeometryTest {
     fun everyMasterIsAClosedResolutionIndependentContour() {
         LumenPieceKind.entries.forEach { kind ->
             val contours = LumenPieceGeometry.spec(kind).contours
-            assertTrue("$kind requires at least one contour", contours.isNotEmpty())
+            assertTrue(contours.isNotEmpty(), "$kind requires at least one contour")
             contours.forEachIndexed { index, contour ->
-                assertTrue("$kind contour $index requires at least three points", contour.size >= 6)
-                assertEquals("$kind contour $index must contain x/y pairs", 0, contour.size % 2)
+                assertTrue(contour.size >= 6, "$kind contour $index requires at least three points")
+                assertEquals(0, contour.size % 2, "$kind contour $index must contain x/y pairs")
                 contour.forEach { coordinate ->
-                    assertTrue("$kind contour $index coordinate must be normalized: $coordinate", coordinate in 0f..1f)
+                    assertTrue(coordinate in 0f..1f, "$kind contour $index coordinate must be normalized: $coordinate")
                 }
             }
         }
