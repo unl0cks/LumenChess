@@ -32,6 +32,7 @@ import dev.lumenchess.play.PLAY_LIVE_TEST_TAG
 import dev.lumenchess.play.PLAY_SETUP_TEST_TAG
 import dev.lumenchess.play.PLAY_START_TEST_TAG
 import dev.lumenchess.play.PlayEngine
+import dev.lumenchess.play.PlayEngineGateway
 import dev.lumenchess.play.PlaySide
 import dev.lumenchess.play.PlayTimeControl
 import dev.lumenchess.play.PlayViewModel
@@ -122,6 +123,14 @@ class P5LiveScreenshotQaTest {
                 val pending = requireNotNull(coordinator.state.pendingEngineSearch) {
                     "Expected pending engine search before deterministic move $uci"
                 }
+                // The screenshot seeds an exact opening itself. Cancel the real native search
+                // first so its still-running request cannot collide with the next seeded ply.
+                val gatewayField = PlayViewModel::class.java.getDeclaredField("engineGateway").apply {
+                    isAccessible = true
+                }
+                val gateway = requireNotNull(gatewayField.get(viewModel) as? PlayEngineGateway)
+                gateway.cancelSearch(pending.searchId)
+                Thread.sleep(240L)
                 coordinator.onEngineResult(
                     EngineSearchResult(
                         searchId = pending.searchId,

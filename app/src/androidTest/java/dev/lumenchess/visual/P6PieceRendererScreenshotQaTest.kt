@@ -25,6 +25,7 @@ import dev.lumenchess.board.ChessboardInput
 import dev.lumenchess.board.ChessboardPalette
 import dev.lumenchess.board.LumenChessboard
 import dev.lumenchess.board.LumenVectorPieceSet
+import dev.lumenchess.customization.BoardThemeCatalog
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Fen
 import dev.lumenchess.core.chess.Piece
@@ -79,6 +80,14 @@ class P6PieceRendererScreenshotQaTest {
             LumenTheme { BlackMidnightCritical(Modifier.testTag("p6-black-midnight-critical")) }
         }
         captureNode("p6-black-midnight-critical.png", "p6-black-midnight-critical")
+    }
+
+    @Test
+    fun capturePublicThemeContrastMatrix() {
+        composeRule.setContent {
+            LumenTheme { PublicThemeContrast(Modifier.testTag("p6-public-theme-contrast")) }
+        }
+        captureNode("p6-public-theme-contrast.png", "p6-public-theme-contrast")
     }
 
     @Test
@@ -158,6 +167,23 @@ class P6PieceRendererScreenshotQaTest {
         Column(modifier) {
             PieceRow(Color.BLACK, ComposeColor(0xFF394449), pixelDp(160))
             PieceRow(Color.BLACK, ComposeColor(0xFF121719), pixelDp(160))
+        }
+    }
+
+    @Composable
+    private fun PublicThemeContrast(modifier: Modifier = Modifier) {
+        val cell = pixelDp(120)
+        Column(modifier) {
+            listOf(
+                BoardThemeCatalog.LumenBlue.palette,
+                BoardThemeCatalog.MidnightOled.palette,
+                BoardThemeCatalog.Graphite.palette,
+            ).forEach { palette ->
+                PieceRow(Color.WHITE, palette.lightSquare, cell)
+                PieceRow(Color.WHITE, palette.darkSquare, cell)
+                PieceRow(Color.BLACK, palette.lightSquare, cell)
+                PieceRow(Color.BLACK, palette.darkSquare, cell)
+            }
         }
     }
 

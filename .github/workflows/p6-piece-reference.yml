@@ -114,6 +114,7 @@ jobs:
           test -f p6-piece-screenshots/p6-contact-sheet.png
           test -f p6-piece-screenshots/p6-white-light-critical.png
           test -f p6-piece-screenshots/p6-black-midnight-critical.png
+          test -f p6-piece-screenshots/p6-public-theme-contrast.png
           test -f p6-piece-screenshots/p6-rounding-matrix.png
           test -f p6-piece-screenshots/p6-starting-position.png
           test -f p6-piece-screenshots/p6-representative-position.png

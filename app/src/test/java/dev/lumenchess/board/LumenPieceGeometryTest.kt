@@ -73,4 +73,11 @@ class LumenPieceGeometryTest {
             }
         }
     }
+
+    @Test
+    fun contourRetainsOnePhysicalPixelOfPreviewSeparation() {
+        assertEquals(2f, lumenPieceEdgeWidthPx(93f), 0.001f)
+        assertEquals(2f, lumenPieceEdgeWidthPx(160f), 0.001f)
+        assertEquals(2.5f, lumenPieceEdgeWidthPx(200f), 0.001f)
+    }
 }

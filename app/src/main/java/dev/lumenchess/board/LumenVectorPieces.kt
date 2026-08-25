@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import dev.lumenchess.core.chess.Color as ChessColor
 import dev.lumenchess.core.chess.Piece
 import dev.lumenchess.core.chess.PieceType
+import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -74,7 +75,7 @@ private fun LumenRefinedPieceArtwork(piece: Piece, modifier: Modifier) {
                             close()
                         }
                     }
-                    val edgeWidth = 2f * opticsScale
+                    val edgeWidth = lumenPieceEdgeWidthPx(square)
                     onDrawBehind {
                         drawPath(
                             path = renderedPath,
@@ -87,6 +88,9 @@ private fun LumenRefinedPieceArtwork(piece: Piece, modifier: Modifier) {
         )
     }
 }
+
+/** Keeps the contour at one physical pixel outside the fill in smaller catalog previews. */
+internal fun lumenPieceEdgeWidthPx(squarePx: Float): Float = max(2f, 2f * squarePx / 160f)
 
 @Composable
 internal fun LumenPieceArtwork(piece: Piece, tint: Color, outlined: Boolean, modifier: Modifier) {
