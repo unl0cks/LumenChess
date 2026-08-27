@@ -1,6 +1,6 @@
 package dev.lumenchess.board
 
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.Color
 import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.Square
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -60,11 +60,15 @@ class BoardFeedbackTest {
     }
 
     private fun assertColor(
-        actual: androidx.compose.ui.graphics.Color,
+        actual: Color,
         expectedRgb: Int,
         expectedAlpha: Float,
     ) {
-        assertEquals(expectedRgb, actual.toArgb() and 0x00FFFFFF)
+        val expected = Color(0xFF000000L or expectedRgb.toLong())
+        val channelTolerance = 1f / 255f
+        assertTrue(kotlin.math.abs(actual.red - expected.red) <= channelTolerance)
+        assertTrue(kotlin.math.abs(actual.green - expected.green) <= channelTolerance)
+        assertTrue(kotlin.math.abs(actual.blue - expected.blue) <= channelTolerance)
         assertTrue(
             kotlin.math.abs(actual.alpha - expectedAlpha) < .001f,
             "expected alpha $expectedAlpha but was ${actual.alpha}",
