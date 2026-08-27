@@ -101,7 +101,7 @@ class LumenChessboardTest {
             LumenTheme {
                 LumenChessboard(
                     position = Position.initial(),
-                    highlights = ChessboardHighlights(lastMove = Move.parseUci("e2e4"), premoveSquares = setOf(Square.parse("g1"), Square.parse("f3"))),
+                    highlights = ChessboardHighlights(lastMove = Move.parseUci("e2e4"), premove = Move.parseUci("g1f3")),
                     arrows = listOf(ChessboardArrow(Square.parse("d1"), Square.parse("h5"))), onMove = {},
                 )
             }
@@ -110,6 +110,28 @@ class LumenChessboardTest {
         val e4State = composeRule.onNodeWithTag("square-e4").fetchSemanticsNode().config.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.StateDescription) { "" }
         val g1State = composeRule.onNodeWithTag("square-g1").fetchSemanticsNode().config.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.StateDescription) { "" }
         assertTrue(e4State.contains("last move")); assertTrue(g1State.contains("premove"))
+    }
+
+    @Test fun premoveOriginDestinationAndPendingTapRemainPresentationDistinct() {
+        composeRule.setContent {
+            LumenTheme {
+                LumenChessboard(
+                    position = Position.initial(),
+                    highlights = ChessboardHighlights(
+                        premove = Move.parseUci("g1f3"),
+                        pendingPremoveOrigin = Square.parse("b1"),
+                    ),
+                    onMove = {},
+                )
+            }
+        }
+
+        val origin = stateDescription("square-g1")
+        val destination = stateDescription("square-f3")
+        val pending = stateDescription("square-b1")
+        assertTrue(origin.contains("premove origin"))
+        assertTrue(destination.contains("premove destination"))
+        assertTrue(pending.contains("pending premove origin"))
     }
 
     @Test fun selectingPieceExposesCoreLegalAndCaptureDestinations() {
@@ -146,4 +168,8 @@ class LumenChessboardTest {
         composeRule.onNodeWithTag("square-e2").performClick(); composeRule.onNodeWithTag("square-e4").performClick()
         composeRule.runOnIdle { assertEquals(listOf(Move.parseUci("e2e4"), Move.parseUci("e2e4")), emitted) }
     }
+
+    private fun stateDescription(tag: String): String = composeRule.onNodeWithTag(tag)
+        .fetchSemanticsNode().config
+        .getOrElse(androidx.compose.ui.semantics.SemanticsProperties.StateDescription) { "" }
 }

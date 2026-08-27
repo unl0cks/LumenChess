@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -269,7 +268,7 @@ fun LumenChessboard(
                         }
                         val legalTarget = candidates.isNotEmpty()
                         val captureTarget = candidates.any { ChessboardMoveResolver.isCapture(position, it) }
-                        val lastMove = highlights.lastMove
+                        val feedback = highlights.feedbackFor(square)
                         ChessboardSquare(
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             square = square,
@@ -278,9 +277,8 @@ fun LumenChessboard(
                             selected = square == selectedSquare,
                             legalTarget = legalTarget,
                             captureTarget = captureTarget,
-                            lastMove = lastMove != null && (square == lastMove.from || square == lastMove.to),
+                            feedback = feedback,
                             check = square == checkSquare,
-                            premove = square in highlights.premoveSquares,
                             extraHighlight = square in highlights.extraSquares,
                             tapEnabled = input.tapEnabled && pendingPromotion.isEmpty(),
                             palette = resolvedPalette,
@@ -419,9 +417,8 @@ private fun ChessboardSquare(
     selected: Boolean,
     legalTarget: Boolean,
     captureTarget: Boolean,
-    lastMove: Boolean,
+    feedback: BoardSquareFeedback,
     check: Boolean,
-    premove: Boolean,
     extraHighlight: Boolean,
     tapEnabled: Boolean,
     palette: ChessboardPalette,
@@ -432,9 +429,18 @@ private fun ChessboardSquare(
     val states = buildList {
         if (selected) add("selected")
         if (captureTarget) add("capture") else if (legalTarget) add("legal move")
-        if (lastMove) add("last move")
+        when (feedback.history) {
+            BoardHistoryRole.NONE -> Unit
+            BoardHistoryRole.ORIGIN -> add("last move origin")
+            BoardHistoryRole.DESTINATION -> add("last move destination")
+        }
         if (check) add("check")
-        if (premove) add("premove")
+        when (feedback.premove) {
+            BoardPremoveRole.NONE -> Unit
+            BoardPremoveRole.ORIGIN -> add("premove origin")
+            BoardPremoveRole.DESTINATION -> add("premove destination")
+            BoardPremoveRole.PENDING_ORIGIN -> add("pending premove origin")
+        }
         if (extraHighlight) add("highlighted")
     }
     var squareModifier = modifier
@@ -447,15 +453,15 @@ private fun ChessboardSquare(
     if (tapEnabled) squareModifier = squareModifier.clickable(onClick = onClick)
 
     Box(modifier = squareModifier, contentAlignment = Alignment.Center) {
-        if (lastMove) HighlightOverlay(palette.lastMove)
-        if (premove) HighlightOverlay(palette.premove)
-        if (extraHighlight) HighlightOverlay(palette.extraHighlight)
-        if (selected) HighlightOverlay(palette.selected)
-        if (check) HighlightOverlay(palette.check)
-        when {
-            captureTarget -> CaptureTargetOverlay(palette.legalCapture)
-            legalTarget -> Box(Modifier.size(12.dp).background(palette.legalMove, CircleShape))
-        }
+        BoardFeedbackUnderPiece(
+            darkSquare = dark,
+            feedback = feedback,
+            selected = selected,
+            legalTarget = legalTarget,
+            captureTarget = captureTarget,
+            extraHighlight = palette.extraHighlight.takeIf { extraHighlight },
+            modifier = Modifier.fillMaxSize(),
+        )
         if (piece != null) {
             pieceSet.Piece(
                 piece = piece,
@@ -463,23 +469,9 @@ private fun ChessboardSquare(
                 modifier = Modifier.fillMaxSize(0.90f).testTag("piece-${square.algebraic}-${pieceSet.id}"),
             )
         }
-    }
-}
-
-@Composable
-private fun HighlightOverlay(color: androidx.compose.ui.graphics.Color) {
-    Box(Modifier.fillMaxSize().background(color))
-}
-
-@Composable
-private fun CaptureTargetOverlay(color: androidx.compose.ui.graphics.Color) {
-    Canvas(Modifier.fillMaxSize()) {
-        val radius = size.minDimension * .36f
-        drawCircle(
-            color = color,
-            radius = radius,
-            center = center,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = size.minDimension * .07f),
+        BoardFeedbackCheckFrame(
+            visible = check,
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }

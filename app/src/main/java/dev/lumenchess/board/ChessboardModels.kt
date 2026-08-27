@@ -22,11 +22,26 @@ data class ChessboardInput(
 
 data class ChessboardHighlights(
     val lastMove: Move? = null,
-    val premoveSquares: Set<Square> = emptySet(),
+    val premove: Move? = null,
+    val pendingPremoveOrigin: Square? = null,
     val extraSquares: Set<Square> = emptySet(),
     val showLegalMoves: Boolean = true,
     val showCheck: Boolean = true,
-)
+) {
+    internal fun feedbackFor(square: Square): BoardSquareFeedback = BoardSquareFeedback(
+        history = when (square) {
+            lastMove?.from -> BoardHistoryRole.ORIGIN
+            lastMove?.to -> BoardHistoryRole.DESTINATION
+            else -> BoardHistoryRole.NONE
+        },
+        premove = when (square) {
+            premove?.from -> BoardPremoveRole.ORIGIN
+            premove?.to -> BoardPremoveRole.DESTINATION
+            pendingPremoveOrigin -> BoardPremoveRole.PENDING_ORIGIN
+            else -> BoardPremoveRole.NONE
+        },
+    )
+}
 
 enum class ChessboardArrowStyle {
     PRIMARY,

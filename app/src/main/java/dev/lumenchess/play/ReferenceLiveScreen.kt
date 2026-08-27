@@ -152,7 +152,7 @@ internal fun ReferenceLiveScreen(ui: PlayUiState, viewModel: PlayViewModel, modi
                     ChessboardInput(tapEnabled = inputEnabled, dragEnabled = inputEnabled),
                     ChessboardHighlights(
                         lastMove = lastMove,
-                        premoveSquares = queuedPremove?.let { setOf(it.from, it.to) }.orEmpty(),
+                        premove = queuedPremove,
                     ),
                 )
                 if (premoveEnabled) {

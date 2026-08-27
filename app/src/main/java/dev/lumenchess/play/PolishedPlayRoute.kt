@@ -470,9 +470,7 @@ private fun P2LiveScreen(
                     ),
                     highlights = ChessboardHighlights(
                         lastMove = lastMove,
-                        premoveSquares = queuedPremove
-                            ?.let { setOf(it.from, it.to) }
-                            .orEmpty(),
+                        premove = queuedPremove,
                     ),
                 )
                 if (premoveEnabled) {

@@ -319,7 +319,7 @@ private fun PlayLiveScreen(
                     ),
                     highlights = ChessboardHighlights(
                         lastMove = lastMove,
-                        premoveSquares = queuedPremove?.let { setOf(it.from, it.to) }.orEmpty(),
+                        premove = queuedPremove,
                     ),
                     modifier = Modifier.matchParentSize(),
                 )

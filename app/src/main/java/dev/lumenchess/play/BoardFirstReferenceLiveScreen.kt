@@ -93,6 +93,10 @@ internal fun BoardFirstReferenceLiveScreen(
     val premoveEnabled = !humanTurn && !runtime.paused && runtime.terminal == null
     val lastMove = runtime.gameTree.mainline().lastOrNull()?.move
     val queuedPremove = runtime.queuedPremove?.move
+    var pendingPremoveOrigin by remember(runtime.positionRevision) { mutableStateOf<Square?>(null) }
+    LaunchedEffect(runtime.queuedPremove) {
+        if (runtime.queuedPremove == null) pendingPremoveOrigin = null
+    }
     val status = when {
         ui.message != null -> ui.message
         runtime.terminal != null -> "Game over"
@@ -157,7 +161,8 @@ internal fun BoardFirstReferenceLiveScreen(
                     ChessboardInput(tapEnabled = inputEnabled, dragEnabled = inputEnabled),
                     ChessboardHighlights(
                         lastMove = lastMove,
-                        premoveSquares = queuedPremove?.let { setOf(it.from, it.to) }.orEmpty(),
+                        premove = queuedPremove,
+                        pendingPremoveOrigin = pendingPremoveOrigin,
                     ),
                 )
                 if (premoveEnabled) {
@@ -165,6 +170,8 @@ internal fun BoardFirstReferenceLiveScreen(
                         runtime = runtime,
                         humanSide = humanSide,
                         orientation = orientation,
+                        from = pendingPremoveOrigin,
+                        onFromChange = { pendingPremoveOrigin = it },
                         onPremove = viewModel::queuePremove,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -322,11 +329,11 @@ private fun BoardFirstPremoveOverlay(
     runtime: RuntimeState,
     humanSide: Color,
     orientation: ChessboardOrientation,
+    from: Square?,
+    onFromChange: (Square?) -> Unit,
     onPremove: (Move) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var from by remember(runtime.positionRevision) { mutableStateOf<Square?>(null) }
-    LaunchedEffect(runtime.queuedPremove) { if (runtime.queuedPremove == null) from = null }
     Box(
         modifier.semantics { contentDescription = "Premove input board" }
             .testTag(PLAY_PREMOVE_OVERLAY_TEST_TAG)
@@ -340,9 +347,9 @@ private fun BoardFirstPremoveOverlay(
                     }
                     val selected = from
                     when {
-                        selected == null -> if (runtime.position[square]?.color == humanSide) from = square
-                        selected == square -> from = null
-                        runtime.position[square]?.color == humanSide -> from = square
+                        selected == null -> if (runtime.position[square]?.color == humanSide) onFromChange(square)
+                        selected == square -> onFromChange(null)
+                        runtime.position[square]?.color == humanSide -> onFromChange(square)
                         else -> {
                             val piece = runtime.position[selected]
                             val promotionRank = if (humanSide == Color.WHITE) 7 else 0
@@ -350,7 +357,7 @@ private fun BoardFirstPremoveOverlay(
                                 PieceType.QUEEN
                             } else null
                             onPremove(Move(selected, square, promotion))
-                            from = null
+                            onFromChange(null)
                         }
                     }
                 }
