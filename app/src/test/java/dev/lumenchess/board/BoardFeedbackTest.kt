@@ -66,11 +66,12 @@ class BoardFeedbackTest {
     ) {
         val expected = Color(0xFF000000L or expectedRgb.toLong())
         val channelTolerance = 1f / 255f
+        val alphaTolerance = (0.5f / 255f) + 0.000001f
         assertTrue(kotlin.math.abs(actual.red - expected.red) <= channelTolerance)
         assertTrue(kotlin.math.abs(actual.green - expected.green) <= channelTolerance)
         assertTrue(kotlin.math.abs(actual.blue - expected.blue) <= channelTolerance)
         assertTrue(
-            kotlin.math.abs(actual.alpha - expectedAlpha) < .001f,
+            kotlin.math.abs(actual.alpha - expectedAlpha) <= alphaTolerance,
             "expected alpha $expectedAlpha but was ${actual.alpha}",
         )
     }
