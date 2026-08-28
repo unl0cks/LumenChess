@@ -24,6 +24,10 @@ data class ChessboardHighlights(
     val lastMove: Move? = null,
     val premove: Move? = null,
     val pendingPremoveOrigin: Square? = null,
+    /** Optional authoritative revision used only to cancel stale presentation motion. */
+    val positionRevision: Long? = null,
+    /** Presentation source; it never participates in legality or runtime mutation. */
+    val movePresentation: BoardMovePresentation = BoardMovePresentation.ENGINE,
     val extraSquares: Set<Square> = emptySet(),
     val showLegalMoves: Boolean = true,
     val showCheck: Boolean = true,

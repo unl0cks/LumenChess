@@ -26,7 +26,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,6 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.lumenchess.board.ChessboardHighlights
 import dev.lumenchess.board.ChessboardInput
+import dev.lumenchess.board.BoardMovePresentation
+import dev.lumenchess.board.BoardMovePresentationClassifier
 import dev.lumenchess.board.ChessboardOrientation
 import dev.lumenchess.board.LumenChessboard
 import dev.lumenchess.core.chess.Color
@@ -93,6 +97,18 @@ internal fun BoardFirstReferenceLiveScreen(
     val premoveEnabled = !humanTurn && !runtime.paused && runtime.terminal == null
     val lastMove = runtime.gameTree.mainline().lastOrNull()?.move
     val queuedPremove = runtime.queuedPremove?.move
+    var presentedRevision by remember { mutableLongStateOf(runtime.positionRevision.value) }
+    val revisionDelta = (runtime.positionRevision.value - presentedRevision).coerceAtLeast(0L)
+    val lastMover = runtime.position.sideToMove.opposite
+    val movePresentation = if (revisionDelta == 0L) {
+        BoardMovePresentation.ENGINE
+    } else {
+        BoardMovePresentationClassifier.classify(
+            revisionDelta = revisionDelta,
+            lastMoverIsHuman = runtime.controllers.forSide(lastMover) == RuntimeController.HUMAN,
+        )
+    }
+    SideEffect { presentedRevision = runtime.positionRevision.value }
     var pendingPremoveOrigin by remember(runtime.positionRevision) { mutableStateOf<Square?>(null) }
     LaunchedEffect(runtime.queuedPremove) {
         if (runtime.queuedPremove == null) pendingPremoveOrigin = null
@@ -163,6 +179,8 @@ internal fun BoardFirstReferenceLiveScreen(
                         lastMove = lastMove,
                         premove = queuedPremove,
                         pendingPremoveOrigin = pendingPremoveOrigin,
+                        positionRevision = runtime.positionRevision.value,
+                        movePresentation = movePresentation,
                     ),
                 )
                 if (premoveEnabled) {
