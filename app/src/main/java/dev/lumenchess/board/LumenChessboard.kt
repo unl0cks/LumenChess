@@ -58,8 +58,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.floor
 import kotlin.math.sqrt
 
-private data class TravelingPiece(
-    val plan: BoardMotionPlan.Travel,
+private data class ActiveBoardMotion(
+    val plan: BoardMotionPlan,
     val identity: BoardMotionIdentity,
 )
 
@@ -87,6 +87,7 @@ fun LumenChessboard(
     val legalMoves = remember(position) { MoveGenerator.legalMoves(position) }
     val coroutineScope = rememberCoroutineScope()
     val moveProgress = remember { Animatable(1f) }
+    val promotionProgress = remember { Animatable(1f) }
     val density = LocalDensity.current
 
     var selectedSquare by remember(position) { mutableStateOf<Square?>(null) }
@@ -115,7 +116,7 @@ fun LumenChessboard(
             ),
         )
     }
-    var travelingPiece by remember { mutableStateOf<TravelingPiece?>(null) }
+    var activeBoardMotion by remember { mutableStateOf<ActiveBoardMotion?>(null) }
 
     val checkSquare = remember(position, highlights.showCheck) {
         if (!highlights.showCheck || !MoveGenerator.isInCheck(position, position.sideToMove)) {
@@ -269,28 +270,27 @@ fun LumenChessboard(
     // The authoritative position can arrive one draw before LaunchedEffect starts. Resolve that
     // pending presentation synchronously so tap/engine/capture moves never flash on the final
     // square before their presentation-only travel begins.
-    val pendingTravel = if (
+    val pendingMotion = if (
         previousPosition != position &&
         !suppressNextTravel &&
         previousMotionIdentity.orientation == motionIdentity.orientation
     ) {
         highlights.lastMove?.let { move ->
-            (BoardMotionPlanner.plan(
+            BoardMotionPlanner.plan(
                 previous = previousPosition,
                 current = position,
                 move = move,
                 presentation = highlights.movePresentation,
                 animationsEnabled = ValueAnimator.areAnimatorsEnabled(),
-            ) as? BoardMotionPlan.Travel)?.let { plan ->
-                TravelingPiece(plan = plan, identity = motionIdentity)
-            }
+            ).takeUnless { it == BoardMotionPlan.Atomic }
+                ?.let { plan -> ActiveBoardMotion(plan = plan, identity = motionIdentity) }
         }
     } else {
         null
     }
-    val visibleTravel = travelingPiece
+    val visibleMotion = activeBoardMotion
         ?.takeIf { it.identity == motionIdentity }
-        ?: pendingTravel
+        ?: pendingMotion
 
     LaunchedEffect(motionIdentity, position, highlights.lastMove, highlights.movePresentation) {
         val oldIdentity = previousMotionIdentity
@@ -300,8 +300,9 @@ fun LumenChessboard(
 
         // A new authoritative revision or orientation owns the presentation. Compose cancels the
         // previous LaunchedEffect before entering here, and the old overlay is cleared first.
-        travelingPiece = null
+        activeBoardMotion = null
         moveProgress.snapTo(1f)
+        promotionProgress.snapTo(1f)
         if (orientationChanged) {
             dragMotionJob?.cancel()
             dragMotionJob = null
@@ -328,18 +329,43 @@ fun LumenChessboard(
             presentation = highlights.movePresentation,
             animationsEnabled = animationsEnabled,
         )
-        if (plan !is BoardMotionPlan.Travel) return@LaunchedEffect
+        if (plan == BoardMotionPlan.Atomic) return@LaunchedEffect
 
-        val travel = TravelingPiece(plan = plan, identity = motionIdentity)
-        travelingPiece = travel
+        val motion = ActiveBoardMotion(plan = plan, identity = motionIdentity)
+        activeBoardMotion = motion
         moveProgress.snapTo(0f)
+        promotionProgress.snapTo(0f)
         try {
-            moveProgress.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = plan.durationMillis, easing = LumenMotion.CrispEase),
-            )
+            when (plan) {
+                BoardMotionPlan.Atomic -> Unit
+                is BoardMotionPlan.Castling -> moveProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(
+                        durationMillis = plan.durationMillis,
+                        easing = LumenMotion.CrispEase,
+                    ),
+                )
+                is BoardMotionPlan.Travel -> {
+                    moveProgress.animateTo(
+                        targetValue = 1f,
+                        animationSpec = tween(
+                            durationMillis = plan.durationMillis,
+                            easing = LumenMotion.CrispEase,
+                        ),
+                    )
+                    plan.promotion?.let { promotion ->
+                        promotionProgress.animateTo(
+                            targetValue = 1f,
+                            animationSpec = tween(
+                                durationMillis = promotion.durationMillis,
+                                easing = LumenMotion.CrispEase,
+                            ),
+                        )
+                    }
+                }
+            }
         } finally {
-            if (travelingPiece == travel) travelingPiece = null
+            if (activeBoardMotion == motion) activeBoardMotion = null
         }
     }
 
@@ -369,8 +395,12 @@ fun LumenChessboard(
                         when (val submission = submitInput(from, target)) {
                             is InputSubmission.Committed -> {
                                 if (MoveGenerator.castlingSide(position, submission.move) != null) {
-                                    // P6.4 intentionally presents castling atomically until the
-                                    // separately approved dual-piece motion phase exists.
+                                    suppressNextTravel = false
+                                    dragMotionJob?.cancel()
+                                    dragMotionJob = null
+                                    clearDrag()
+                                } else if (submission.move.promotion != null) {
+                                    suppressNextTravel = false
                                     dragMotionJob?.cancel()
                                     dragMotionJob = null
                                     clearDrag()
@@ -413,8 +443,12 @@ fun LumenChessboard(
                     repeat(8) { visualColumn ->
                         val square = squareAtVisual(visualColumn, visualRow, orientation)
                         val hiddenByDrag = square == dragFrom || square == snappingTarget
-                        val hiddenByTravel = visibleTravel?.plan?.move?.to == square
-                        val piece = position[square].takeUnless { hiddenByDrag || hiddenByTravel }
+                        val hiddenByMotion = when (val plan = visibleMotion?.plan) {
+                            is BoardMotionPlan.Travel -> plan.move.to == square
+                            is BoardMotionPlan.Castling -> square in plan.suppressedSquares
+                            BoardMotionPlan.Atomic, null -> false
+                        }
+                        val piece = position[square].takeUnless { hiddenByDrag || hiddenByMotion }
                         val selected = selectedSquare
                         val candidates = if (selected != null && highlights.showLegalMoves) {
                             ChessboardMoveResolver.candidates(position, legalMoves, selected, square)
@@ -485,43 +519,109 @@ fun LumenChessboard(
                 }
             }
 
-            visibleTravel?.let { travel ->
-                val progress = if (travel === pendingTravel) 0f else moveProgress.value
-                val plan = travel.plan
-                val start = squareCenter(plan.move.from, boardSize.width.toFloat(), orientation)
-                val end = squareCenter(plan.move.to, boardSize.width.toFloat(), orientation)
-                plan.capturedPiece?.let { captured ->
-                    val elapsedMillis = progress * plan.durationMillis
-                    val alpha = (1f - elapsedMillis / plan.captureFadeDurationMillis).coerceIn(0f, 1f)
-                    if (alpha > 0f) {
-                        PieceOverlay(
-                            piece = captured,
-                            position = squareCenter(
-                                plan.capturedSquare ?: plan.move.to,
+            visibleMotion?.let { motion ->
+                val progress = if (motion === pendingMotion) 0f else moveProgress.value
+                when (val plan = motion.plan) {
+                    BoardMotionPlan.Atomic -> Unit
+                    is BoardMotionPlan.Castling -> {
+                        listOf(plan.rook, plan.king).forEach { leg ->
+                            if (!leg.isStatic) {
+                                PieceOverlay(
+                                    piece = leg.piece,
+                                    position = lerpOffset(
+                                        squareCenter(leg.from, boardSize.width.toFloat(), orientation),
+                                        squareCenter(leg.to, boardSize.width.toFloat(), orientation),
+                                        progress,
+                                    ),
+                                    cellPx = cellPx,
+                                    cellDp = cellDp,
+                                    palette = resolvedPalette,
+                                    pieceSet = resolvedPieceSet,
+                                    alpha = 1f,
+                                    scale = 0.90f,
+                                    overlayZIndex = leg.zIndex,
+                                    modifier = Modifier.testTag(
+                                        if (leg.piece.type == PieceType.KING) "castling-king" else "castling-rook",
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    is BoardMotionPlan.Travel -> {
+                        val start = squareCenter(plan.move.from, boardSize.width.toFloat(), orientation)
+                        val end = squareCenter(plan.move.to, boardSize.width.toFloat(), orientation)
+                        plan.capturedPiece?.let { captured ->
+                            val elapsedMillis = progress * plan.durationMillis
+                            val alpha = (1f - elapsedMillis / plan.captureFadeDurationMillis)
+                                .coerceIn(0f, 1f)
+                            if (alpha > 0f) {
+                                PieceOverlay(
+                                    piece = captured,
+                                    position = squareCenter(
+                                        plan.capturedSquare ?: plan.move.to,
+                                        boardSize.width.toFloat(),
+                                        orientation,
+                                    ),
+                                    cellPx = cellPx,
+                                    cellDp = cellDp,
+                                    palette = resolvedPalette,
+                                    pieceSet = resolvedPieceSet,
+                                    alpha = alpha,
+                                    scale = 0.90f,
+                                    modifier = Modifier.testTag("captured-piece-fade"),
+                                )
+                            }
+                        }
+                        val promotion = plan.promotion
+                        if (promotion != null && progress >= 1f) {
+                            val replacementProgress = if (motion === pendingMotion) 0f else promotionProgress.value
+                            val promotedScale = 0.90f * (
+                                promotion.initialScale + (1f - promotion.initialScale) * replacementProgress
+                            )
+                            val destination = squareCenter(
+                                plan.move.to,
                                 boardSize.width.toFloat(),
                                 orientation,
-                            ),
-                            cellPx = cellPx,
-                            cellDp = cellDp,
-                            palette = resolvedPalette,
-                            pieceSet = resolvedPieceSet,
-                            alpha = alpha,
-                            scale = 0.90f,
-                            modifier = Modifier.testTag("captured-piece-fade"),
-                        )
+                            )
+                            if (replacementProgress < 1f) {
+                                PieceOverlay(
+                                    piece = promotion.outgoingPiece,
+                                    position = destination,
+                                    cellPx = cellPx,
+                                    cellDp = cellDp,
+                                    palette = resolvedPalette,
+                                    pieceSet = resolvedPieceSet,
+                                    alpha = 1f - replacementProgress,
+                                    scale = 0.90f,
+                                    modifier = Modifier.testTag("promotion-outgoing-piece"),
+                                )
+                            }
+                            PieceOverlay(
+                                piece = promotion.promotedPiece,
+                                position = destination,
+                                cellPx = cellPx,
+                                cellDp = cellDp,
+                                palette = resolvedPalette,
+                                pieceSet = resolvedPieceSet,
+                                alpha = replacementProgress,
+                                scale = promotedScale,
+                                modifier = Modifier.testTag("promotion-promoted-piece"),
+                            )
+                        } else {
+                            PieceOverlay(
+                                piece = plan.piece,
+                                position = lerpOffset(start, end, progress),
+                                cellPx = cellPx,
+                                cellDp = cellDp,
+                                palette = resolvedPalette,
+                                pieceSet = resolvedPieceSet,
+                                alpha = 1f,
+                                scale = 0.90f,
+                                modifier = Modifier.testTag("traveling-piece"),
+                            )
+                        }
                     }
                 }
-                PieceOverlay(
-                    piece = plan.piece,
-                    position = lerpOffset(start, end, progress),
-                    cellPx = cellPx,
-                    cellDp = cellDp,
-                    palette = resolvedPalette,
-                    pieceSet = resolvedPieceSet,
-                    alpha = 1f,
-                    scale = 0.90f,
-                    modifier = Modifier.testTag("traveling-piece"),
-                )
             }
         }
 
@@ -630,6 +730,7 @@ private fun PieceOverlay(
     pieceSet: PieceSet,
     alpha: Float,
     scale: Float,
+    overlayZIndex: Float = 4f,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -640,7 +741,7 @@ private fun PieceOverlay(
                 translationY = position.y - cellPx / 2f
                 this.alpha = alpha
             }
-            .zIndex(4f),
+            .zIndex(overlayZIndex),
         contentAlignment = Alignment.Center,
     ) {
         pieceSet.Piece(

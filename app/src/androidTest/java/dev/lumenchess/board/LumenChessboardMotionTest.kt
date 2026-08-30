@@ -96,20 +96,77 @@ class LumenChessboardMotionTest {
     }
 
     @Test
-    fun standardCastlingUsesAtomicFinalPresentation() {
+    fun standardCastlingTravelsBothPiecesWithoutCanonicalDuplicatesOrBoardMovement() {
         composeRule.mainClock.autoAdvance = false
         val position = mutableStateOf(Fen.parse("4k3/8/8/8/8/8/8/4K2R w K - 0 1"))
         val lastMove = mutableStateOf<Move?>(null)
         val revision = mutableLongStateOf(0L)
         setMotionBoard(position, lastMove, revision)
+        val initialBounds = boardBounds()
 
         composeRule.onNodeWithTag("square-e1").performClick()
         composeRule.onNodeWithTag("square-g1").performClick()
         composeRule.mainClock.advanceTimeByFrame()
 
-        transient("traveling-piece").assertDoesNotExist()
+        transient("castling-rook").assertExists()
+        transient("castling-king").assertExists()
+        composeRule.onNodeWithTag("piece-g1-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("piece-f1-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals(initialBounds, boardBounds())
+
+        composeRule.mainClock.advanceTimeBy(180L)
+        composeRule.mainClock.advanceTimeByFrame()
+        transient("castling-rook").assertDoesNotExist()
+        transient("castling-king").assertDoesNotExist()
         composeRule.onNodeWithTag("piece-g1-lumen-vector", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag("piece-f1-lumen-vector", useUnmergedTree = true).assertExists()
+        assertEquals(initialBounds, boardBounds())
+    }
+
+    @Test
+    fun chess960ZeroDistanceKingStaysCanonicalWhileOnlyRookTravels() {
+        composeRule.mainClock.autoAdvance = false
+        val position = mutableStateOf(Fen.parse("4k3/8/8/8/8/8/8/6KR w H - 0 1", dev.lumenchess.core.chess.Variant.CHESS960))
+        val lastMove = mutableStateOf<Move?>(null)
+        val revision = mutableLongStateOf(0L)
+        setMotionBoard(position, lastMove, revision)
+
+        composeRule.onNodeWithTag("square-g1").performClick()
+        composeRule.onNodeWithTag("square-h1").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+
+        transient("castling-king").assertDoesNotExist()
+        transient("castling-rook").assertExists()
+        composeRule.onNodeWithTag("piece-g1-lumen-vector", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("piece-f1-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun promotionTravelsPawnThenBridgesToCanonicalPromotedPiece() {
+        composeRule.mainClock.autoAdvance = false
+        val position = mutableStateOf(Fen.parse("7k/P7/8/8/8/8/8/7K w - - 0 1"))
+        val lastMove = mutableStateOf<Move?>(null)
+        val revision = mutableLongStateOf(0L)
+        setMotionBoard(position, lastMove, revision)
+
+        composeRule.onNodeWithTag("square-a7").performClick()
+        composeRule.onNodeWithTag("square-a8").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithTag("promotion-choice-queen").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+
+        transient("traveling-piece").assertExists()
+        composeRule.onNodeWithTag("piece-a8-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.mainClock.advanceTimeBy(145L)
+        composeRule.mainClock.advanceTimeByFrame()
+        transient("promotion-outgoing-piece").assertExists()
+        transient("promotion-promoted-piece").assertExists()
+        composeRule.onNodeWithTag("piece-a8-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.mainClock.advanceTimeBy(96L)
+        composeRule.mainClock.advanceTimeByFrame()
+        transient("promotion-outgoing-piece").assertDoesNotExist()
+        transient("promotion-promoted-piece").assertDoesNotExist()
+        composeRule.onNodeWithTag("piece-a8-lumen-vector", useUnmergedTree = true).assertExists()
     }
 
     @Test
