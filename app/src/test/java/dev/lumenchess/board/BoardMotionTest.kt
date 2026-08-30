@@ -1,5 +1,6 @@
 package dev.lumenchess.board
 
+import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Fen
 import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.MoveGenerator
@@ -78,6 +79,55 @@ class BoardMotionTest {
         assertEquals(Square.parse("f1"), plan.rook.to)
         assertTrue(plan.king.zIndex > plan.rook.zIndex)
         assertEquals(setOf(Square.parse("g1"), Square.parse("f1")), plan.suppressedSquares)
+    }
+
+    @Test
+    fun `all four standard castling moves create two concurrent legs`() {
+        listOf(
+            Triple("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "e1g1", Color.WHITE),
+            Triple("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "e1c1", Color.WHITE),
+            Triple("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", "e8g8", Color.BLACK),
+            Triple("r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1", "e8c8", Color.BLACK),
+        ).forEach { (fen, uci, color) ->
+            val before = Fen.parse(fen)
+            val move = Move.parseUci(uci)
+            val plan = assertInstanceOf(
+                BoardMotionPlan.Castling::class.java,
+                BoardMotionPlanner.plan(
+                    before,
+                    MoveGenerator.applyLegalMove(before, move),
+                    move,
+                    BoardMovePresentation.HUMAN_TAP,
+                    true,
+                ),
+            )
+
+            assertEquals(color, plan.color)
+            assertFalse(plan.king.isStatic)
+            assertFalse(plan.rook.isStatic)
+            assertEquals(165, plan.durationMillis)
+        }
+    }
+
+    @Test
+    fun `ordinary Chess960 castling derives the rook source from castling rights`() {
+        val before = Fen.parse("4k3/8/8/8/8/8/8/RK2R3 w EA - 0 1", Variant.CHESS960)
+        val move = Move.parseUci("b1e1")
+        val plan = assertInstanceOf(
+            BoardMotionPlan.Castling::class.java,
+            BoardMotionPlanner.plan(
+                before,
+                MoveGenerator.applyLegalMove(before, move),
+                move,
+                BoardMovePresentation.HUMAN_TAP,
+                true,
+            ),
+        )
+
+        assertEquals(Square.parse("b1"), plan.king.from)
+        assertEquals(Square.parse("g1"), plan.king.to)
+        assertEquals(Square.parse("e1"), plan.rook.from)
+        assertEquals(Square.parse("f1"), plan.rook.to)
     }
 
     @Test
@@ -189,6 +239,32 @@ class BoardMotionTest {
         assertEquals(
             BoardMotionPlan.Atomic,
             BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.HUMAN_TAP, false),
+        )
+
+        val castleBefore = Fen.parse("4k3/8/8/8/8/8/8/4K2R w K - 0 1")
+        val castleMove = Move.parseUci("e1g1")
+        assertEquals(
+            BoardMotionPlan.Atomic,
+            BoardMotionPlanner.plan(
+                castleBefore,
+                MoveGenerator.applyLegalMove(castleBefore, castleMove),
+                castleMove,
+                BoardMovePresentation.HUMAN_TAP,
+                false,
+            ),
+        )
+
+        val promotionBefore = Fen.parse("7k/P7/8/8/8/8/8/7K w - - 0 1")
+        val promotionMove = Move.parseUci("a7a8q")
+        assertEquals(
+            BoardMotionPlan.Atomic,
+            BoardMotionPlanner.plan(
+                promotionBefore,
+                MoveGenerator.applyLegalMove(promotionBefore, promotionMove),
+                promotionMove,
+                BoardMovePresentation.HUMAN_TAP,
+                false,
+            ),
         )
     }
 

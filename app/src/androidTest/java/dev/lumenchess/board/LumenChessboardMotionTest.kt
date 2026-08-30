@@ -170,6 +170,84 @@ class LumenChessboardMotionTest {
     }
 
     @Test
+    fun capturePromotionFadesVictimBeforeTheReplacementBridge() {
+        composeRule.mainClock.autoAdvance = false
+        val position = mutableStateOf(Fen.parse("4k2r/6P1/8/8/8/8/8/4K3 w - - 0 1"))
+        val lastMove = mutableStateOf<Move?>(null)
+        val revision = mutableLongStateOf(0L)
+        setMotionBoard(position, lastMove, revision)
+
+        composeRule.onNodeWithTag("square-g7").performClick()
+        composeRule.onNodeWithTag("square-h8").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithTag("promotion-choice-knight").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+
+        transient("captured-piece-fade").assertExists()
+        transient("traveling-piece").assertExists()
+        composeRule.mainClock.advanceTimeBy(70L)
+        transient("captured-piece-fade").assertDoesNotExist()
+        transient("traveling-piece").assertExists()
+
+        composeRule.mainClock.advanceTimeBy(96L)
+        composeRule.mainClock.advanceTimeByFrame()
+        transient("promotion-promoted-piece").assertExists()
+        composeRule.onNodeWithTag("piece-h8-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun enPassantKeepsVictimFadeOnItsRealSquareAndResolvesOnce() {
+        composeRule.mainClock.autoAdvance = false
+        val position = mutableStateOf(Fen.parse("7k/8/8/3pP3/8/8/8/7K w - d6 0 1"))
+        val lastMove = mutableStateOf<Move?>(null)
+        val revision = mutableLongStateOf(0L)
+        setMotionBoard(position, lastMove, revision)
+
+        composeRule.onNodeWithTag("square-e5").performClick()
+        composeRule.onNodeWithTag("square-d6").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+
+        transient("captured-piece-fade").assertExists()
+        transient("traveling-piece").assertExists()
+        composeRule.onNodeWithTag("piece-d5-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.mainClock.advanceTimeBy(180L)
+        composeRule.mainClock.advanceTimeByFrame()
+        transient("captured-piece-fade").assertDoesNotExist()
+        transient("traveling-piece").assertDoesNotExist()
+        composeRule.onNodeWithTag("piece-d6-lumen-vector", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun newerRevisionCancelsAnActiveCastlingPlan() {
+        composeRule.mainClock.autoAdvance = false
+        val position = mutableStateOf(Fen.parse("4k3/8/8/8/8/8/8/4K2R w K - 0 1"))
+        val lastMove = mutableStateOf<Move?>(null)
+        val revision = mutableLongStateOf(0L)
+        setMotionBoard(position, lastMove, revision)
+
+        composeRule.onNodeWithTag("square-e1").performClick()
+        composeRule.onNodeWithTag("square-g1").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        transient("castling-king").assertExists()
+        transient("castling-rook").assertExists()
+
+        composeRule.runOnIdle {
+            val supersedingMove = Move.parseUci("e8e7")
+            position.value = MoveGenerator.applyLegalMove(position.value, supersedingMove)
+            lastMove.value = supersedingMove
+            revision.longValue += 1L
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+
+        transient("castling-king").assertDoesNotExist()
+        transient("castling-rook").assertDoesNotExist()
+        composeRule.onNodeWithTag("piece-g1-lumen-vector", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("piece-f1-lumen-vector", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("piece-e7-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
+        transient("traveling-piece").assertExists()
+    }
+
+    @Test
     fun capturedVictimFadesBeforeAttackerTravelCompletes() {
         composeRule.mainClock.autoAdvance = false
         val position = mutableStateOf(Fen.parse("7k/8/8/3p4/4P3/8/8/7K w - - 0 1"))
