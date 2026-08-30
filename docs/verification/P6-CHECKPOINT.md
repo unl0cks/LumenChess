@@ -242,3 +242,38 @@ evidence):
 The local transfer package is
 `LumenChess-P6.5A-design-checkpoint-d961a656.zip` (2,040,280 bytes), SHA-256
 `5d31955418f9ca7f5071bde2bd3239c330688d0e1e48dae652ddb870750dd9ce`.
+
+### P6.5A and P6.5B manual approval
+
+P6.5A's Special-Move Motion & P6 Interaction Closure design is manually approved.
+The approved production implementation culminates at
+`01eabc7f9af47e87880f1fa6c26ee7af302855fc`, with the corrected every-frame
+native promotion evidence lane at
+`917209a354861ad1c9ca05a6ca9203d2fbdee544`.
+
+P6.5B is manually approved with:
+
+- concurrent 165 ms Standard and generalized Chess960 castling travel;
+- deterministic king-above-rook transient ordering and static zero-distance legs;
+- explicit canonical-destination suppression and revision-bound cancellation;
+- normal source-specific pawn travel followed by an 80 ms promotion replacement
+  bridge using Grounded Precision easing;
+- outgoing pawn alpha from 1 to 0, promoted-piece alpha from 0 to 1, and promoted
+  scale from approximately 0.96 to 1.00;
+- unchanged, approved en-passant presentation;
+- verified Neo, 3D Staunton, and Public Lumen renderer compatibility;
+- unchanged P1 board bounds through special-move presentation.
+
+The initial sparse promotion evidence sampled relative to authoritative commit and
+did not capture the active replacement frames. The corrected API-37 evidence
+separately anchored pawn arrival and bridge start, then captured every 16 ms frame
+through the full 80 ms bridge. It proved that production promotion behavior was
+already correct, so no production promotion correction was required.
+
+The corrected review package is
+`LumenChess-P6.5B-promotion-review-917209a3.zip` (8,067,991 bytes), SHA-256
+`3d77f0af77424f98314e39e2176dbbeccad856ccfa7bc76fff373abe04337878`.
+All 155 declared manifest members matched their sizes and SHA-256 digests.
+
+P6.5B approval does not merge P6, authorize a signed APK, or begin M20. A final
+bounded P6 closure audit remains required before leaving the P6 lane.
