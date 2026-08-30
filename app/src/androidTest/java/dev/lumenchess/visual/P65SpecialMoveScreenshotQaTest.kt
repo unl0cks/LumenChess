@@ -268,6 +268,134 @@ class P65SpecialMoveScreenshotQaTest {
     }
 
     @Test
+    fun capturePromotionBridgeAtEveryComposeFrame() {
+        composeRule.mainClock.autoAdvance = false
+        val position = mutableStateOf(WHITE_QUIET_PROMOTION)
+        val lastMove = mutableStateOf<Move?>(null)
+        val presentation = mutableStateOf(BoardMovePresentation.HUMAN_TAP)
+        val revision = mutableLongStateOf(0L)
+        val orientation = mutableStateOf(ChessboardOrientation.WHITE)
+        val pieceSetId = mutableStateOf(NEO_ID)
+        setMotionBoard(position, lastMove, presentation, revision, orientation, pieceSetId)
+
+        val frameRecords = mutableListOf<PromotionFrameRecord>()
+
+        fun captureLane(
+            folder: String,
+            before: Position,
+            moveText: String,
+            source: BoardMovePresentation,
+            renderer: String,
+        ) {
+            val move = Move.parseUci(moveText)
+            reset(position, lastMove, presentation, revision, orientation, pieceSetId, before, renderer)
+            rendererRecords += RendererRecord("promotion-vsync-$folder", renderer, PieceSetCatalog.definition(renderer).id)
+            captureBoard("promotion-bridge-vsync/$folder/000-before.png", "$folder-before")
+
+            val commitClockMillis = composeRule.mainClock.currentTime
+            commit(position, lastMove, presentation, revision, move, source)
+            var arrivalClockMillis: Long? = null
+            var bridgeStartClockMillis: Long? = null
+            var stableFrames = 0
+
+            repeat(28) { frameIndex ->
+                if (frameIndex > 0) composeRule.mainClock.advanceTimeByFrame()
+                val clockMillis = composeRule.mainClock.currentTime
+                val traveling = tagExists("traveling-piece")
+                val outgoing = tagExists("promotion-outgoing-piece")
+                val promoted = tagExists("promotion-promoted-piece")
+                val captured = tagExists("captured-piece-fade")
+                if (arrivalClockMillis == null && outgoing && promoted) {
+                    arrivalClockMillis = clockMillis
+                } else if (bridgeStartClockMillis == null && outgoing && promoted) {
+                    bridgeStartClockMillis = clockMillis
+                }
+                val canonical = bridgeStartClockMillis != null &&
+                    tagExists("piece-${move.to.algebraic}-$renderer", useUnmergedTree = true)
+                val arrivalElapsed = arrivalClockMillis?.let(clockMillis::minus)
+                val bridgeElapsed = bridgeStartClockMillis?.let(clockMillis::minus)
+                val stage = when {
+                    outgoing || promoted -> "bridge"
+                    traveling -> "travel"
+                    canonical -> "canonical"
+                    else -> "pending"
+                }
+                val relativeMillis = clockMillis - commitClockMillis
+                captureBoard(
+                    "promotion-bridge-vsync/$folder/frame-${frameIndex.toString().padStart(2, '0')}-${relativeMillis.toString().padStart(3, '0')}ms.png",
+                    "$folder-frame-$frameIndex",
+                )
+                frameRecords += PromotionFrameRecord(
+                    lane = folder,
+                    rendererId = renderer,
+                    movePresentation = source.name,
+                    frameIndex = frameIndex,
+                    clockMillis = clockMillis,
+                    relativeToCommitMillis = relativeMillis,
+                    arrivalElapsedMillis = arrivalElapsed,
+                    bridgeElapsedMillis = bridgeElapsed,
+                    stage = stage,
+                    travelingVisible = traveling,
+                    outgoingPawnVisible = outgoing,
+                    promotedPieceVisible = promoted,
+                    canonicalPieceVisible = canonical,
+                    capturedVictimVisible = captured,
+                )
+                stableFrames = if (canonical) stableFrames + 1 else 0
+                if (stableFrames >= 2) return
+            }
+            error("Promotion lane $folder did not reach two stable canonical frames")
+        }
+
+        captureLane(
+            "01-white-queen-human-neo",
+            WHITE_QUIET_PROMOTION,
+            "a7a8q",
+            BoardMovePresentation.HUMAN_TAP,
+            NEO_ID,
+        )
+        captureLane(
+            "02-white-knight-premove-neo",
+            WHITE_QUIET_PROMOTION,
+            "a7a8n",
+            BoardMovePresentation.PREMOVE,
+            NEO_ID,
+        )
+        captureLane(
+            "03-black-queen-engine-neo",
+            BLACK_QUIET_PROMOTION,
+            "a2a1q",
+            BoardMovePresentation.ENGINE,
+            NEO_ID,
+        )
+        captureLane(
+            "04-capture-queen-human-neo",
+            WHITE_CAPTURE_PROMOTION,
+            "g7h8q",
+            BoardMovePresentation.HUMAN_TAP,
+            NEO_ID,
+        )
+        captureLane(
+            "05-white-queen-human-3d-staunton",
+            WHITE_QUIET_PROMOTION,
+            "a7a8q",
+            BoardMovePresentation.HUMAN_TAP,
+            STAUNTON_ID,
+        )
+        captureLane(
+            "06-white-queen-human-public-lumen",
+            WHITE_QUIET_PROMOTION,
+            "a7a8q",
+            BoardMovePresentation.HUMAN_TAP,
+            PUBLIC_LUMEN_ID,
+        )
+
+        writePromotionFrameRecords("metadata/promotion-bridge-vsync.json", frameRecords)
+        writeBounds("metadata/board-bounds-promotion-vsync.json")
+        writeRendererRecords("metadata/renderer-promotion-vsync.json")
+    }
+
+    @Test
     fun captureEnPassantRegression() {
         composeRule.mainClock.autoAdvance = false
         val position = mutableStateOf(EN_PASSANT)
@@ -410,6 +538,9 @@ class P65SpecialMoveScreenshotQaTest {
         }
     }
 
+    private fun tagExists(tag: String, useUnmergedTree: Boolean = false): Boolean =
+        composeRule.onAllNodesWithTag(tag, useUnmergedTree = useUnmergedTree).fetchSemanticsNodes().isNotEmpty()
+
     private fun captureBoard(relativeName: String, boundLabel: String) {
         composeRule.waitForIdle()
         val node = composeRule.onNodeWithTag(MOTION_BOARD_TAG)
@@ -450,6 +581,13 @@ class P65SpecialMoveScreenshotQaTest {
         writeText(relativeName, "[\n$entries\n]\n")
     }
 
+    private fun writePromotionFrameRecords(relativeName: String, records: List<PromotionFrameRecord>) {
+        val entries = records.joinToString(",\n") { record ->
+            """  {"lane":"${record.lane}","rendererId":"${record.rendererId}","movePresentation":"${record.movePresentation}","frameIndex":${record.frameIndex},"clockMillis":${record.clockMillis},"relativeToCommitMillis":${record.relativeToCommitMillis},"arrivalElapsedMillis":${record.arrivalElapsedMillis?.toString() ?: "null"},"bridgeElapsedMillis":${record.bridgeElapsedMillis?.toString() ?: "null"},"stage":"${record.stage}","travelingVisible":${record.travelingVisible},"outgoingPawnVisible":${record.outgoingPawnVisible},"promotedPieceVisible":${record.promotedPieceVisible},"canonicalPieceVisible":${record.canonicalPieceVisible},"capturedVictimVisible":${record.capturedVictimVisible}}"""
+        }
+        writeText(relativeName, "[\n$entries\n]\n")
+    }
+
     private fun writeBitmap(relativeName: String, bitmap: Bitmap) {
         val destination = outputFile(relativeName)
         destination.parentFile?.mkdirs()
@@ -481,6 +619,23 @@ class P65SpecialMoveScreenshotQaTest {
         val capture: String,
         val storedId: String,
         val resolvedId: String,
+    )
+
+    private data class PromotionFrameRecord(
+        val lane: String,
+        val rendererId: String,
+        val movePresentation: String,
+        val frameIndex: Int,
+        val clockMillis: Long,
+        val relativeToCommitMillis: Long,
+        val arrivalElapsedMillis: Long?,
+        val bridgeElapsedMillis: Long?,
+        val stage: String,
+        val travelingVisible: Boolean,
+        val outgoingPawnVisible: Boolean,
+        val promotedPieceVisible: Boolean,
+        val canonicalPieceVisible: Boolean,
+        val capturedVictimVisible: Boolean,
     )
 
     private companion object {
