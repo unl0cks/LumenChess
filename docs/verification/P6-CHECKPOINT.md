@@ -277,3 +277,96 @@ All 155 declared manifest members matched their sizes and SHA-256 digests.
 
 P6.5B approval does not merge P6, authorize a signed APK, or begin M20. A final
 bounded P6 closure audit remains required before leaving the P6 lane.
+
+## Final P6 closure
+
+The bounded closure audit completed on 2026-08-30 without changing production
+code, approved visual tokens, imported-piece fitting, or motion timings. P6.1
+through P6.5 are complete on the isolated
+`codex/p6-personal-piece-integration` branch:
+
+- the personal Chess.com piece integration is approved for the private build
+  path, with 39 complete styles and 468 canonical piece PNGs discovered from
+  sanitized generated input;
+- P6.3 Quiet Classical Hybrid board feedback is manually approved;
+- P6.4 Grounded Precision ordinary motion is manually approved;
+- P6.5 concurrent castling and promotion presentation is manually approved;
+- existing en-passant presentation remains approved and unchanged.
+
+### Approved-system reconstruction
+
+The final source audit confirmed that the P6.3 tokens and semantic draw order
+have not drifted. Selection remains four `#6AD1DC` corner brackets at 94%; legal
+dots remain adaptive at 56%; capture rings remain adaptive at 72%; last-move
+origin/destination washes remain `#C9BA61` at 18%/30%; check remains the
+`#D96066` inset frame at 84%; and committed/pending premove rails remain
+`#8398BA` at 80%/67%. The layer order remains square, history, premove,
+selection, legal/capture, piece, check, arrows, and promotion.
+
+Grounded Precision remains unchanged: 70 ms pickup, 1.04 held scale, -2 dp lift,
+20% alpha-following contact shadow with 1.3 dp blur and 1.5 dp Y offset, immediate
+one-to-one drag, 90 ms legal settle, 120 ms illegal snap-back, 145 ms human
+travel, 155 ms engine travel, 110 ms premove travel, and 55 ms victim fade using
+`CubicBezier(0.2, 0, 0, 1)`. Revision/orientation changes and disabled Android
+animations continue to discard transient state and render the latest
+authoritative position immediately.
+
+Special-move presentation remains explicit and revision-bound. Castling uses
+authoritative castling identity and the previous position's castling-right rook
+square, concurrently animates non-zero king and rook legs for 165 ms, renders
+the king above the rook during overlap, and suppresses only the moving canonical
+destinations. The 80 ms promotion bridge retains the arriving pawn while fading
+it from 1 to 0, fades the canonical promoted identity from 0 to 1, and scales the
+promoted piece from approximately 0.96 to 1.00. Canonical state remains committed
+before every presentation bridge.
+
+### Closure verification
+
+Public JVM, lint, debug assembly, and Android-test assembly lanes completed
+successfully for the app, core chess, runtime, engine API/host, persistence, and
+private-asset build logic. Recorded JVM suites completed with zero failures:
+app 96, core chess 71, game runtime 46, engine API 35, and engine-host unit 5.
+The API-37 engine-host and persistence lanes completed 19 and 47 native tests
+respectively with zero failures. The complete app instrumentation lane reported
+104 tests: 79 executed successfully and 25 explicitly gated screenshot-QA tests
+skipped. The separately enabled P6.5 native special-move lane executed all five
+tests successfully.
+
+Native API-37 evidence used the 1344x2992, 489 dpi device. The integrated Live
+board remained exactly `Rect(33,277-1311,1555)` (1278x1278 px) through pickup,
+drag, legal/illegal release, tap and engine travel, capture, premove, board flip,
+and engine response. The isolated special-move board remained exactly
+`Rect(32,856-1312,2136)` (1280x1280 px) for all 298 sampled castling, promotion,
+and en-passant frames. Every measured delta was 0 px. Renderer metadata contained
+23 stored/resolved identity records for Neo (`private.chesscom.ejgfv`), 3D
+Staunton (`private.chesscom.3d_staunton`), and Public Lumen (`lumen-vector`) with
+zero mismatches.
+
+The public debug APK contained zero private piece PNGs, generated personal-stage
+files, private source paths, or unrelated external-source content. The personal
+debug APK contained exactly 468 canonical piece PNGs across 39 styles (plus the
+eight already-supported optional board PNGs), while excluding scripts, archives,
+virtual environments, metadata, and source paths. Both artifacts were local debug
+verification outputs only; no release or signed APK was built.
+
+The tracked-tree privacy scan found zero private Chess.com PNGs, `local-assets/`,
+generated personal assets, APKs, keystores, private archives, or absolute local
+asset paths. Existing untracked historical P6 reference directories were left
+untouched and remain outside Git. `git diff --check` passed.
+
+GitHub Android CI run `33332819431` passed its `checkpoint` job for the P6.5B
+approval record. The `full`, `engine-device`, and `play-device` jobs were skipped
+by the existing branch policy and are not represented as passes. A supported
+CodeRabbit executable or callable review tool was unavailable in the current
+environment, so no external CodeRabbit result is claimed.
+
+### Closure state and next boundary
+
+P1 board stability, Standard and Chess960 behavior, Stockfish and Reckless
+progression, premoves, P6.3 feedback, P6.4 motion, P6.5 special moves, and
+private/public piece separation are green. Runtime/core state remains
+authoritative; presentation follows committed state and remains disposable.
+`LumenChessboard` remains presentation/input only. No known P6 blocker remains.
+
+This closure record does not merge or promote the P6 branch, build a release or
+signed APK, or begin M20. Leaving P6 requires a separate explicit authorization.
