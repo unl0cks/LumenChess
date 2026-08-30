@@ -61,26 +61,34 @@ class BoardMotionTest {
     }
 
     @Test
-    fun `standard castling uses atomic fallback`() {
+    fun `standard castling creates concurrent deterministic king and rook legs`() {
         val before = Fen.parse("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1")
         val move = Move.parseUci("e1g1")
         val after = MoveGenerator.applyLegalMove(before, move)
 
-        assertEquals(
-            BoardMotionPlan.Atomic,
+        val plan = assertInstanceOf(
+            BoardMotionPlan.Castling::class.java,
             BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.HUMAN_TAP, true),
         )
+
+        assertEquals(165, plan.durationMillis)
+        assertEquals(Square.parse("e1"), plan.king.from)
+        assertEquals(Square.parse("g1"), plan.king.to)
+        assertEquals(Square.parse("h1"), plan.rook.from)
+        assertEquals(Square.parse("f1"), plan.rook.to)
+        assertTrue(plan.king.zIndex > plan.rook.zIndex)
+        assertEquals(setOf(Square.parse("g1"), Square.parse("f1")), plan.suppressedSquares)
     }
 
     @Test
-    fun `chess960 castling is atomic when king or rook begins on destination`() {
-        val stationaryKing = Fen.parse("7k/8/8/8/8/8/8/R1K5 w A - 0 1", Variant.CHESS960)
-        val stationaryKingMove = Move.parseUci("c1a1")
+    fun `chess960 castling no longer uses atomic fallback when one member is stationary`() {
+        val stationaryKing = Fen.parse("4k3/8/8/8/8/8/8/6KR w H - 0 1", Variant.CHESS960)
+        val stationaryKingMove = Move.parseUci("g1h1")
         val stationaryRook = Fen.parse("7k/8/8/8/8/8/8/4KR2 w F - 0 1", Variant.CHESS960)
         val stationaryRookMove = Move.parseUci("e1f1")
 
-        assertEquals(
-            BoardMotionPlan.Atomic,
+        val kingStatic = assertInstanceOf(
+            BoardMotionPlan.Castling::class.java,
             BoardMotionPlanner.plan(
                 stationaryKing,
                 MoveGenerator.applyLegalMove(stationaryKing, stationaryKingMove),
@@ -89,8 +97,8 @@ class BoardMotionTest {
                 true,
             ),
         )
-        assertEquals(
-            BoardMotionPlan.Atomic,
+        val rookStatic = assertInstanceOf(
+            BoardMotionPlan.Castling::class.java,
             BoardMotionPlanner.plan(
                 stationaryRook,
                 MoveGenerator.applyLegalMove(stationaryRook, stationaryRookMove),
@@ -99,6 +107,65 @@ class BoardMotionTest {
                 true,
             ),
         )
+
+        assertTrue(kingStatic.king.isStatic)
+        assertFalse(kingStatic.rook.isStatic)
+        assertEquals(setOf(Square.parse("f1")), kingStatic.suppressedSquares)
+        assertFalse(rookStatic.king.isStatic)
+        assertTrue(rookStatic.rook.isStatic)
+        assertEquals(setOf(Square.parse("g1")), rookStatic.suppressedSquares)
+    }
+
+    @Test
+    fun `chess960 crossing plan keeps explicit identities and king above rook`() {
+        val before = Fen.parse("7k/8/8/8/8/8/8/2RK4 w C - 0 1", Variant.CHESS960)
+        val move = Move.parseUci("d1c1")
+        val after = MoveGenerator.applyLegalMove(before, move)
+        val plan = assertInstanceOf(
+            BoardMotionPlan.Castling::class.java,
+            BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.HUMAN_TAP, true),
+        )
+
+        assertEquals(Square.parse("d1"), plan.king.from)
+        assertEquals(Square.parse("c1"), plan.king.to)
+        assertEquals(Square.parse("c1"), plan.rook.from)
+        assertEquals(Square.parse("d1"), plan.rook.to)
+        assertTrue(plan.king.zIndex > plan.rook.zIndex)
+        assertEquals(setOf(Square.parse("c1"), Square.parse("d1")), plan.suppressedSquares)
+    }
+
+    @Test
+    fun `promotion travel preserves the pawn rather than traveling the canonical promoted piece`() {
+        val before = Fen.parse("7k/P7/8/8/8/8/8/7K w - - 0 1")
+        val move = Move.parseUci("a7a8q")
+        val after = MoveGenerator.applyLegalMove(before, move)
+        val plan = assertInstanceOf(
+            BoardMotionPlan.Travel::class.java,
+            BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.HUMAN_TAP, true),
+        )
+
+        assertEquals(before[move.from], plan.piece)
+        assertEquals(145, plan.durationMillis)
+        assertEquals(before[move.from], plan.promotion?.outgoingPiece)
+        assertEquals(after[move.to], plan.promotion?.promotedPiece)
+        assertEquals(80, plan.promotion?.durationMillis)
+        assertEquals(.96f, plan.promotion?.initialScale)
+    }
+
+    @Test
+    fun `capture promotion keeps the real victim square while the pawn travels`() {
+        val before = Fen.parse("4k2r/6P1/8/8/8/8/8/4K3 w - - 0 1")
+        val move = Move.parseUci("g7h8n")
+        val after = MoveGenerator.applyLegalMove(before, move)
+        val plan = assertInstanceOf(
+            BoardMotionPlan.Travel::class.java,
+            BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.HUMAN_TAP, true),
+        )
+
+        assertEquals(before[move.from], plan.piece)
+        assertEquals(Square.parse("h8"), plan.capturedSquare)
+        assertEquals(before[Square.parse("h8")], plan.capturedPiece)
+        assertEquals(after[move.to], plan.promotion?.promotedPiece)
     }
 
     @Test
@@ -137,6 +204,21 @@ class BoardMotionTest {
 
         assertEquals(Square.parse("d5"), plan.capturedSquare)
         assertEquals(GroundedPrecisionBoardMotion.captureFadeDurationMillis, plan.captureFadeDurationMillis)
+    }
+
+    @Test
+    fun `en passant still fades the victim on its original square`() {
+        val before = Fen.parse("7k/8/8/3pP3/8/8/8/7K w - d6 0 1")
+        val move = Move.parseUci("e5d6")
+        val after = MoveGenerator.applyLegalMove(before, move)
+        val plan = assertInstanceOf(
+            BoardMotionPlan.Travel::class.java,
+            BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.HUMAN_TAP, true),
+        )
+
+        assertEquals(Square.parse("d5"), plan.capturedSquare)
+        assertEquals(before[Square.parse("d5")], plan.capturedPiece)
+        assertEquals(before[Square.parse("e5")], plan.piece)
     }
 
     @Test
