@@ -188,6 +188,9 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     internal fun currentCoordinatorForTest(): ArenaRuntimeCoordinator? = coordinator
+    internal fun restartEngineHostForTest(side: Color) {
+        if (side == Color.WHITE) whiteGateway?.restartHostForDiagnostics() else blackGateway?.restartHostForDiagnostics()
+    }
 
     override fun onCleared() {
         mainHandler.removeCallbacks(clockTicker)
