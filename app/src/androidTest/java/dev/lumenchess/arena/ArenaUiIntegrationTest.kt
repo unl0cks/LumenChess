@@ -3,6 +3,7 @@ package dev.lumenchess.arena
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import dev.lumenchess.MainActivity
@@ -33,5 +34,14 @@ class ArenaUiIntegrationTest {
     fun playOverviewArenaHeroRoutesToTheSameSetup() {
         composeRule.onNodeWithTag("play-overview-arena").performClick()
         composeRule.onNodeWithTag("arena-setup").assertIsDisplayed()
+    }
+
+    @Test
+    fun randomOpeningOffersTheDocumentedCustomHandoffDepth() {
+        composeRule.onNodeWithTag("main-tab-arena").performClick()
+        composeRule.onNodeWithText("Random opening").performScrollTo().performClick()
+        composeRule.onNodeWithText("Custom").performScrollTo().performClick()
+
+        composeRule.onNodeWithText("Custom handoff (plies)").assertIsDisplayed()
     }
 }

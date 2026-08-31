@@ -165,10 +165,21 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
             if (setup.opening.mode == ArenaOpeningMode.RANDOM_OPENING || setup.opening.mode == ArenaOpeningMode.OPENING_FAMILY) {
                 Text("Engine handoff", style = MaterialTheme.typography.labelMedium, color = LumenColors.OnSurfaceMuted)
                 ArenaChoiceRow(
-                    choices = listOf(4 to "4 ply", 8 to "8 ply", 12 to "12 ply"),
-                    selected = setup.opening.handoffPlies,
-                    onSelect = viewModel::updateOpeningHandoff,
+                    choices = listOf(4 to "4 ply", 8 to "8 ply", 12 to "12 ply", 0 to "Custom"),
+                    selected = setup.opening.handoffPlies.takeIf { it in arenaHandoffPresets } ?: 0,
+                    onSelect = { plies ->
+                        viewModel.updateOpeningHandoff(
+                            if (plies == 0) setup.opening.handoffPlies.takeUnless { it in arenaHandoffPresets } ?: 6
+                            else plies,
+                        )
+                    },
                 )
+                if (setup.opening.handoffPlies !in arenaHandoffPresets) {
+                    ArenaNumberField(
+                        "Custom handoff (plies)",
+                        setup.opening.handoffPlies.toString(),
+                    ) { raw -> raw.toIntOrNull()?.let(viewModel::updateOpeningHandoff) }
+                }
             }
             if (setup.opening.mode == ArenaOpeningMode.OPENING_FAMILY) {
                 ArenaChoiceRow(
@@ -236,6 +247,8 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
         Spacer(Modifier.height(12.dp))
     }
 }
+
+private val arenaHandoffPresets = setOf(4, 8, 12)
 
 @Composable
 private fun ArenaEngineControls(side: Color, config: ArenaEngineConfig, viewModel: ArenaViewModel) {
