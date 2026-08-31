@@ -430,7 +430,7 @@ private fun ArenaParticipantRow(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(engine.displayName, color = LumenColors.OnSurface, fontWeight = FontWeight.SemiBold, maxLines = 1)
             Text(
-                "${side.name.lowercase().replaceFirstChar { it.uppercase() }} · ${if (active && !runtime.paused) "Thinking" else status}",
+                "${side.name.lowercase().replaceFirstChar { it.uppercase() }} · ${arenaParticipantStatus(active, runtime.paused, runtime.engineHostAvailable, status)}",
                 color = LumenColors.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
@@ -445,6 +445,13 @@ private fun ArenaParticipantRow(
         )
     }
 }
+
+internal fun arenaParticipantStatus(
+    active: Boolean,
+    paused: Boolean,
+    allHostsAvailable: Boolean,
+    engineStatus: String,
+): String = if (active && !paused && allHostsAvailable) "Thinking" else engineStatus
 
 @Composable
 private fun ArenaAction(label: String, tag: String, onClick: () -> Unit, modifier: Modifier) {

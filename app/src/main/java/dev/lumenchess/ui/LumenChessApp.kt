@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 
 internal enum class MainTab(val label:String,val previewCopy:String) {
     Play("Play","Play against Stockfish or Reckless"),
-    Arena("Arena","Set up engine battles and take over positions"),
+    Arena("Arena","Set up engine battles with independent engines and openings"),
     Games("Games","Browse your local and imported chess library"),
     Insights("Insights","Explore performance trends and chess statistics"),
     Settings("Settings","Tune LumenChess to your board and feedback preferences"),

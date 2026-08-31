@@ -731,7 +731,7 @@ internal fun ReferenceArenaPreviewScreen(onBack: () -> Unit, modifier: Modifier 
                         color = palette.text,
                     )
                     Text(
-                        text = "Set up engine battles, opening positions, and takeover play from the dedicated Arena tab.",
+                        text = "Set up engine battles, opening positions, and independent strength profiles in Arena.",
                         style = LumenTypography.ModeSubtitle,
                         color = palette.muted,
                     )
