@@ -1,9 +1,9 @@
 package dev.lumenchess.arena
 
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.test.fetchSemanticsNode
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModelProvider
 import dev.lumenchess.MainActivity
 import dev.lumenchess.core.chess.Color
@@ -21,6 +21,7 @@ class ArenaM20IntegrationTest {
 
     @Test
     fun stockfishAndRecklessProgressUnderOneRuntimeWithoutMovingTheBoard() {
+        openArena()
         val viewModel = ViewModelProvider(composeRule.activity)[ArenaViewModel::class.java]
         composeRule.runOnUiThread { viewModel.startNewArena() }
         waitForLive(viewModel)
@@ -39,6 +40,7 @@ class ArenaM20IntegrationTest {
 
     @Test
     fun chess960AndHostRecoveryRemainPresentationOnly() {
+        openArena()
         val viewModel = ViewModelProvider(composeRule.activity)[ArenaViewModel::class.java]
         composeRule.runOnUiThread {
             viewModel.updateVariant(Variant.CHESS960)
@@ -71,6 +73,12 @@ class ArenaM20IntegrationTest {
             viewModel.uiState.value.mode == ArenaScreenMode.LIVE && viewModel.uiState.value.runtime != null
         }
         composeRule.onNodeWithTag("arena-board-stage").fetchSemanticsNode()
+    }
+
+    private fun openArena() {
+        composeRule.onNodeWithTag("p5-play-overview").fetchSemanticsNode()
+        composeRule.onNodeWithTag("main-tab-arena").performClick()
+        composeRule.onNodeWithTag("arena-setup").fetchSemanticsNode()
     }
 
     private fun boardBounds(): Rect = composeRule.onNodeWithTag("arena-board-stage")
