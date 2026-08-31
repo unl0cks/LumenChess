@@ -471,7 +471,10 @@ jobs:
           grep -q 'Physical density: 489' <<< "$density"
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
-          adb shell settings put global animator_duration_scale 0
+          # Board-motion instrumentation advances Compose's clock explicitly and asserts
+          # transient presentation frames. Keep the platform animator enabled so those tests
+          # exercise the animated contract; disabled-animation behavior is covered separately.
+          adb shell settings put global animator_duration_scale 1
           if ! ./gradlew :engine-host:connectedDebugAndroidTest :data-persistence:connectedDebugAndroidTest :app:connectedDebugAndroidTest; then
             echo "==== Android instrumentation XML reports ===="
             find engine-host/build data-persistence/build app/build -type f \( -name 'TEST-*.xml' -o -name '*.xml' \) -path '*androidTest-results*' -print -exec cat {} \; || true
