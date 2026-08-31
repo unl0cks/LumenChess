@@ -30,15 +30,20 @@ class LiveGamePersistenceRepository(
         tree: GameTree,
         metadata: GamePersistenceMetadata,
         restoreMetadata: Map<String, String>,
+        sourceType: GameSourceType = GameSourceType.LOCAL,
+        whiteParticipant: ParticipantDraft? = null,
+        blackParticipant: ParticipantDraft? = null,
     ): PersistentGameId {
         if (existingId == null) {
             return canonicalRepository.saveGame(
                 PersistGameRequest(
                     tree = tree,
                     metadata = metadata,
+                    whiteParticipant = whiteParticipant,
+                    blackParticipant = blackParticipant,
                     sources = listOf(
                         GameSourceDraft(
-                            type = GameSourceType.LOCAL,
+                            type = sourceType,
                             lastSyncedAtEpochMillis = System.currentTimeMillis(),
                             metadata = restoreMetadata,
                         ),
@@ -138,12 +143,12 @@ class LiveGamePersistenceRepository(
             ) { "Live game ${existingId.value} disappeared while updating metadata" }
 
             val now = System.currentTimeMillis()
-            val localSource = database.sourceDao().forGame(existingId.value)
-                .firstOrNull { it.sourceType == GameSourceType.LOCAL.name }
+            val liveSource = database.sourceDao().forGame(existingId.value)
+                .firstOrNull { it.sourceType == sourceType.name }
                 ?: GameSourceEntity(
                     id = newId(),
                     gameId = existingId.value,
-                    sourceType = GameSourceType.LOCAL.name,
+                    sourceType = sourceType.name,
                     externalGameId = null,
                     externalUrl = null,
                     importedAtEpochMillis = null,
@@ -152,7 +157,7 @@ class LiveGamePersistenceRepository(
                 ).also { database.sourceDao().insertSources(listOf(it)) }
 
             database.sourceDao().refreshSource(
-                id = localSource.id,
+                id = liveSource.id,
                 externalUrl = null,
                 importedAtEpochMillis = null,
                 lastSyncedAtEpochMillis = now,
@@ -160,7 +165,7 @@ class LiveGamePersistenceRepository(
             if (restoreMetadata.isNotEmpty()) {
                 database.sourceDao().upsertMetadata(
                     restoreMetadata.entries.sortedBy { it.key }.map { (key, value) ->
-                        GameSourceMetadataEntity(localSource.id, key, value)
+                        GameSourceMetadataEntity(liveSource.id, key, value)
                     },
                 )
             }

@@ -32,6 +32,28 @@ class LiveGamePersistenceRepositoryTest {
     }
 
     @Test
+    fun arenaLiveSaveUsesEngineArenaSourceAndEngineParticipants() = runBlocking {
+        val tree = Pgn.parseGame("[Result \"*\"]\n\n1. e4 *")
+
+        val id = live.persist(
+            existingId = null,
+            tree = tree,
+            metadata = GamePersistenceMetadata(createdAtEpochMillis = 5L),
+            restoreMetadata = mapOf("lumen.arena.m20.version" to "1"),
+            sourceType = GameSourceType.ENGINE_ARENA,
+            whiteParticipant = ParticipantDraft(ParticipantKind.ENGINE, "Stockfish 18", "Stockfish", "18"),
+            blackParticipant = ParticipantDraft(ParticipantKind.ENGINE, "Reckless 0.9.0", "Reckless", "0.9.0"),
+        )
+
+        val loaded = requireNotNull(canonical.loadGame(id))
+        assertEquals(GameSourceType.ENGINE_ARENA, loaded.sources.single().type)
+        assertEquals("1", loaded.sources.single().metadata["lumen.arena.m20.version"])
+        assertEquals(ParticipantKind.ENGINE, loaded.whiteParticipant?.kind)
+        assertEquals("Stockfish 18", loaded.whiteParticipant?.displayName)
+        assertEquals("Reckless 0.9.0", loaded.blackParticipant?.displayName)
+    }
+
+    @Test
     fun repeatedLiveSavesKeepStableUuidAndDoNotDuplicateMainlineNodes() = runBlocking {
         val initial = Pgn.parseGame("[Result \"*\"]\n\n1. e4 *")
         val later = Pgn.parseGame("[Result \"*\"]\n\n1. e4 e5 2. Nf3 *")
