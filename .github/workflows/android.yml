@@ -374,7 +374,8 @@ jobs:
       github.event_name == 'pull_request' ||
       (github.event_name == 'push' &&
        (startsWith(github.event.head_commit.message, 'checkpoint(M15):') ||
-        startsWith(github.event.head_commit.message, 'checkpoint(M19):')))
+        startsWith(github.event.head_commit.message, 'checkpoint(M19):') ||
+        startsWith(github.event.head_commit.message, 'checkpoint(M20):')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -480,3 +481,26 @@ jobs:
             find engine-host/build data-persistence/build app/build -type f \( -name 'TEST-*.xml' -o -name '*.xml' \) -path '*androidTest-results*' -print -exec cat {} \; || true
             exit 1
           fi
+          if [ "${{ startsWith(github.event.head_commit.message, 'checkpoint(M20):') }}" = "true" ]; then
+            adb shell pm clear dev.lumenchess
+            rm -rf m20-arena-native
+            mkdir -p m20-arena-native
+            adb shell am instrument -w -r \
+              -e m20ArenaQa true \
+              -e class 'dev.lumenchess.arena.ArenaNativeQaTest' \
+              dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner
+            adb pull /sdcard/Android/data/dev.lumenchess/files/m20-arena-native/. m20-arena-native/
+            test "$(find m20-arena-native -type f -name '*.png' | wc -l | tr -d ' ')" = "6"
+            test -f m20-arena-native/board-bounds.txt
+          fi
+      - name: Upload M20 native Arena evidence
+        if: always() && github.event_name == 'push' && startsWith(github.event.head_commit.message, 'checkpoint(M20):')
+        uses: actions/upload-artifact@v4
+        with:
+          name: m20-arena-native-${{ github.sha }}
+          path: |
+            m20-arena-native/
+            app/build/outputs/androidTest-results/
+            app/build/reports/androidTests/
+          if-no-files-found: warn
+          retention-days: 14

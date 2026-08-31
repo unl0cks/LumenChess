@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.lumenchess.board.BoardMovePresentation
 import dev.lumenchess.board.BoardMovePresentationClassifier
 import dev.lumenchess.board.ChessboardHighlights
@@ -464,5 +464,3 @@ private fun arenaClockText(millis: Long?): String {
     val safe = millis.coerceAtLeast(0L)
     return "%d:%02d".format(safe / 60_000L, (safe % 60_000L) / 1_000L)
 }
-
-private val Color.opposite: Color get() = if (this == Color.WHITE) Color.BLACK else Color.WHITE

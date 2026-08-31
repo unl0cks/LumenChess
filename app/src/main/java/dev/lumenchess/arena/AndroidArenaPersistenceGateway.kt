@@ -120,16 +120,16 @@ class AndroidArenaPersistenceGateway(
 
     private fun <T> runSuspendBlocking(block: suspend () -> T): T {
         val latch = CountDownLatch(1)
-        val result = AtomicReference<Result<T>>()
+        val outcome = AtomicReference<Result<T>>()
         block.startCoroutine(object : Continuation<T> {
             override val context = EmptyCoroutineContext
-            override fun resumeWith(value: Result<T>) {
-                result.set(value)
+            override fun resumeWith(result: Result<T>) {
+                outcome.set(result)
                 latch.countDown()
             }
         })
         latch.await()
-        return requireNotNull(result.get()).getOrThrow()
+        return requireNotNull(outcome.get()).getOrThrow()
     }
 
     companion object {
