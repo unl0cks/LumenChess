@@ -17,14 +17,13 @@ class LumenNavigationTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun navigationUsesCompactIconLabelTabsAndIntentionalProductPreview() {
+    fun navigationUsesCompactIconLabelTabsAndRealArenaSurface() {
         composeRule.onNodeWithTag("main-tab-play").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-play-overview").assertIsDisplayed()
         composeRule.onNodeWithTag("main-tab-arena").performClick()
-        composeRule.onNodeWithTag("derivative-future-preview").assertIsDisplayed()
-        composeRule.onNodeWithTag("derivative-preview-panel").assertIsDisplayed()
+        composeRule.onNodeWithTag("arena-setup").assertIsDisplayed()
         assertTrue(composeRule.onAllNodesWithText("Arena").fetchSemanticsNodes().isNotEmpty())
-        composeRule.onNodeWithText("Set up engine battles and take over positions").assertIsDisplayed()
+        composeRule.onNodeWithText("Independent engines, one authoritative game.").assertIsDisplayed()
         composeRule.onAllNodesWithText("not available in this build", substring = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("Coming in a later milestone", substring = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("will arrive with its engine-battle runtime", substring = true).assertCountEquals(0)

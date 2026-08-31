@@ -74,10 +74,8 @@ class P5PlayOverviewScreenshotQaTest {
         waitForTag("p5-play-overview")
 
         composeRule.onNodeWithTag("play-overview-arena").performClick()
-        composeRule.onNodeWithTag("derivative-arena-preview").assertIsDisplayed()
-        composeRule.onNodeWithText(
-            "Set up engine battles, opening positions, and takeover play from the dedicated Arena tab.",
-        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("arena-setup").assertIsDisplayed()
+        composeRule.onNodeWithText("Independent engines, one authoritative game.").assertIsDisplayed()
     }
 
     @Test

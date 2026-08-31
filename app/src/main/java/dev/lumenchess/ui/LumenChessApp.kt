@@ -26,6 +26,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.lumenchess.board.ChessboardPresentationStyle
 import dev.lumenchess.board.PieceSetCatalog
 import dev.lumenchess.board.ProvideChessboardPresentationStyle
+import dev.lumenchess.arena.ArenaRoute
+import dev.lumenchess.arena.ArenaScreenMode
+import dev.lumenchess.arena.ArenaViewModel
 import dev.lumenchess.customization.BoardThemeCatalog
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
@@ -56,13 +59,16 @@ fun LumenChessApp() {
     var settingsDestination by remember { mutableStateOf(SettingsDestination.ROOT) }
     var playFocusedSubpage by remember { mutableStateOf(false) }
     val playViewModel:PlayViewModel=viewModel()
+    val arenaViewModel:ArenaViewModel=viewModel()
     val playUi by playViewModel.uiState
+    val arenaUi by arenaViewModel.uiState
     val context=LocalContext.current
     val scope=rememberCoroutineScope()
     val appearanceRepository=remember(context.applicationContext){ DataStoreAppearanceSettingsRepository.from(context.applicationContext) }
     val persistedAppearanceSettings by appearanceRepository.settings.collectAsStateWithLifecycle(initialValue=AppearanceSettings())
     var appearanceSettings by remember { mutableStateOf(persistedAppearanceSettings) }
     val livePlay=currentTab==MainTab.Play&&playUi.mode==PlayScreenMode.LIVE
+    val liveArena=currentTab==MainTab.Arena&&arenaUi.mode==ArenaScreenMode.LIVE
     val focusedPlaySubpage=currentTab==MainTab.Play&&playFocusedSubpage
     val slideDistance=with(LocalDensity.current){10.dp.roundToPx()}
 
@@ -82,7 +88,7 @@ fun LumenChessApp() {
             Scaffold(
                 containerColor=LumenColors.Background,
                 bottomBar={
-                    if(!livePlay&&!focusedPlaySubpage) {
+                    if(!livePlay&&!liveArena&&!focusedPlaySubpage) {
                         LumenBottomNavigation(currentTab){currentTab=it}
                     }
                 },
@@ -104,6 +110,11 @@ fun LumenChessApp() {
                                 viewModel=playViewModel,
                                 modifier=Modifier.fillMaxSize(),
                                 onFocusedSubpageChanged={playFocusedSubpage=it},
+                                onOpenArena={currentTab=MainTab.Arena},
+                            )
+                            MainTab.Arena -> ArenaRoute(
+                                viewModel=arenaViewModel,
+                                modifier=Modifier.fillMaxSize(),
                             )
                             MainTab.Settings -> when(destination) {
                                 SettingsDestination.ROOT -> SettingsScreen(

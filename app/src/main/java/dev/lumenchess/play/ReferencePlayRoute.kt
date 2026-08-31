@@ -24,7 +24,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.lumenchess.design.LumenMotion
 
-private enum class ReferencePlayPage { OVERVIEW, SETUP, ARENA_PREVIEW }
+private enum class ReferencePlayPage { OVERVIEW, SETUP }
 
 /** P5 reference-fidelity presentation only. Runtime ownership stays in [PlayViewModel]. */
 @Composable
@@ -32,6 +32,7 @@ fun ReferencePlayRoute(
     modifier: Modifier = Modifier,
     viewModel: PlayViewModel,
     onFocusedSubpageChanged: (Boolean) -> Unit = {},
+    onOpenArena: () -> Unit = {},
 ) {
     val ui by viewModel.uiState
     var page by rememberSaveable { mutableStateOf(ReferencePlayPage.OVERVIEW) }
@@ -90,17 +91,13 @@ fun ReferencePlayRoute(
                 ReferencePlayPage.OVERVIEW -> ApprovedPlayOverviewScreen(
                     ui = ui,
                     onPlayVsEngine = { page = ReferencePlayPage.SETUP },
-                    onArenaPreview = { page = ReferencePlayPage.ARENA_PREVIEW },
+                    onArenaPreview = onOpenArena,
                     onBack = { backDispatcher?.onBackPressed() },
                     modifier = Modifier,
                 )
                 ReferencePlayPage.SETUP -> ReferenceSetupScreen(
                     ui = ui,
                     viewModel = viewModel,
-                    onBack = { page = ReferencePlayPage.OVERVIEW },
-                    modifier = Modifier,
-                )
-                ReferencePlayPage.ARENA_PREVIEW -> ReferenceArenaPreviewScreen(
                     onBack = { page = ReferencePlayPage.OVERVIEW },
                     modifier = Modifier,
                 )

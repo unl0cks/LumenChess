@@ -48,10 +48,10 @@ class P5ReferenceStructureTest {
     }
 
     @Test
-    fun arenaPreviewUsesIntentionalDerivativeShellWithoutRuntimeCopy() {
+    fun arenaHeroOpensTheFirstClassM20Setup() {
         composeRule.onNodeWithTag("play-overview-arena").performClick()
-        composeRule.onNodeWithTag("derivative-arena-preview").assertIsDisplayed()
-        composeRule.onNodeWithTag("derivative-preview-panel").assertIsDisplayed()
+        composeRule.onNodeWithTag("arena-setup").assertIsDisplayed()
+        composeRule.onNodeWithTag("arena-white-engine").assertIsDisplayed()
         composeRule.onAllNodesWithText("will arrive with its engine-battle runtime", substring = true).assertCountEquals(0)
     }
 
