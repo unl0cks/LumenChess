@@ -63,6 +63,11 @@ class ArenaRuntimeCoordinator private constructor(
 
     fun onEngineHostDied(side: Color) {
         readyHosts -= side
+        // A failure in either required host invalidates the single authoritative Arena search.
+        // Unlike human-vs-engine Play, that search may belong to the still-alive sibling host, so
+        // cancel it explicitly before the runtime discards its pending identity.
+        searchOwners.toList().forEach { (searchId, owner) -> engine(owner).cancelSearch(searchId) }
+        searchOwners.clear()
         if (state.engineHostAvailable) dispatch { RuntimeEvent.EngineHostDied(it) }
     }
 
