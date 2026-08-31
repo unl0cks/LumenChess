@@ -370,3 +370,51 @@ authoritative; presentation follows committed state and remains disposable.
 
 This closure record does not merge or promote the P6 branch, build a release or
 signed APK, or begin M20. Leaving P6 requires a separate explicit authorization.
+
+## P6 promotion
+
+The fully approved P6 branch was promoted to `main` on 2026-08-31 under the
+separate bounded promotion authorization.
+
+- pre-promotion `main`: `54ff48fcc05e97e61b7a4075806c8c512bc5a9b7`;
+- approved P6 closure: `52b3c55dc2658d5074edcf67eae5fe383969e90d`;
+- promotion method: exact fast-forward of the approved branch history, with no
+  merge commit, squash, rebase, cherry-pick reconstruction, or conflict
+  resolution;
+- first promoted `main`: `52b3c55dc2658d5074edcf67eae5fe383969e90d`;
+- post-promotion CI verification tip before this record:
+  `f46d4e1b160ecad9f808fb6ef0ecc54f56da63fd`.
+
+The first post-promotion Android CI run exposed a workflow/test-contract
+conflict rather than an application defect: the cumulative lane globally set
+Android animator duration scale to zero while board-motion instrumentation
+explicitly asserted transient animation frames. The exact failure reproduced
+locally with animator scale zero and passed repeatedly with animator scale one.
+The workflow-only correction keeps window and transition animations disabled,
+keeps the platform animator enabled for the motion assertions, and leaves the
+separately verified disabled-animation atomic production behavior unchanged.
+No application, runtime, board, piece, or engine production file changed during
+promotion.
+
+Post-promotion Android CI run `33369875562` passed its full job, including JVM
+tests, lint, assemblies, ABI and 16 KiB ELF verification, Room schema checks,
+and cumulative API-37 instrumentation. The existing `checkpoint`,
+`play-device`, and `engine-device` jobs were skipped by branch policy and are
+not represented as passes.
+
+The promoted tree retains the manually approved P6.3 Quiet Classical Hybrid,
+P6.4 Grounded Precision motion, and P6.5 special-move presentation without
+token, timing, geometry, or choreography changes. Local post-promotion gates
+also reconfirmed Standard, Chess960, Stockfish, Reckless, premoves, promotion,
+en passant, and zero-pixel P1 board-bound deltas.
+
+Public debug packaging contained zero private Chess.com piece PNGs, generated
+personal assets, or private source-path references. Personal debug packaging
+contained exactly 39 complete styles and 468 canonical private piece PNGs from
+the ignored external source, with no scripts, archives, virtual environments,
+or source paths. These were verification-only debug builds; no release or
+signed APK was built or published. The rejected `c21a2f6` renderer remains
+outside the promoted lineage.
+
+P6 promotion is complete and durable on `main`. M20 has not started; beginning
+M20 is the next possible boundary and requires separate explicit authorization.
