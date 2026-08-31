@@ -24,6 +24,8 @@ import dev.lumenchess.engine.api.UciCommandEncoder
 import dev.lumenchess.engine.api.UciEvent
 import dev.lumenchess.engine.api.UciProtocolException
 import dev.lumenchess.engine.api.UciProtocolParser
+import dev.lumenchess.engine.api.UciScore
+import dev.lumenchess.engine.api.UciScoreBound
 import dev.lumenchess.engine.host.transport.EngineHostFailureCode
 import dev.lumenchess.engine.host.transport.IEngineHost
 import dev.lumenchess.engine.host.transport.IEngineHostCallback
@@ -346,7 +348,13 @@ private class HostSession(
                 ready = true
                 if (active == null) pending?.also { pending = null; beginSearch(it) }
             }
-            is UciEvent.Info -> active?.candidateAccumulator?.observe(event.info)
+            is UciEvent.Info -> {
+                val current = active
+                current?.candidateAccumulator?.observe(event.info)
+                if (current != null && !current.cancelled) {
+                    event.info.toRankOneSearchInfo()?.let { projected -> emitSearchInfo(current, projected) }
+                }
+            }
             is UciEvent.BestMove -> {
                 val completed = active ?: return@synchronized
                 active = null
@@ -390,6 +398,26 @@ private class HostSession(
         backend.close()
     }
 
+    private fun emitSearchInfo(search: SearchEnvelope, info: ProjectedSearchInfo) {
+        try {
+            callback.onSearchInfo(
+                sessionId,
+                hostGeneration,
+                search.searchId,
+                search.positionRevision,
+                info.depth,
+                info.scoreKind,
+                info.scoreValue,
+                info.scoreBound,
+                info.nodes,
+                info.nodesPerSecond,
+                info.principalVariation,
+            )
+        } catch (_: RemoteException) {
+            // Analysis is disposable when the app-side transport has disappeared.
+        }
+    }
+
     private fun fail(code: EngineHostFailureCode, message: String) {
         try {
             callback.onHostFailure(sessionId, hostGeneration, code.wireValue, message)
@@ -403,7 +431,43 @@ private class HostSession(
         cap == null -> requested
         else -> minOf(requested, cap)
     }
+
 }
+
+internal data class ProjectedSearchInfo(
+    val depth: Int,
+    val scoreKind: Int,
+    val scoreValue: Int,
+    val scoreBound: Int,
+    val nodes: Long,
+    val nodesPerSecond: Long,
+    val principalVariation: String,
+)
+
+internal fun dev.lumenchess.engine.api.UciInfo.toRankOneSearchInfo(): ProjectedSearchInfo? {
+    if ((multiPv ?: 1) != 1) return null
+    val (scoreKind, scoreValue, scoreBound) = when (val resolvedScore = score) {
+        is UciScore.Centipawns -> Triple(1, resolvedScore.value, resolvedScore.bound.wireValue)
+        is UciScore.Mate -> Triple(2, resolvedScore.moves, resolvedScore.bound.wireValue)
+        null -> return null
+    }
+    return ProjectedSearchInfo(
+        depth = depth ?: 0,
+        scoreKind = scoreKind,
+        scoreValue = scoreValue,
+        scoreBound = scoreBound,
+        nodes = nodes ?: 0L,
+        nodesPerSecond = nodesPerSecond ?: 0L,
+        principalVariation = principalVariation.joinToString(" "),
+    )
+}
+
+private val UciScoreBound.wireValue: Int
+    get() = when (this) {
+        UciScoreBound.EXACT -> 0
+        UciScoreBound.LOWER -> 1
+        UciScoreBound.UPPER -> 2
+    }
 
 internal interface UciBackend : AutoCloseable {
     interface Listener {

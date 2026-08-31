@@ -8,6 +8,8 @@ import android.os.IBinder
 import android.os.RemoteException
 import dev.lumenchess.core.chess.Fen
 import dev.lumenchess.engine.api.EngineCapabilities
+import dev.lumenchess.engine.api.EngineSearchId
+import dev.lumenchess.engine.api.EngineSearchInfo
 import dev.lumenchess.engine.api.EngineSearchResult
 import dev.lumenchess.engine.api.EngineSession
 import dev.lumenchess.engine.api.EngineSessionCommand
@@ -15,6 +17,9 @@ import dev.lumenchess.engine.api.EngineSessionId
 import dev.lumenchess.engine.api.EngineStrengthPlanner
 import dev.lumenchess.engine.api.EngineStrengthPlanning
 import dev.lumenchess.engine.api.EngineStrengthTarget
+import dev.lumenchess.engine.api.PositionRevision
+import dev.lumenchess.engine.api.UciScore
+import dev.lumenchess.engine.api.UciScoreBound
 import dev.lumenchess.engine.host.EngineSlotAService
 import dev.lumenchess.engine.host.EngineSlotBService
 import java.util.concurrent.ConcurrentHashMap
@@ -48,6 +53,7 @@ data class EngineHostFailure(
 interface EngineHostListener {
     fun onConnected(slot: EngineSlot, processId: Int, hostGeneration: Long) {}
     fun onSearchResult(sessionId: EngineSessionId, result: EngineSearchResult) {}
+    fun onSearchInfo(sessionId: EngineSessionId, info: EngineSearchInfo) {}
     fun onSessionFailure(sessionId: EngineSessionId?, failure: EngineHostFailure) {}
     fun onHostDied(slot: EngineSlot, hostGeneration: Long) {}
 }
@@ -199,6 +205,60 @@ private class RemoteEngineSession(
     private val inFlight = ConcurrentHashMap<Long, Long>()
 
     val callback: IEngineHostCallback = object : IEngineHostCallback.Stub() {
+        override fun onSearchInfo(
+            callbackSessionId: String,
+            hostGeneration: Long,
+            searchId: Long,
+            positionRevision: Long,
+            depth: Int,
+            scoreKind: Int,
+            scoreValue: Int,
+            scoreBound: Int,
+            nodes: Long,
+            nodesPerSecond: Long,
+            principalVariation: String,
+        ) {
+            if (closed.get()) return
+            if (callbackSessionId != sessionId.value || hostGeneration != expectedGeneration) {
+                stale("Info callback belonged to a different engine session or host generation")
+                return
+            }
+            if (inFlight[searchId] != positionRevision) {
+                stale("Info callback did not match an in-flight search/revision")
+                return
+            }
+            val bound = when (scoreBound) {
+                0 -> UciScoreBound.EXACT
+                1 -> UciScoreBound.LOWER
+                2 -> UciScoreBound.UPPER
+                else -> {
+                    stale("Info callback had an invalid score bound")
+                    return
+                }
+            }
+            val score = when (scoreKind) {
+                0 -> null
+                1 -> UciScore.Centipawns(scoreValue, bound)
+                2 -> UciScore.Mate(scoreValue, bound)
+                else -> {
+                    stale("Info callback had an invalid score kind")
+                    return
+                }
+            }
+            listener.onSearchInfo(
+                sessionId,
+                EngineSearchInfo(
+                    searchId = EngineSearchId(searchId),
+                    positionRevision = PositionRevision(positionRevision),
+                    depth = depth.takeIf { it > 0 },
+                    score = score,
+                    nodes = nodes.takeIf { it > 0L },
+                    nodesPerSecond = nodesPerSecond.takeIf { it > 0L },
+                    principalVariation = principalVariation.split(' ').filter(String::isNotBlank),
+                ),
+            )
+        }
+
         override fun onSearchResult(
             callbackSessionId: String,
             hostGeneration: Long,
@@ -219,8 +279,8 @@ private class RemoteEngineSession(
             listener.onSearchResult(
                 sessionId,
                 EngineSearchResult(
-                    searchId = dev.lumenchess.engine.api.EngineSearchId(searchId),
-                    positionRevision = dev.lumenchess.engine.api.PositionRevision(positionRevision),
+                    searchId = EngineSearchId(searchId),
+                    positionRevision = PositionRevision(positionRevision),
                     bestMoveUci = bestMoveUci.ifEmpty { null },
                 ),
             )

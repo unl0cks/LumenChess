@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import dev.lumenchess.engine.api.EngineSearchId
+import dev.lumenchess.engine.api.EngineSearchInfo
 import dev.lumenchess.engine.api.EngineSearchRequest
 import dev.lumenchess.engine.api.EngineSearchResult
 import dev.lumenchess.engine.api.EngineSession
@@ -35,6 +36,7 @@ class AndroidPlayEngineGateway(
         fun onEngineHostRecovered()
         fun onEngineHostDied()
         fun onEngineResult(result: EngineSearchResult)
+        fun onEngineInfo(info: EngineSearchInfo) {}
         fun onEngineFailure(failure: EngineHostFailure)
     }
 
@@ -124,6 +126,14 @@ class AndroidPlayEngineGateway(
                     handler.post {
                         if (isActive(token) && sessionId == this@AndroidPlayEngineGateway.sessionId) {
                             listener?.onEngineResult(result)
+                        }
+                    }
+                }
+
+                override fun onSearchInfo(sessionId: EngineSessionId, info: EngineSearchInfo) {
+                    handler.post {
+                        if (isActive(token) && sessionId == this@AndroidPlayEngineGateway.sessionId) {
+                            listener?.onEngineInfo(info)
                         }
                     }
                 }

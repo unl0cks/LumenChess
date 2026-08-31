@@ -8,6 +8,19 @@ oneway interface IEngineHostCallback {
         long positionRevision,
         String bestMoveUci
     );
+    void onSearchInfo(
+        String sessionId,
+        long hostGeneration,
+        long searchId,
+        long positionRevision,
+        int depth,
+        int scoreKind,
+        int scoreValue,
+        int scoreBound,
+        long nodes,
+        long nodesPerSecond,
+        String principalVariation
+    );
     void onHostFailure(
         String sessionId,
         long hostGeneration,

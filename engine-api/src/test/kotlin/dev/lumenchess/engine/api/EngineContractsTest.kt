@@ -11,6 +11,24 @@ import kotlin.test.assertTrue
 
 class EngineContractsTest {
     @Test
+    fun searchInfoCarriesTheSearchCorrelationIdentity() {
+        val info = EngineSearchInfo(
+            searchId = EngineSearchId(41),
+            positionRevision = PositionRevision(7),
+            depth = 18,
+            score = UciScore.Centipawns(73),
+            nodes = 12_345,
+            nodesPerSecond = 987_000,
+            principalVariation = listOf("e2e4", "e7e5"),
+        )
+
+        assertEquals(EngineSearchId(41), info.searchId)
+        assertEquals(PositionRevision(7), info.positionRevision)
+        assertEquals(UciScore.Centipawns(73), info.score)
+        assertEquals(listOf("e2e4", "e7e5"), info.principalVariation)
+    }
+
+    @Test
     fun capabilitiesAreTypedAndVariantAware() {
         val capabilities = EngineCapabilities(
             variants = setOf(Variant.STANDARD, Variant.CHESS960),

@@ -71,6 +71,17 @@ data class EngineSearchResult(
     val bestMoveUci: String?,
 )
 
+/** Correlated, disposable search analysis. It never carries move or runtime authority. */
+data class EngineSearchInfo(
+    val searchId: EngineSearchId,
+    val positionRevision: PositionRevision,
+    val depth: Int? = null,
+    val score: UciScore? = null,
+    val nodes: Long? = null,
+    val nodesPerSecond: Long? = null,
+    val principalVariation: List<String> = emptyList(),
+)
+
 sealed interface EngineSessionCommand {
     data object NewGame : EngineSessionCommand
     data class StartSearch(val request: EngineSearchRequest) : EngineSessionCommand
