@@ -404,6 +404,27 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Verify cumulative JVM, Android modules, lint, and assemblies
         run: ./gradlew :core-chess:test :game-runtime:test :engine-api:test :engine-host:testDebugUnitTest :engine-host:lintDebug :engine-host:assembleDebug :engine-host:assembleDebugAndroidTest :data-persistence:testDebugUnitTest :data-persistence:lintDebug :data-persistence:assembleDebug :data-persistence:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Verify public APK excludes personal asset payloads and source paths
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          apk = Path("app/build/outputs/apk/debug/app-debug.apk")
+          assert apk.is_file(), apk
+          with ZipFile(apk) as archive:
+              names = archive.namelist()
+          leaked_entries = [
+              name for name in names
+              if name.startswith("assets/pieces/") or name.startswith("assets/boards/")
+          ]
+          assert not leaked_entries, leaked_entries[:20]
+          payload = apk.read_bytes().lower()
+          forbidden = [b"chess.com-boards-and-pieces", b"lumenpersonalassets", b"c:\\users\\"]
+          hits = [token.decode("ascii") for token in forbidden if token in payload]
+          assert not hits, hits
+          print("Public APK privacy scan: 0 generated personal entries; 0 local-source tokens")
+          PY
       - name: Verify native engine ABIs and 16 KiB ELF alignment
         run: |
           readelf="$ANDROID_HOME/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
@@ -490,7 +511,7 @@ jobs:
               -e class 'dev.lumenchess.arena.ArenaNativeQaTest' \
               dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner
             adb pull /sdcard/Android/data/dev.lumenchess/files/m20-arena-native/. m20-arena-native/
-            test "$(find m20-arena-native -type f -name '*.png' | wc -l | tr -d ' ')" = "6"
+            test "$(find m20-arena-native -type f -name '*.png' | wc -l | tr -d ' ')" = "7"
             test -f m20-arena-native/board-bounds.txt
           fi
       - name: Upload M20 native Arena evidence

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -45,17 +46,25 @@ class ArenaNativeQaTest {
         captureRoot("01-arena-setup.png")
 
         val viewModel = ViewModelProvider(composeRule.activity)[ArenaViewModel::class.java]
+        composeRule.runOnUiThread {
+            viewModel.updateOpeningMode(ArenaOpeningMode.RANDOM_OPENING)
+            viewModel.updateOpeningHandoff(6)
+        }
+        composeRule.onNodeWithTag("arena-opening-options").performScrollTo()
+        captureRoot("02-arena-opening-setup.png")
+
+        composeRule.runOnUiThread { viewModel.updateOpeningMode(ArenaOpeningMode.NORMAL) }
         composeRule.runOnUiThread { viewModel.startNewArena() }
         waitForProgress(viewModel, minimumRevision = 3L)
         assertNotNull("Arena evaluation should receive correlated rank-one UCI info", viewModel.uiState.value.evaluation)
         val standardBounds = boardBounds()
-        captureRoot("02-arena-standard-live.png")
-        captureBoard("03-arena-standard-board.png")
+        captureRoot("03-arena-standard-live.png")
+        captureBoard("04-arena-standard-board.png")
 
         composeRule.runOnUiThread { viewModel.flipBoard() }
         composeRule.waitForIdle()
         assertEquals(standardBounds, boardBounds())
-        captureRoot("04-arena-standard-flipped.png")
+        captureRoot("05-arena-standard-flipped.png")
 
         composeRule.runOnUiThread {
             viewModel.stopArena()
@@ -67,8 +76,8 @@ class ArenaNativeQaTest {
         val chess960Bounds = boardBounds()
         assertEquals(standardBounds.width, chess960Bounds.width, 0f)
         assertEquals(standardBounds.height, chess960Bounds.height, 0f)
-        captureRoot("05-arena-chess960-live.png")
-        captureBoard("06-arena-chess960-board.png")
+        captureRoot("06-arena-chess960-live.png")
+        captureBoard("07-arena-chess960-board.png")
 
         writeMetadata(standardBounds, chess960Bounds, viewModel)
     }
