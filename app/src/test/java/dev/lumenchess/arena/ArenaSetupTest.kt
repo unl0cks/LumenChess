@@ -79,6 +79,15 @@ class ArenaSetupTest {
     }
 
     @Test
+    fun everyBundledOpeningLineIsLegalThroughTheMaximumHandoff() {
+        ArenaOpeningCatalog.lines.indices.forEach { index ->
+            val opening = ArenaOpeningCatalog.resolveRandom(handoffPlies = 12, randomInt = { index })
+
+            assertEquals(12, opening.appliedMoves.size, ArenaOpeningCatalog.lines[index].name)
+        }
+    }
+
+    @Test
     fun openingFamilySelectsOnlyThatFamily() {
         val setup = ArenaSetupConfig(
             opening = ArenaOpeningSetup(

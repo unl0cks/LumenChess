@@ -42,6 +42,6 @@ class ArenaUiIntegrationTest {
         composeRule.onNodeWithText("Random opening").performScrollTo().performClick()
         composeRule.onNodeWithText("Custom").performScrollTo().performClick()
 
-        composeRule.onNodeWithText("Custom handoff (plies)").assertIsDisplayed()
+        composeRule.onNodeWithText("Custom handoff (plies)").performScrollTo().assertIsDisplayed()
     }
 }
