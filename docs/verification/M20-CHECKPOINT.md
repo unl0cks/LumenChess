@@ -132,12 +132,25 @@ The M20 test surface covers:
 - Standard Stockfish/Reckless progression and Chess960 progression/recovery;
 - zero-delta board bounds through multiple authoritative Arena revisions.
 
-The branch CI checkpoint preceding this record passed its proportional JVM/build
-lane at `f557da98632b367a83087f443ea2eda6173d1d93` in Android CI run
-`33421687197`. The final `checkpoint(M20)` commit intentionally triggers the
-repository's complete build, lint, packaging, API-37 instrumentation, and native
-Arena evidence lane. Results from that exact SHA belong in the manual-review
-report; this document does not predeclare them green.
+The branch CI checkpoint at `876f263` compiled and passed the complete cumulative
+API-37 device suite (48 engine-host, 19 persistence, and 111 app tests), but its
+separate native-evidence launch exposed a QA-only setup defect: the cumulative
+instrumentation task had uninstalled the APKs before the direct Arena capture.
+Checkpoint `6653cde` restored both APKs before that capture. Its complete JVM,
+lint, assembly, ABI/schema, public-packaging, and app device lanes passed, while
+the cumulative device run exposed a real cancellation race in the existing
+Reckless host test: a final disposable evaluation callback could arrive after
+`StopSearch` removed its local correlation and was incorrectly promoted to a
+session failure.
+
+The focused correction discards only cancelled or superseded analysis callbacks.
+Session/generation mismatches, malformed current analysis, and authoritative move
+results remain strict. A pure correlation regression test freezes delivery for
+the current search and disposal for missing/mismatched correlations. The final
+`checkpoint(M20)` commit intentionally retriggers the complete build, lint,
+packaging, API-37 instrumentation, and native Arena evidence lane. Results from
+that exact SHA belong in the manual-review report; this document does not
+predeclare them green.
 
 Local Gradle execution on the current Windows host remains unavailable before
 project configuration because Gradle cannot establish its required loopback IPC
@@ -178,6 +191,9 @@ assets, personal APKs, archives, and keystores remain ignored and untracked.
 
 - Native visual approval remains pending until the exact checkpoint SHA passes the
   complete CI/device lane and its native artifacts are manually inspected.
+- The cancelled-analysis race found by the cumulative Reckless device lane is
+  corrected without weakening authoritative result correlation; its exact
+  checkpoint rerun remains part of the final gate.
 - Local Windows Gradle verification is blocked by the host loopback limitation
   described above; no local pass is claimed.
 - M21 manual opening/takeover/return is not implemented.
