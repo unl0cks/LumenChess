@@ -50,6 +50,20 @@ data class EngineHostFailure(
     val message: String,
 )
 
+internal enum class SearchInfoDisposition {
+    DELIVER,
+    DISCARD,
+}
+
+internal fun correlateSearchInfo(
+    expectedRevision: Long?,
+    callbackRevision: Long,
+): SearchInfoDisposition = if (expectedRevision == callbackRevision) {
+    SearchInfoDisposition.DELIVER
+} else {
+    SearchInfoDisposition.DISCARD
+}
+
 interface EngineHostListener {
     fun onConnected(slot: EngineSlot, processId: Int, hostGeneration: Long) {}
     fun onSearchResult(sessionId: EngineSessionId, result: EngineSearchResult) {}
@@ -223,8 +237,12 @@ private class RemoteEngineSession(
                 stale("Info callback belonged to a different engine session or host generation")
                 return
             }
-            if (inFlight[searchId] != positionRevision) {
-                stale("Info callback did not match an in-flight search/revision")
+            // Analysis is disposable presentation data. StopSearch removes the local correlation
+            // before the isolated host necessarily observes cancellation, so a final queued info
+            // callback must be ignored rather than promoted to a session failure. Search results
+            // remain strict and authoritative in onSearchResult below.
+            val disposition = correlateSearchInfo(inFlight[searchId], positionRevision)
+            if (disposition == SearchInfoDisposition.DISCARD) {
                 return
             }
             val bound = when (scoreBound) {
