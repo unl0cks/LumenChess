@@ -9,7 +9,10 @@ to `main`, M21, M22, a release, or a signed APK.
 - Recovered and approved starting `main`:
   `3af3fe36184cf35f4fb0878e83c3adc233189b7e`.
 - M20 branch: `codex/m20-arena-base`.
-- The checkpoint SHA is the `checkpoint(M20): ...` commit containing this file.
+- Fully tested implementation/native candidate:
+  `f7084d73a628ddbcba4c5416184a4c5fde175a6f`.
+- A later documentation-only handoff record does not change that tested source
+  or native-evidence identity.
 - P5 and P6 remain promoted and unchanged.
 - Rejected P6 renderer lineage beginning at `c21a2f6` remains excluded.
 
@@ -133,7 +136,8 @@ The M20 test surface covers:
 - zero-delta board bounds through multiple authoritative Arena revisions.
 
 The branch CI checkpoint at `876f263` compiled and passed the complete cumulative
-API-37 device suite (48 engine-host, 19 persistence, and 111 app tests), but its
+API-37 device suite (19 engine-host, 48 persistence, and 85 app cases: 59 passed,
+26 opt-in capture cases skipped), but its
 separate native-evidence launch exposed a QA-only setup defect: the cumulative
 instrumentation task had uninstalled the APKs before the direct Arena capture.
 Checkpoint `6653cde` restored both APKs before that capture. Its complete JVM,
@@ -210,20 +214,84 @@ remain expected to discover 39 complete styles and 468 canonical piece PNGs only
 when the existing external property is supplied. Source artwork, generated private
 assets, personal APKs, archives, and keystores remain ignored and untracked.
 
+## Verified native candidate — 2026-09-02
+
+Android CI run [33610971968](https://github.com/unl0cks/LumenChess/actions/runs/33610971968)
+executed at `f7084d73a628ddbcba4c5416184a4c5fde175a6f`:
+
+- Proportional checkpoint: **passed**.
+- Full cumulative gate: **passed** — core-chess, runtime, engine API/host,
+  persistence and app unit tests, lint, debug and Android-test assembly, native
+  ABI/16 KiB checks, Room schema check, public packaging and API-37 devices.
+- Engine-host instrumentation: **19 passed**.
+- Persistence instrumentation: **48 passed**.
+- App cumulative instrumentation: **86 cases**, **60 passed**, **26 skipped**,
+  **0 failed**. The runner's final `112` display counts skipped events twice;
+  it is not 112 executed passing tests.
+- Explicit Arena native-capture invocation: **1 passed**, producing seven PNGs
+  and measured metadata after the cumulative run.
+- Separate `play-device` and `engine-device` jobs: **skipped by branch policy**,
+  not passes. Relevant integration tests ran in the full cumulative lane.
+- The new native score-contrast regression passed both appearances with positive,
+  neutral and negative values. Cancelled-search analysis regression and real
+  Stockfish/Reckless progression passed.
+
+The seven final, unmodified native PNGs were inspected. Dark appearance,
+stored/resolved `lumen-vector`, readable evaluation score/depth, both orientations,
+Standard and Chess960 are visible. No concrete new clipping, internal compositing
+seam, renderer substitution or board-layout defect was observed in these static
+frames. This is an agent inspection, **not user visual approval** and not a claim
+to have recorded every animation frame.
+
+Measured Arena stage at 1344 x 2992 / 489 dpi:
+
+| State | Native bounds | Size |
+| --- | --- | --- |
+| Standard progression | `(21,350)-(1323,1652)` | 1302 x 1302 px |
+| Chess960 progression | `(21,350)-(1323,1652)` | 1302 x 1302 px |
+
+The native lane asserts exact before/after equality on flip. Integration tests
+assert exact stage equality across multiple authoritative revisions and required
+host loss/recovery: **0 px layout delta**. This is the new Arena stage; it does not
+replace or relabel the distinct approved Play Live geometry.
+
+The public APK scan found **0 generated personal entries and 0 local-source
+tokens**. Read-only external inventory still finds **39 complete styles / 468
+canonical PNGs**. Tracked-file scans found no private source/generated assets,
+APKs, keystores, private archives or absolute personal-source paths.
+
+Production changes are bounded to eight new `arena/` files, four app routing/
+gateway files, four engine-transport files and one live persistence repository
+(17 files total). `core-chess`, `game-runtime`, board rendering, piece catalog/
+cache/fitting, feedback/motion, Settings and design-system production files have
+no M20 delta. Existing Play regression covers human moves, both engines, Chess960,
+premoves, persistence and restart; existing board motion tests cover castling,
+promotion, en passant, capture, drag and cancellation.
+
+The transferable manual-review package is `LumenChess-M20-review-f7084d7.zip`.
+It contains original public native PNGs, exact board metadata, a README,
+verification results and a SHA-256 manifest. Private artwork and APKs are excluded.
+Archive size: **4,055,722 bytes**; SHA-256:
+`a7cbe7ba9aa00189169a69ac7bc45d72f74b949933c4434fcfce07dbc923c27a`.
+All 10 declared members verified; the eleventh ZIP member is the manifest itself.
+
 ## Known limitations and next boundary
 
-- Native visual approval remains pending until the exact checkpoint SHA passes the
-  complete CI/device lane and its native artifacts are manually inspected.
-- The cancelled-analysis race found by the cumulative Reckless device lane is
-  corrected without weakening authoritative result correlation; its exact
-  checkpoint rerun remains part of the final gate.
+- User approval of the M20 native UI/interaction remains pending. The complete
+  candidate CI/device gate and agent image inspection are finished.
 - Local Windows Gradle verification is blocked by the host loopback limitation
   described above; no local pass is claimed.
+- A fresh personal APK and Neo/3D Staunton M20 native captures were **not run**.
+  The existing Ubuntu environment also lacks a configured Android/JDK toolchain.
+  The personal mechanism is unchanged and inventory is verified, but these are
+  not substitutes for a new personal packaging/device pass.
+- CodeRabbit is unavailable through the supported tools/installed CLI; a focused
+  source review was performed, not an external CodeRabbit review.
 - M21 manual opening/takeover/return is not implemented.
 - M22 branching is not implemented.
 - No release or signed APK has been built.
 - This branch has not been merged or promoted to `main`.
 
-If the exact checkpoint is objectively green, the next authorized action is manual
-M20 review. Promotion, M21, M22, and release work each require separate explicit
-authorization.
+The next boundary is manual M20 review with the private-device verification
+limitation above disclosed. Promotion, M21, M22, and release work each require
+separate explicit authorization.
