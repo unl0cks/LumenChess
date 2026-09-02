@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
 import dev.lumenchess.board.ChessboardOrientation
 import dev.lumenchess.core.chess.Color
+import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.engine.api.EngineSearchInfo
 import dev.lumenchess.engine.api.EngineSearchResult
@@ -21,6 +22,11 @@ import dev.lumenchess.play.AndroidPlayEngineGateway
 import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.play.PlayTimeControl
 import dev.lumenchess.runtime.RuntimeState
+import dev.lumenchess.runtime.RuntimeController
+import dev.lumenchess.runtime.RuntimeDisposition
+import dev.lumenchess.runtime.ManualClockPolicy
+import dev.lumenchess.runtime.ManualControlLease
+import dev.lumenchess.runtime.RuntimeManualControl
 import dev.lumenchess.runtime.clock.ClockReading
 import dev.lumenchess.runtime.clock.DeterministicGameClock
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
@@ -44,9 +50,11 @@ data class ArenaUiState(
     val orientation: ChessboardOrientation = ChessboardOrientation.WHITE,
     val gameId: String? = null,
     val message: String? = null,
+    val sessionGeneration: Long = 0L,
+    val lastMoveWasHuman: Boolean = false,
 )
 
-/** Android presentation bridge for M20. Canonical chess state remains inside [ArenaRuntimeCoordinator]. */
+/** Android presentation bridge for Arena. Canonical chess state remains inside [ArenaRuntimeCoordinator]. */
 class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val timeSource = MonotonicTimeSource { SystemClock.elapsedRealtime() }
@@ -62,6 +70,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private var restoreProbe: AndroidArenaPersistenceGateway? = null
     private var screenStarted = false
     private var pausedForLifecycle = false
+    private var sessionGeneration = 0L
 
     private val clockTicker = object : Runnable {
         override fun run() {
@@ -101,6 +110,18 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     fun updateOpeningFamily(value: String) = updateSetup { copy(opening = opening.copy(familyId = value)) }
     fun updateOpeningHandoff(plies: Int) = updateSetup { copy(opening = opening.copy(handoffPlies = plies)) }
     fun updateCustomFen(value: String) = updateSetup { copy(opening = opening.copy(customFen = value)) }
+    fun updateManualSide(value: ArenaManualSide) = updateSetup {
+        copy(manualOpening = manualOpening.copy(sides = value))
+    }
+    fun updateManualLimitMode(value: ArenaManualLimitMode) = updateSetup {
+        copy(manualOpening = manualOpening.copy(limitMode = value))
+    }
+    fun updateManualMoveLimitText(value: String) = updateSetup {
+        copy(manualOpening = manualOpening.copy(moveLimitText = value))
+    }
+    fun updateManualClockPolicy(value: ManualClockPolicy) = updateSetup {
+        copy(manualOpening = manualOpening.copy(clockPolicy = value))
+    }
 
     fun updateEngine(side: Color, engine: PlayEngine) = updateEngineConfig(side) { copy(engine = engine) }
     fun updateStrengthModel(side: Color, model: EngineStrengthModel) =
@@ -133,6 +154,53 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun agreeDraw() {
         coordinator?.agreeDraw()
+        refreshRuntimeProjection(checkTimeout = false)
+    }
+
+    fun takeOver(side: ArenaManualSide, clockPolicy: ManualClockPolicy = ManualClockPolicy.LOCKED) {
+        val existing = coordinator?.state?.manualControl ?: RuntimeManualControl()
+        val control = RuntimeManualControl(
+            white = if (side == ArenaManualSide.WHITE || side == ArenaManualSide.BOTH) {
+                existing.white ?: ManualControlLease()
+            } else {
+                existing.white
+            },
+            black = if (side == ArenaManualSide.BLACK || side == ArenaManualSide.BOTH) {
+                existing.black ?: ManualControlLease()
+            } else {
+                existing.black
+            },
+            clockPolicy = clockPolicy,
+        )
+        coordinator?.setManualControl(control)
+        refreshRuntimeProjection(checkTimeout = false)
+    }
+
+    fun returnToEngine(side: ArenaManualSide = ArenaManualSide.BOTH) {
+        val current = coordinator?.state?.manualControl ?: return
+        val control = when (side) {
+            ArenaManualSide.WHITE -> current.copy(white = null)
+            ArenaManualSide.BLACK -> current.copy(black = null)
+            ArenaManualSide.BOTH, ArenaManualSide.NONE -> RuntimeManualControl()
+        }
+        coordinator?.setManualControl(control)
+        refreshRuntimeProjection(checkTimeout = false)
+    }
+
+    fun onBoardMove(move: Move, expectedSession: Long, expectedRevision: Long) {
+        val current = mutableUiState.value
+        val runtime = current.runtime ?: return
+        if (
+            current.mode != ArenaScreenMode.LIVE ||
+            current.sessionGeneration != expectedSession ||
+            runtime.positionRevision.value != expectedRevision ||
+            runtime.paused || runtime.terminal != null ||
+            runtime.controllers.forSide(runtime.position.sideToMove) != RuntimeController.HUMAN
+        ) return
+        val result = coordinator?.humanMove(move) ?: return
+        if (result.disposition == RuntimeDisposition.APPLIED) {
+            mutableUiState.value = mutableUiState.value.copy(lastMoveWasHuman = true)
+        }
         refreshRuntimeProjection(checkTimeout = false)
     }
 
@@ -202,6 +270,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startResolvedArena(setup: ResolvedArenaSetup, restored: RestoredArenaGame?) {
+        sessionGeneration += 1L
         stopLiveAdapters()
         restoreProbe?.setListener(null)
         restoreProbe?.close()
@@ -260,6 +329,8 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             blackEngineStatus = "Connecting ${setup.black.engine.displayName}…",
             gameId = restored?.gameId,
             message = null,
+            sessionGeneration = sessionGeneration,
+            lastMoveWasHuman = false,
         )
         if (restored == null) runtimeCoordinator.start() else if (restored.snapshot.terminal == null) runtimeCoordinator.resume()
         white.connect()
@@ -283,7 +354,10 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         override fun onEngineResult(result: EngineSearchResult) {
-            coordinator?.onEngineResult(side, result)
+            val dispatchResult = coordinator?.onEngineResult(side, result)
+            if (dispatchResult?.disposition == RuntimeDisposition.APPLIED) {
+                mutableUiState.value = mutableUiState.value.copy(lastMoveWasHuman = false)
+            }
             refreshRuntimeProjection(checkTimeout = false)
         }
 

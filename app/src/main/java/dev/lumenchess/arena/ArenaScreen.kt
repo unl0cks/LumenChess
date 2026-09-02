@@ -26,6 +26,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -59,6 +61,8 @@ import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.play.PlayTimeControl
 import dev.lumenchess.play.presentationLabel
 import dev.lumenchess.runtime.RuntimeState
+import dev.lumenchess.runtime.ManualClockPolicy
+import dev.lumenchess.runtime.RuntimeController
 
 @Composable
 fun ArenaRoute(
@@ -205,6 +209,51 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
                         unfocusedLabelColor = LumenColors.OnSurfaceMuted,
                         cursorColor = LumenColors.AccentBlueBright,
                     ),
+                )
+            }
+        }
+
+        ArenaSection("Manual control", "arena-manual-options") {
+            Text(
+                "Optionally play the opening yourself before handing control back to the engines.",
+                color = LumenColors.OnSurfaceMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text("Control", style = MaterialTheme.typography.labelMedium, color = LumenColors.OnSurfaceMuted)
+            ArenaChoiceRow(
+                choices = listOf(
+                    ArenaManualSide.NONE to "Engines",
+                    ArenaManualSide.WHITE to "White",
+                    ArenaManualSide.BLACK to "Black",
+                    ArenaManualSide.BOTH to "Both",
+                ),
+                selected = setup.manualOpening.sides,
+                onSelect = viewModel::updateManualSide,
+            )
+            if (setup.manualOpening.sides != ArenaManualSide.NONE) {
+                Text("Release", style = MaterialTheme.typography.labelMedium, color = LumenColors.OnSurfaceMuted)
+                ArenaChoiceRow(
+                    choices = listOf(
+                        ArenaManualLimitMode.FINITE to "Move limit",
+                        ArenaManualLimitMode.UNTIL_RELEASE to "Until released",
+                    ),
+                    selected = setup.manualOpening.limitMode,
+                    onSelect = viewModel::updateManualLimitMode,
+                )
+                if (setup.manualOpening.limitMode == ArenaManualLimitMode.FINITE) {
+                    ArenaNumberField(
+                        "Manual moves (1–99)",
+                        setup.manualOpening.moveLimitText,
+                    ) { viewModel.updateManualMoveLimitText(it) }
+                }
+                Text("Clock policy", style = MaterialTheme.typography.labelMedium, color = LumenColors.OnSurfaceMuted)
+                ArenaChoiceRow(
+                    choices = listOf(
+                        ManualClockPolicy.LOCKED to "Clocks paused",
+                        ManualClockPolicy.COUNT_TIME to "Count time",
+                    ),
+                    selected = setup.manualOpening.clockPolicy,
+                    onSelect = viewModel::updateManualClockPolicy,
                 )
             }
         }
@@ -358,10 +407,13 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
     BackHandler(onBack = viewModel::stopArena)
     val lastMove = runtime.gameTree.mainline().lastOrNull()?.move
     var presentedRevision by remember { mutableLongStateOf(runtime.positionRevision.value) }
+    var showManualControl by remember { mutableStateOf(false) }
     val revisionDelta = (runtime.positionRevision.value - presentedRevision).coerceAtLeast(0L)
     val movePresentation = if (revisionDelta == 0L) BoardMovePresentation.ENGINE else {
-        BoardMovePresentationClassifier.classify(revisionDelta, lastMoverIsHuman = false)
+        BoardMovePresentationClassifier.classify(revisionDelta, lastMoverIsHuman = ui.lastMoveWasHuman)
     }
+    val inputEnabled = runtime.controllers.forSide(runtime.position.sideToMove) == RuntimeController.HUMAN &&
+        !runtime.paused && runtime.terminal == null
     SideEffect { presentedRevision = runtime.positionRevision.value }
 
     Column(
@@ -385,10 +437,16 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
         ) {
             LumenChessboard(
                 position = runtime.position,
-                onMove = {},
+                onMove = { move ->
+                    viewModel.onBoardMove(
+                        move = move,
+                        expectedSession = ui.sessionGeneration,
+                        expectedRevision = runtime.positionRevision.value,
+                    )
+                },
                 modifier = Modifier.fillMaxSize(),
                 orientation = ui.orientation,
-                input = ChessboardInput(tapEnabled = false, dragEnabled = false),
+                input = ChessboardInput(tapEnabled = inputEnabled, dragEnabled = inputEnabled),
                 highlights = ChessboardHighlights(
                     lastMove = lastMove,
                     positionRevision = runtime.positionRevision.value,
@@ -412,8 +470,117 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
                 if (runtime.paused) viewModel::resume else viewModel::pause,
                 Modifier.weight(1f),
             )
+            ArenaAction("Control", "arena-control", { showManualControl = true }, Modifier.weight(1f))
             ArenaAction("Stop", "arena-stop", viewModel::stopArena, Modifier.weight(1f))
         }
+    }
+    if (showManualControl) {
+        ArenaManualControlDialog(
+            runtime = runtime,
+            onDismiss = { showManualControl = false },
+            onTakeOver = { side, policy ->
+                viewModel.takeOver(side, policy)
+                showManualControl = false
+            },
+            onReturn = { side ->
+                viewModel.returnToEngine(side)
+                showManualControl = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ArenaManualControlDialog(
+    runtime: RuntimeState,
+    onDismiss: () -> Unit,
+    onTakeOver: (ArenaManualSide, ManualClockPolicy) -> Unit,
+    onReturn: (ArenaManualSide) -> Unit,
+) {
+    val active = runtime.manualControl.isActive
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(LumenColors.SurfaceRaised, RoundedCornerShape(12.dp))
+                .border(1.dp, LumenColors.OutlineStrong, RoundedCornerShape(12.dp))
+                .testTag("arena-manual-dialog")
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                if (active) "Manual control" else "Take over",
+                color = LumenColors.OnSurface,
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                manualControlDescription(runtime),
+                color = LumenColors.OnSurfaceMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text("Take over", color = LumenColors.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+            ArenaChoiceRow(
+                choices = listOf(
+                    ArenaManualSide.WHITE to "White",
+                    ArenaManualSide.BLACK to "Black",
+                    ArenaManualSide.BOTH to "Both",
+                ),
+                selected = null,
+                onSelect = { side ->
+                    onTakeOver(
+                        side,
+                        if (active) runtime.manualControl.clockPolicy else ManualClockPolicy.LOCKED,
+                    )
+                },
+            )
+            if (active) {
+                Text("Return to engine", color = LumenColors.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+                ArenaChoiceRow(
+                    choices = listOf(
+                        ArenaManualSide.WHITE to "White",
+                        ArenaManualSide.BLACK to "Black",
+                        ArenaManualSide.BOTH to "Both",
+                    ),
+                    selected = null,
+                    onSelect = onReturn,
+                )
+                Text("Clock policy", color = LumenColors.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+                ArenaChoiceRow(
+                    choices = listOf(
+                        ManualClockPolicy.LOCKED to "Clocks paused",
+                        ManualClockPolicy.COUNT_TIME to "Count time",
+                    ),
+                    selected = runtime.manualControl.clockPolicy,
+                    onSelect = { policy ->
+                        onTakeOver(
+                            when {
+                                runtime.manualControl.white != null && runtime.manualControl.black != null -> ArenaManualSide.BOTH
+                                runtime.manualControl.white != null -> ArenaManualSide.WHITE
+                                else -> ArenaManualSide.BLACK
+                            },
+                            policy,
+                        )
+                    },
+                )
+            }
+            LumenDerivativeSurface(
+                role = DerivativeSurfaceRole.NEUTRAL_ROW,
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text("Cancel", color = LumenColors.OnSurfaceMuted) }
+        }
+    }
+}
+
+private fun manualControlDescription(runtime: RuntimeState): String {
+    val labels = buildList {
+        runtime.manualControl.white?.let { add("White${it.remainingMoves?.let { moves -> " · $moves moves left" }.orEmpty()}") }
+        runtime.manualControl.black?.let { add("Black${it.remainingMoves?.let { moves -> " · $moves moves left" }.orEmpty()}") }
+    }
+    return if (labels.isEmpty()) "Choose a side to control. Clocks pause by default." else {
+        "You control ${labels.joinToString(" and ")}. " +
+            if (runtime.manualControl.clockPolicy == ManualClockPolicy.LOCKED) "Clocks paused." else "Clocks running."
     }
 }
 
@@ -443,7 +610,9 @@ private fun ArenaParticipantRow(
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(engine.displayName, color = LumenColors.OnSurface, fontWeight = FontWeight.SemiBold, maxLines = 1)
             Text(
-                "${side.name.lowercase().replaceFirstChar { it.uppercase() }} · ${arenaParticipantStatus(active, runtime.paused, runtime.engineHostAvailable, status)}",
+                "${side.name.lowercase().replaceFirstChar { it.uppercase() }} · ${runtime.manualControl.forSide(side)?.let { lease ->
+                    "Manual control${lease.remainingMoves?.let { remaining -> " · $remaining left" }.orEmpty()}"
+                } ?: arenaParticipantStatus(active, runtime.paused, runtime.engineHostAvailable, status)}",
                 color = LumenColors.OnSurfaceMuted,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
@@ -452,7 +621,7 @@ private fun ArenaParticipantRow(
         }
         LumenClock(
             arenaClockText(millis),
-            active = active && !runtime.paused,
+            active = active && !runtime.paused && runtime.clock.running,
             light = side == Color.WHITE,
             modifier = Modifier.width(94.dp).height(44.dp).testTag("arena-${side.name.lowercase()}-clock"),
         )
