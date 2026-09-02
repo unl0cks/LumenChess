@@ -17,6 +17,7 @@ import dev.lumenchess.board.PieceSetCatalog
 import dev.lumenchess.core.chess.*
 import dev.lumenchess.data.persistence.*
 import dev.lumenchess.engine.api.*
+import dev.lumenchess.engine.host.transport.EngineSlot
 import dev.lumenchess.play.AndroidPlayEngineGateway
 import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.settings.*
@@ -154,12 +155,38 @@ class ArenaReviewCompletionQaTest {
         openArenaThroughSettings()
         configureAsymmetricEngines()
         choose("Random", "arena-game-options")
-        startPaused("30-restore-initial")
-        progressWithRealHosts("31-before-process-stop", minimumMoves = 4)
+        assertEquals(ArenaColorAssignment.RANDOM, vm.uiState.value.setup.colorAssignment)
+        capture("40-random-setup", board = false)
+        var reversedAttempt = 0
+        for (attempt in 1..12) {
+            startPaused("random-attempt-$attempt", screenshot = false)
+            val assigned = vm.uiState.value.resolvedSetup!!
+            val reversed = assigned.white.engine == PlayEngine.RECKLESS_0_9_0
+            assertEquals(if (reversed) PlayEngine.STOCKFISH_18 else PlayEngine.RECKLESS_0_9_0, assigned.black.engine)
+            val stockfish = if (reversed) assigned.black else assigned.white
+            val reckless = if (reversed) assigned.white else assigned.black
+            assertEquals(EngineStrengthTarget.Elo(2000), stockfish.strength.target)
+            assertEquals(EngineStrengthModel.ENGINE_NATIVE, stockfish.strength.model)
+            assertEquals(EngineStrengthTarget.Elo(1200), reckless.strength.target)
+            assertEquals(EngineStrengthModel.HUMANIZED, reckless.strength.model)
+            events.put(JSONObject().put("randomAttempt", attempt).put("reversed", reversed)
+                .put("white", assigned.white.toString()).put("black", assigned.black.toString())
+                .put("randomSource", "unmodified product RNG; no seed injected"))
+            writeEvents("random-attempts.json")
+            if (reversed) {
+                reversedAttempt = attempt
+                capture("41-random-reversed-start")
+                break
+            }
+            stop()
+        }
+        assertTrue("No reversed assignment in 12 product-RNG starts; investigate before retrying", reversedAttempt > 0)
+        progressWithRealHosts("42-random-reversed-progressed", minimumMoves = 4)
         val canonical = verifyCanonicalRecord("before-process-stop")
         val restored = ArenaSnapshotCodec.decode(canonical)
         assertTrue(restored.snapshot.paused)
         assertFalse(restored.snapshot.clock.running)
+        capture("31-before-process-stop")
         val expected = JSONObject()
             .put("gameId", canonical.id.value)
             .put("fen", Fen.serialize(restored.snapshot.position))
@@ -168,6 +195,12 @@ class ArenaReviewCompletionQaTest {
             .put("black", restored.setup.black.toString())
             .put("clockWhite", restored.snapshot.clock.whiteRemainingMillis)
             .put("clockBlack", restored.snapshot.clock.blackRemainingMillis)
+            .put("clockActive", restored.snapshot.clock.activeSide.name)
+            .put("storedPieceSetId", settings().pieceSetId)
+            .put("resolvedPieceSetId", PieceSetCatalog.definition(settings().pieceSetId).id)
+            .put("whiteParticipant", canonical.whiteParticipant!!.displayName)
+            .put("blackParticipant", canonical.blackParticipant!!.displayName)
+            .put("randomAttempts", reversedAttempt)
             .put("bounds", rectJson(bounds()))
         File(output(), "restore-expected.json").writeText(expected.toString(2))
         writeEvents("restore-before.json")
@@ -176,7 +209,12 @@ class ArenaReviewCompletionQaTest {
 
     @Test fun verifyProcessRestoration() {
         val expected = JSONObject(File(output(), "restore-expected.json").readText())
-        openArenaThroughSettings()
+        waitTag("p5-play-overview")
+        assertEquals(expected.getString("storedPieceSetId"), settings().pieceSetId)
+        assertEquals(expected.getString("resolvedPieceSetId"), PieceSetCatalog.definition(settings().pieceSetId).id)
+        record("process-reopened-without-reselection", board = false)
+        tag("main-tab-arena").performClick()
+        waitTag("arena-setup")
         rule.waitUntil(10_000) { vm.uiState.value.restorableGame != null }
         val restored = vm.uiState.value.restorableGame!!
         assertEquals(expected.getString("gameId"), restored.gameId)
@@ -186,8 +224,17 @@ class ArenaReviewCompletionQaTest {
         assertEquals(expected.getString("black"), restored.setup.black.toString())
         assertEquals(expected.getLong("clockWhite"), restored.snapshot.clock.whiteRemainingMillis)
         assertEquals(expected.getLong("clockBlack"), restored.snapshot.clock.blackRemainingMillis)
+        assertEquals(expected.getString("clockActive"), restored.snapshot.clock.activeSide.name)
         assertTrue(restored.snapshot.paused)
         assertFalse(restored.snapshot.clock.running)
+        events.put(JSONObject().put("phase", "restorable-canonical-snapshot")
+            .put("gameId", restored.gameId).put("fen", Fen.serialize(restored.snapshot.position))
+            .put("revision", restored.snapshot.positionRevision.value)
+            .put("white", restored.setup.white.toString()).put("black", restored.setup.black.toString())
+            .put("clockWhite", restored.snapshot.clock.whiteRemainingMillis)
+            .put("clockBlack", restored.snapshot.clock.blackRemainingMillis)
+            .put("paused", restored.snapshot.paused).put("clockRunning", restored.snapshot.clock.running)
+            .put("inFlightPersisted", false).put("preferenceReselectedAfterRestart", false))
         tag("arena-resume").performScrollTo().assertIsDisplayed()
         capture("32-restoration-entry", board = false)
         tag("arena-resume").performClick()
@@ -200,6 +247,7 @@ class ArenaReviewCompletionQaTest {
         val prior = expected.getJSONArray("bounds")
         referenceBounds = Rect(prior.getDouble(0).toFloat(), prior.getDouble(1).toFloat(), prior.getDouble(2).toFloat(), prior.getDouble(3).toFloat())
         capture("33-restored-live")
+        verifyCanonicalRecord("restored-canonical-record")
         events.put(JSONObject().put("restoration", "paused canonical snapshot; explicit Resume Arena resumes, then QA pauses via UI").put("inFlightPersisted", false))
         progressWithRealHosts("34-restored-progressed")
         writeEvents("restore-after.json")
@@ -243,14 +291,14 @@ class ArenaReviewCompletionQaTest {
         rule.waitForIdle()
     }
 
-    private fun startPaused(name: String) {
+    private fun startPaused(name: String, screenshot: Boolean = true) {
         tag("arena-start").performScrollTo().assertIsEnabled().performClick()
         waitTag("arena-live")
         tag("arena-pause").performClick()
         rule.waitUntil(5_000) { vm.uiState.value.runtime?.paused == true }
         assertEquals("Must capture the actual initial position, not a later revision", 0L, vm.uiState.value.runtime!!.positionRevision.value)
         assertEquals(vm.uiState.value.resolvedSetup!!.initialPosition, vm.uiState.value.runtime!!.position)
-        capture(name)
+        if (screenshot) capture(name) else record(name)
     }
 
     private fun stop() {
@@ -292,6 +340,13 @@ class ArenaReviewCompletionQaTest {
         rule.runOnUiThread {
             val gatewayField = ArenaViewModel::class.java.getDeclaredField(if (side == Color.WHITE) "whiteGateway" else "blackGateway").apply { isAccessible = true }
             val gateway = gatewayField.get(vm) as AndroidPlayEngineGateway
+            val engine = AndroidPlayEngineGateway::class.java.getDeclaredField("engine").apply { isAccessible = true }.get(gateway) as PlayEngine
+            val slot = AndroidPlayEngineGateway::class.java.getDeclaredField("slot").apply { isAccessible = true }.get(gateway) as EngineSlot
+            val setup = vm.uiState.value.resolvedSetup!!
+            assertEquals(if (side == Color.WHITE) setup.white.engine else setup.black.engine, engine)
+            assertEquals(if (side == Color.WHITE) "A" else "B", slot.toString())
+            events.put(JSONObject().put("transportSide", side.name).put("actualGatewayEngine", engine.name)
+                .put("actualGatewaySlot", slot.toString()).put("sessionId", gateway.sessionId.value))
             val field = AndroidPlayEngineGateway::class.java.getDeclaredField("session").apply { isAccessible = true }
             val real = field.get(gateway) as EngineSession
             field.set(gateway, object : EngineSession by real {
@@ -311,7 +366,11 @@ class ArenaReviewCompletionQaTest {
             var result: LoadedCanonicalGame? = null
             rule.waitUntil(10_000) {
                 result = runBlocking { LiveGamePersistenceRepository(database).load(PersistentGameId(id)) }
-                result?.tree?.mainline()?.size?.toLong() == vm.uiState.value.runtime!!.positionRevision.value
+                val current = vm.uiState.value.runtime!!
+                val decoded = result?.let(ArenaSnapshotCodec::decode)
+                decoded != null && decoded.snapshot.positionRevision == current.positionRevision &&
+                    decoded.snapshot.clock.whiteRemainingMillis == current.clock.whiteRemainingMillis &&
+                    decoded.snapshot.clock.blackRemainingMillis == current.clock.blackRemainingMillis
             }
             val game = result!!
             val setup = vm.uiState.value.resolvedSetup!!
@@ -325,7 +384,15 @@ class ArenaReviewCompletionQaTest {
             assertTrue(decoded.snapshot.paused)
             events.put(JSONObject().put("phase", phase).put("canonicalGameId", id)
                 .put("whiteParticipant", game.whiteParticipant!!.displayName)
-                .put("blackParticipant", game.blackParticipant!!.displayName).put("restorePaused", true))
+                .put("blackParticipant", game.blackParticipant!!.displayName).put("restorePaused", true)
+                .put("whiteConfiguration", decoded.setup.white.toString())
+                .put("blackConfiguration", decoded.setup.black.toString())
+                .put("fen", Fen.serialize(decoded.snapshot.position))
+                .put("revision", decoded.snapshot.positionRevision.value)
+                .put("clockWhite", decoded.snapshot.clock.whiteRemainingMillis)
+                .put("clockBlack", decoded.snapshot.clock.blackRemainingMillis)
+                .put("clockRunning", decoded.snapshot.clock.running)
+                .put("sourceMetadata", JSONObject(game.sources.single { it.type == GameSourceType.ENGINE_ARENA }.metadata)))
             return game
         } finally { LumenDatabaseFactory.close(database) }
     }
@@ -356,6 +423,11 @@ class ArenaReviewCompletionQaTest {
             assertTrue("Must observe actual board piece renderer tags", pieces.isNotEmpty())
             pieces.forEach { assertTrue(it.config[SemanticsProperties.TestTag].endsWith("-$style")) }
             val state = vm.uiState.value
+            for (side in Color.entries) {
+                val engine = if (side == Color.WHITE) state.resolvedSetup!!.white.engine else state.resolvedSetup!!.black.engine
+                rule.onNode(hasText(engine.displayName) and hasAnyAncestor(hasTestTag("arena-${side.name.lowercase()}-row")))
+                    .assertIsDisplayed()
+            }
             entry.put("bounds", rectJson(bounds())).put("fen", Fen.serialize(state.runtime!!.position))
                 .put("revision", state.runtime.positionRevision.value).put("paused", state.runtime.paused)
                 .put("orientation", state.orientation.name).put("opening", state.resolvedSetup!!.opening.label)
