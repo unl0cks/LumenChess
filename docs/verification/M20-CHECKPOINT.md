@@ -161,6 +161,14 @@ P5 reference lane does, and verifies stored appearance plus stored/resolved publ
 Lumen identity for every image. Application defaults and production pixels are
 unchanged. The replacement native evidence must be inspected before handoff.
 
+The same native inspection exposed an M20-only evaluation-readout defect: a score
+straddling the dark/light bar split inherited insufficient text contrast (the
+captured `+0.36` ink measured 1.19:1 against its dark segment). The score and depth
+now have solid neutral backings independent of split position or page appearance.
+A native rendering regression samples the actual text and both padding backgrounds
+for positive, neutral, and negative scores in Dark and Light. This correction does
+not change the board or any approved P5/P6 component.
+
 Local Gradle execution on the current Windows host remains unavailable before
 project configuration because Gradle cannot establish its required loopback IPC
 connection. This host limitation reproduced across available JDK versions and

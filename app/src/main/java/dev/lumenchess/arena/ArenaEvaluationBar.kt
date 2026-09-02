@@ -44,6 +44,9 @@ internal fun ArenaEvaluationBar(
     val whiteWeight = resolved.whiteFraction()
     val blackWeight = 1f - whiteWeight
     val shape = RoundedCornerShape(5.dp)
+    val readoutShape = RoundedCornerShape(3.dp)
+    val readoutBackground = Color(0xFF24292B)
+    val readoutForeground = Color(0xFFE7E3D7)
     Box(
         modifier
             .fillMaxWidth()
@@ -58,18 +61,23 @@ internal fun ArenaEvaluationBar(
         }
         Text(
             text = resolved.label(),
-            modifier = Modifier.align(Alignment.Center).padding(horizontal = 5.dp),
+            modifier = Modifier.align(Alignment.Center)
+                .background(readoutBackground, readoutShape)
+                .padding(horizontal = 5.dp),
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
             fontWeight = FontWeight.SemiBold,
-            color = if (whiteWeight >= .56f) Color(0xFF1B2022) else LumenColors.OnSurface,
+            color = readoutForeground,
         )
         resolved.depth?.let { depth ->
-            Text(
-                text = "d$depth",
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp),
-                color = if (whiteWeight > .78f) Color(0xFF343A3C) else LumenColors.OnSurfaceMuted,
-            )
+            Box(Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)) {
+                Text(
+                    text = "d$depth",
+                    modifier = Modifier.background(readoutBackground, readoutShape)
+                        .padding(horizontal = 3.dp),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp),
+                    color = readoutForeground,
+                )
+            }
         }
     }
 }
