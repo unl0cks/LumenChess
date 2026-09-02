@@ -1,8 +1,10 @@
 # M20 — Arena base checkpoint
 
-This document records the durable implementation and manual-review boundary for
-M20 on the isolated `codex/m20-arena-base` branch. It does not authorize promotion
-to `main`, M21, M22, a release, or a signed APK.
+This document records the durable implementation and review history for M20 on
+`codex/m20-arena-base`. M20 was manually approved on 2026-09-02, and the user
+authorized the bounded promotion described in the final section. Earlier pending
+review statements below are historical. M21, M22, releases and signed/final APKs
+remain unauthorized.
 
 ## Boundary and source of truth
 
@@ -399,3 +401,94 @@ local for manual review and is not uploaded to GitHub.
 The two requested evidence gaps are now demonstrated. **M20 remains pending the
 user's final manual approval.** No promotion/merge, M21, M22, release or signed
 final APK is authorized by this checkpoint.
+
+## Manual approval and authorized promotion — 2026-09-02
+
+The user independently reviewed the final native screenshots and metadata and
+**manually approved M20 — Arena base**. This section supersedes the historical
+pending-review and no-promotion boundaries above; it does not alter their evidence
+or rewrite the implementation history.
+
+### Approved identities and evidence
+
+- Recovered pre-promotion `main`:
+  `3af3fe36184cf35f4fb0878e83c3adc233189b7e`.
+- Recovered approved M20 branch tip:
+  `c300b96a9610731cfad3f3ae67441190c9b072f6`.
+- Approved production-equivalent implementation:
+  `f14cf9aa1b08d7d7eb1634d33ba9c1d07aaed73d`.
+- Final evidence-producing QA commit:
+  `62e17872a4e6a49a4066725a0286c3d170913d9e`.
+- Review package: `LumenChess-M20-final-review-62e1787.zip`.
+- Package size: **13,435,625 bytes**.
+- Package SHA-256:
+  `1bf173454b81a1fe193f7fccfc2e5fee7d6ea15a9d9856ce4be74b0d47d527fb`.
+- Independent integrity result: **29 ZIP members / 28 manifest-declared members /
+  0 mismatches**.
+
+Approval covers setup, independent engines/strength/models, all M20 time controls
+and opening modes, Standard/Chess960, fixed/random colors, evaluation, clocks,
+pause/resume/stop, persistence and process restoration, Public Lumen/Neo/3D
+Staunton, P6 feedback/motion compatibility, and P1 Arena board stability.
+
+The first actual product-RNG attempt produced Reckless 0.9.0 White at 1200 Elo /
+Humanized through host Slot A, and Stockfish 18 Black at 2000 Elo / Native through
+host Slot B. Native cards, canonical participants, real engine routing and
+persisted/restored configurations agree. Production RNG was not modified.
+
+The actual force-stop/reopen lane retained stored and resolved Neo ID
+`private.chesscom.ejgfv`, source `pieces/ejgfv`, without reselecting the style.
+The exact FEN, participant configurations and paused clock snapshot recorded above
+restored at revision 5; Resume Arena subsequently reached revision 9. No in-flight
+search was treated as persisted authoritative state. Setup defaults above the
+Resume card belong to a new game, not the saved game.
+
+Before force-stop, first restored Live, resumed progression, reversed Random start
+and reversed Random progression all measured **`(21,428)-(1323,1730)` / 1302 x 1302
+px**, with **0 px maximum movement or resize**. These native states were manually
+accepted, not merely inferred from test results.
+
+### Verification status at approval
+
+- Final recovered branch CI run
+  [33642046587](https://github.com/unl0cks/LumenChess/actions/runs/33642046587),
+  exact SHA `c300b96a9610731cfad3f3ae67441190c9b072f6`: **completed successfully**.
+  `checkpoint`: **PASS**. `full`, `play-device`, `engine-device`: **SKIPPED by
+  branch policy**, not passes.
+- The checkpoint executed cumulative core/runtime/engine/persistence/app JVM
+  tests, applicable lint/debug assemblies and native ABI/alignment checks. The
+  prior complete API-37 candidate gate and final local native evidence remain
+  recorded in their original sections.
+- Final evidence closure executed **17 focused unit tests and 2 native tests**,
+  all passing, plus debug-test assembly and content/privacy scans. Historical
+  multi-hour/full-device gates were intentionally **NOT RERUN during that
+  evidence-only pass**; skipped jobs were not represented as passing tests.
+- Public APK content scan: **0 private piece/board entries, 0 generated personal
+  staging entries, 0 personal-source path leakage**. This was an existing-APK
+  rescan, not a fresh public build during evidence closure.
+- Personal APK content scan: **39 complete styles / 468 canonical piece PNGs /
+  8 supported optional board PNGs**; no scripts, source archives, virtual
+  environments or external source metadata.
+- Promotion recovery confirmed a clean tracked worktree, no production delta
+  after the approved implementation, `git diff --check` passing, and no tracked
+  private PNGs, generated personal assets, APKs, keystores, private archives or
+  absolute personal-asset source paths. Rejected `c21a2f6...` is not an ancestor.
+
+### Bounded promotion authorization
+
+The user authorizes a documentation-only approval commit followed by promotion of
+the **complete approved M20 history**, preferably a direct fast-forward to `main`.
+The approval record must be pushed normally before promotion. Recheck remote
+topology, required checks and privacy before updating `main`; do not squash,
+cherry-pick, rewrite history or force-push. Production changes are not part of this
+approval operation.
+
+After promotion, verify exact source/history integrity and execute the existing
+`main` Android CI policy (`full`, including API-37 instrumentation and public APK
+privacy); other jobs may be skipped by their existing conditions. This record
+does **not** predeclare that future run successful. Its resulting SHA, run and
+exact job states belong in the promotion report.
+
+**M21 and M22 remain unstarted.** No release or signed/final APK is authorized.
+Stop after M20 promotion verification; the next milestone requires a separate
+explicit user authorization.
