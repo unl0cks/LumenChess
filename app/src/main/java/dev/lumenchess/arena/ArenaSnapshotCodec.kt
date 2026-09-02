@@ -12,6 +12,9 @@ import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.runtime.RuntimeController
 import dev.lumenchess.runtime.RuntimeControllers
 import dev.lumenchess.runtime.RuntimeEventId
+import dev.lumenchess.runtime.ManualClockPolicy
+import dev.lumenchess.runtime.ManualControlLease
+import dev.lumenchess.runtime.RuntimeManualControl
 import dev.lumenchess.runtime.RuntimeSnapshot
 import dev.lumenchess.runtime.RuntimeTerminal
 import dev.lumenchess.runtime.clock.ClockConfig
@@ -26,7 +29,8 @@ data class RestoredArenaGame(
 )
 
 object ArenaSnapshotCodec {
-    private const val VERSION = "1"
+    private const val VERSION = "2"
+    private const val LEGACY_VERSION = "1"
     private const val PREFIX = "lumen.arena.m20."
 
     fun encode(snapshot: RuntimeSnapshot, setup: ResolvedArenaSetup): Map<String, String> = buildMap {
@@ -49,6 +53,11 @@ object ArenaSnapshotCodec {
         snapshot.terminal?.let { put(key("terminal"), encodeTerminal(it)) }
         put(key("processedEventIds"), snapshot.processedEventIds.map { it.value }.sorted().joinToString(","))
         put(key("nextEngineSearchId"), snapshot.nextEngineSearchId.toString())
+        put(key("whiteController"), snapshot.controllers.white.name)
+        put(key("blackController"), snapshot.controllers.black.name)
+        put(key("manualClockPolicy"), snapshot.manualControl.clockPolicy.name)
+        put(key("manualWhite"), encodeLease(snapshot.manualControl.white))
+        put(key("manualBlack"), encodeLease(snapshot.manualControl.black))
     }
 
     fun decode(game: LoadedCanonicalGame): RestoredArenaGame {
@@ -56,12 +65,27 @@ object ArenaSnapshotCodec {
             .asSequence()
             .filter { it.type == GameSourceType.ENGINE_ARENA }
             .map { it.metadata }
-            .firstOrNull { it[key("version")] == VERSION }
+            .firstOrNull { it[key("version")] == VERSION || it[key("version")] == LEGACY_VERSION }
             ?: throw PersistenceMappingException("Game ${game.id.value} has no M20 Arena restore metadata")
 
         val initialMillis = longValue(metadata, "initialMillis")
         val incrementMillis = longValue(metadata, "incrementMillis")
         val openingMode = enumValue<ArenaOpeningMode>(metadata, "openingMode")
+        val isCurrentVersion = metadata[key("version")] == VERSION
+        val manualControl = if (isCurrentVersion) decodeManualControl(metadata) else RuntimeManualControl()
+        val controllers = if (isCurrentVersion) {
+            RuntimeControllers(
+                white = enumValue(metadata, "whiteController"),
+                black = enumValue(metadata, "blackController"),
+            )
+        } else {
+            RuntimeControllers(RuntimeController.ENGINE, RuntimeController.ENGINE)
+        }
+        if ((manualControl.white != null) != (controllers.white == RuntimeController.HUMAN) ||
+            (manualControl.black != null) != (controllers.black == RuntimeController.HUMAN)
+        ) {
+            throw PersistenceMappingException("Stored Arena manual control does not match controllers")
+        }
         val setup = ResolvedArenaSetup(
             variant = game.tree.startPosition.variant,
             chess960Index = metadata[key("chess960Index")]?.let { value ->
@@ -78,6 +102,7 @@ object ArenaSnapshotCodec {
                 appliedMoves = emptyList(),
             ),
             initialPosition = game.tree.startPosition,
+            manualControl = manualControl,
         )
         val mainline = game.tree.mainline()
         val revision = longValue(metadata, "positionRevision")
@@ -105,7 +130,7 @@ object ArenaSnapshotCodec {
             gameTree = game.tree,
             currentNodeId = currentNode.id,
             clock = clock,
-            controllers = RuntimeControllers(RuntimeController.ENGINE, RuntimeController.ENGINE),
+            controllers = controllers,
             positionRevision = PositionRevision(revision),
             paused = true,
             started = booleanValue(metadata, "started"),
@@ -114,6 +139,7 @@ object ArenaSnapshotCodec {
             nextEngineSearchId = longValue(metadata, "nextEngineSearchId").also {
                 if (it <= 0) throw PersistenceMappingException("Stored next Arena search id must be positive")
             },
+            manualControl = manualControl,
         )
         return RestoredArenaGame(game.id.value, setup, snapshot, game.metadata.createdAtEpochMillis)
     }
@@ -124,6 +150,29 @@ object ArenaSnapshotCodec {
         key("${prefix}StrengthTarget") to encodeStrengthTarget(engine.strength.target),
         key("${prefix}StrengthSeed") to engine.strength.seed.toString(),
     )
+
+    private fun encodeLease(lease: ManualControlLease?): String = when (lease) {
+        null -> "NONE"
+        else -> lease.remainingMoves?.toString() ?: "UNLIMITED"
+    }
+
+    private fun decodeManualControl(metadata: Map<String, String>): RuntimeManualControl {
+        fun decodeLease(name: String): ManualControlLease? = when (val value = required(metadata, name)) {
+            "NONE" -> null
+            "UNLIMITED" -> ManualControlLease()
+            else -> value.toIntOrNull()?.let(::ManualControlLease)
+                ?: malformed("manual lease", value)
+        }
+        return try {
+            RuntimeManualControl(
+                white = decodeLease("manualWhite"),
+                black = decodeLease("manualBlack"),
+                clockPolicy = enumValue(metadata, "manualClockPolicy"),
+            )
+        } catch (error: IllegalArgumentException) {
+            throw PersistenceMappingException("Malformed stored Arena manual control", error)
+        }
+    }
 
     private fun decodeEngine(metadata: Map<String, String>, prefix: String): ResolvedArenaEngine =
         ResolvedArenaEngine(

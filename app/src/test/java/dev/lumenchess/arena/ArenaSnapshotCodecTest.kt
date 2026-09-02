@@ -98,6 +98,33 @@ class ArenaSnapshotCodecTest {
         assertFailsWith<PersistenceMappingException> { ArenaSnapshotCodec.decode(game) }
     }
 
+    @Test
+    fun legacyVersionOneArenaMetadataRestoresAsEngineVsEngine() {
+        val setup = ArenaSetupResolver.resolve(ArenaSetupConfig(), randomInt = { 0 })
+        val coordinator = ArenaRuntimeCoordinator.create(
+            setup,
+            MonotonicTimeSource { 1_000 },
+            NoopEngine,
+            NoopEngine,
+            NoopPersistence,
+        )
+        val snapshot = coordinator.snapshotForRestore()
+        val legacy = ArenaSnapshotCodec.encode(snapshot, setup).toMutableMap().apply {
+            this["lumen.arena.m20.version"] = "1"
+            remove("lumen.arena.m20.whiteController")
+            remove("lumen.arena.m20.blackController")
+            remove("lumen.arena.m20.manualClockPolicy")
+            remove("lumen.arena.m20.manualWhite")
+            remove("lumen.arena.m20.manualBlack")
+        }
+
+        val decoded = ArenaSnapshotCodec.decode(loaded(snapshot, legacy))
+
+        assertEquals(RuntimeController.ENGINE, decoded.snapshot.controllers.white)
+        assertEquals(RuntimeController.ENGINE, decoded.snapshot.controllers.black)
+        assertTrue(decoded.snapshot.manualControl == dev.lumenchess.runtime.RuntimeManualControl())
+    }
+
     private fun loaded(
         snapshot: RuntimeSnapshot,
         metadata: Map<String, String>,

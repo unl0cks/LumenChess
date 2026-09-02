@@ -12,6 +12,9 @@ import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.play.PlayTimeControl
 import dev.lumenchess.runtime.clock.ClockConfig
+import dev.lumenchess.runtime.ManualClockPolicy
+import dev.lumenchess.runtime.ManualControlLease
+import dev.lumenchess.runtime.RuntimeManualControl
 
 enum class ArenaColorAssignment { FIXED, RANDOM }
 
@@ -21,6 +24,41 @@ enum class ArenaOpeningMode {
     OPENING_FAMILY,
     CUSTOM_FEN,
     RANDOM_CHESS960,
+}
+
+enum class ArenaManualSide {
+    NONE,
+    WHITE,
+    BLACK,
+    BOTH,
+}
+
+enum class ArenaManualLimitMode {
+    FINITE,
+    UNTIL_RELEASE,
+}
+
+data class ArenaManualOpeningSetup(
+    val sides: ArenaManualSide = ArenaManualSide.NONE,
+    val limitMode: ArenaManualLimitMode = ArenaManualLimitMode.FINITE,
+    val moveLimitText: String = "3",
+    val clockPolicy: ManualClockPolicy = ManualClockPolicy.LOCKED,
+) {
+    val moveLimit: Int?
+        get() = moveLimitText.toIntOrNull()
+
+    fun toRuntimeControl(): RuntimeManualControl {
+        if (sides == ArenaManualSide.NONE) return RuntimeManualControl()
+        val lease = when (limitMode) {
+            ArenaManualLimitMode.FINITE -> ManualControlLease(moveLimit)
+            ArenaManualLimitMode.UNTIL_RELEASE -> ManualControlLease()
+        }
+        return RuntimeManualControl(
+            white = if (sides == ArenaManualSide.WHITE || sides == ArenaManualSide.BOTH) lease else null,
+            black = if (sides == ArenaManualSide.BLACK || sides == ArenaManualSide.BOTH) lease else null,
+            clockPolicy = clockPolicy,
+        )
+    }
 }
 
 data class ArenaEngineConfig(
@@ -45,6 +83,7 @@ data class ArenaSetupConfig(
     val colorAssignment: ArenaColorAssignment = ArenaColorAssignment.FIXED,
     val timeControl: PlayTimeControl = PlayTimeControl(),
     val opening: ArenaOpeningSetup = ArenaOpeningSetup(),
+    val manualOpening: ArenaManualOpeningSetup = ArenaManualOpeningSetup(),
 )
 
 data class ResolvedArenaEngine(
@@ -68,6 +107,7 @@ data class ResolvedArenaSetup(
     val clockConfig: ClockConfig,
     val opening: ResolvedArenaOpening,
     val initialPosition: Position,
+    val manualControl: RuntimeManualControl = RuntimeManualControl(),
 )
 
 sealed interface ArenaSetupValidation {
@@ -89,6 +129,14 @@ object ArenaSetupValidator {
         }
         if (setup.opening.handoffPlies !in 1..12) {
             return ArenaSetupValidation.Invalid("Opening handoff must be between 1 and 12 plies")
+        }
+        if (setup.manualOpening.sides != ArenaManualSide.NONE &&
+            setup.manualOpening.limitMode == ArenaManualLimitMode.FINITE
+        ) {
+            val moveLimit = setup.manualOpening.moveLimit
+            if (moveLimit == null || moveLimit !in 1..99) {
+                return ArenaSetupValidation.Invalid("Manual move limit must be between 1 and 99")
+            }
         }
         if (setup.opening.mode == ArenaOpeningMode.OPENING_FAMILY &&
             ArenaOpeningCatalog.byFamily(setup.opening.familyId).isEmpty()
@@ -202,6 +250,7 @@ object ArenaSetupResolver {
             clockConfig = ClockConfig(setup.timeControl.initialMillis, setup.timeControl.incrementMillis),
             opening = resolvedOpening,
             initialPosition = resolvedOpening.position,
+            manualControl = setup.manualOpening.toRuntimeControl(),
         )
     }
 }
