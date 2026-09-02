@@ -152,6 +152,15 @@ packaging, API-37 instrumentation, and native Arena evidence lane. Results from
 that exact SHA belong in the manual-review report; this document does not
 predeclare them green.
 
+Checkpoint `01c29a8` passed both the full and proportional Android CI gates,
+including cumulative API-37 instrumentation and seven native Arena captures.
+Pixel inspection then found a capture-configuration omission, not a production
+theme defect: the fresh emulator was light while appearance remained `SYSTEM`.
+The bounded QA correction selects Dark through the existing Settings UI, as the
+P5 reference lane does, and verifies stored appearance plus stored/resolved public
+Lumen identity for every image. Application defaults and production pixels are
+unchanged. The replacement native evidence must be inspected before handoff.
+
 Local Gradle execution on the current Windows host remains unavailable before
 project configuration because Gradle cannot establish its required loopback IPC
 connection. This host limitation reproduced across available JDK versions and

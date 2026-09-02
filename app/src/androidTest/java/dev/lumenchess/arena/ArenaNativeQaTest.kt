@@ -14,9 +14,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.MainActivity
+import dev.lumenchess.board.PieceSetCatalog
 import dev.lumenchess.core.chess.Variant
+import dev.lumenchess.settings.AppAppearance
+import dev.lumenchess.settings.AppearanceSettings
+import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
 import java.io.File
 import java.io.FileOutputStream
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assume.assumeTrue
@@ -41,6 +47,7 @@ class ArenaNativeQaTest {
     @Test
     fun capturePublicLumenStandardAndChess960Arena() {
         waitForTag("p5-play-overview")
+        selectApprovedDarkAppearance()
         composeRule.onNodeWithTag("main-tab-arena").performClick()
         waitForTag("arena-setup")
         captureRoot("01-arena-setup.png")
@@ -82,6 +89,28 @@ class ArenaNativeQaTest {
         writeMetadata(standardBounds, chess960Bounds, viewModel)
     }
 
+    private fun selectApprovedDarkAppearance() {
+        // Match the P5 review lane through real Settings UI, not a production default override.
+        composeRule.onNodeWithTag("main-tab-settings").performClick()
+        waitForTag("settings-category-list")
+        composeRule.onNodeWithTag("settings-play").performClick()
+        waitForTag("play-settings-root")
+        composeRule.onNodeWithTag("appearance-dark").performScrollTo().performClick()
+        composeRule.waitUntil(5_000) { capturedSettings().appearance == AppAppearance.DARK }
+        composeRule.onNodeWithTag("play-settings-back").performClick()
+        waitForTag("settings-category-list")
+    }
+
+    private fun capturedSettings(): AppearanceSettings = runBlocking {
+        DataStoreAppearanceSettingsRepository.from(composeRule.activity).settings.first()
+    }
+
+    private fun verifyCaptureIdentity(): AppearanceSettings = capturedSettings().also { settings ->
+        assertEquals(AppAppearance.DARK, settings.appearance)
+        assertEquals("lumen-vector", settings.pieceSetId)
+        assertEquals("lumen-vector", PieceSetCatalog.definition(settings.pieceSetId).id)
+    }
+
     private fun waitForProgress(viewModel: ArenaViewModel, minimumRevision: Long) {
         composeRule.waitUntil(timeoutMillis = 35_000) {
             viewModel.uiState.value.mode == ArenaScreenMode.LIVE &&
@@ -108,6 +137,7 @@ class ArenaNativeQaTest {
         .fetchSemanticsNode().boundsInRoot
 
     private fun writeBitmap(name: String, bitmap: Bitmap) {
+        verifyCaptureIdentity()
         FileOutputStream(File(outputDirectory(), name)).use { output ->
             check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
         }
@@ -115,6 +145,7 @@ class ArenaNativeQaTest {
 
     private fun writeMetadata(standard: Rect, chess960: Rect, viewModel: ArenaViewModel) {
         val metrics = composeRule.activity.resources.displayMetrics
+        val settings = verifyCaptureIdentity()
         File(outputDirectory(), "board-bounds.txt").writeText(
             buildString {
                 appendLine("viewport=${metrics.widthPixels}x${metrics.heightPixels}")
@@ -124,7 +155,9 @@ class ArenaNativeQaTest {
                 appendLine("deltaWidth=${chess960.width - standard.width}")
                 appendLine("deltaHeight=${chess960.height - standard.height}")
                 appendLine("revision=${viewModel.uiState.value.runtime?.positionRevision?.value}")
-                appendLine("pieceSet=public application selection")
+                appendLine("appearance=${settings.appearance}")
+                appendLine("storedPieceSet=${settings.pieceSetId}")
+                appendLine("resolvedPieceSet=${PieceSetCatalog.definition(settings.pieceSetId).id}")
             },
         )
     }
