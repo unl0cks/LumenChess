@@ -169,6 +169,12 @@ A native rendering regression samples the actual text and both padding backgroun
 for positive, neutral, and negative scores in Dark and Light. This correction does
 not change the board or any approved P5/P6 component.
 
+The first contrast-regression run sampled inside Text semantics, which exclude
+surrounding padding, and hit an antialiased glyph edge. The QA probe now samples
+the real backing immediately outside the text bounds in the root capture. The
+4.5:1 threshold and production colors are unchanged; the cumulative existing
+engine, persistence, board, and Arena integration tests passed that run.
+
 Local Gradle execution on the current Windows host remains unavailable before
 project configuration because Gradle cannot establish its required loopback IPC
 connection. This host limitation reproduced across available JDK versions and
