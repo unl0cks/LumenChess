@@ -295,3 +295,107 @@ All 10 declared members verified; the eleventh ZIP member is the manifest itself
 The next boundary is manual M20 review with the private-device verification
 limitation above disclosed. Promotion, M21, M22, and release work each require
 separate explicit authorization.
+
+## Final evidence closure — 2026-09-02
+
+This section supersedes the earlier local-build, personal-renderer and unpushed-QA
+limitations. It does not declare manual M20 approval or authorize promotion.
+
+Recovery found local `e6ce1be918238bbaaedd058650ad4a203bf118b2` one commit ahead of
+remote `f14cf9aa1b08d7d7eb1634d33ba9c1d07aaed73d`. The exact existing QA/documentation
+commit was pushed normally with its SHA preserved. `main` remains
+`3af3fe36184cf35f4fb0878e83c3adc233189b7e`, and rejected `c21a2f6...` remains outside
+the M20 ancestry.
+
+Final native QA source: `62e17872a4e6a49a4066725a0286c3d170913d9e`. Its only code
+change is to the opt-in `ArenaReviewCompletionQaTest.kt`. There is no production
+delta from the already-reviewed `f14cf9a...` candidate. The test now checks the
+persisted Neo selection after process restart without selecting Neo again, records
+actual gateway/host-slot identity, and bounds Random assignment attempts at 12.
+
+### Reversed Random assignment and restoration
+
+The first fresh Random start through the actual setup UI produced:
+
+| Canonical side | Engine | Strength/model | Actual host slot |
+| --- | --- | --- | --- |
+| White | Reckless 0.9.0 | 1200 / Humanized | A |
+| Black | Stockfish 18 | 2000 / Native | B |
+
+No seed or RNG override was injected. Native cards, gateway identity, real Binder
+search requests, canonical participant records and persisted engine metadata all
+agreed with this reversal before and after restoration.
+
+Neo was selected through Settings before starting. Stored and resolved ID remained
+`private.chesscom.ejgfv` (`pieces/ejgfv`) through process stop/reopen, Resume Arena,
+and resumed engine progression. Every observed board-piece semantics tag agreed;
+the original native pixels visibly show Neo.
+
+The canonical game restored at revision 5 with FEN:
+
+`rnbqkbnr/ppp2ppp/4p3/3p4/4P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 1 3`
+
+White/Black participant configurations and saved clocks restored exactly:
+598681 ms White, 596413 ms Black, paused and not running. No in-flight search was
+persisted as authoritative state. The actual Resume Arena action resumes the saved
+game; QA then pauses through the product UI for a stable first-restored screenshot,
+so clock time may elapse after Resume. Subsequent real-host play reached revision 9.
+The new-game setup defaults above the Resume card are independent of the saved
+game; they must not be misread as its restored configuration.
+
+### Native geometry and visual inspection
+
+Fresh API-37 evidence used 1344 x 2992 at 489 dpi, 60 Hz, Google APIs x86_64 with
+16 KiB pages. The installed personal APK hash matched the locally audited APK.
+
+| Required state | Native Compose stage bounds | Size | Delta |
+| --- | --- | --- | --- |
+| Before force-stop | `(21,428)-(1323,1730)` | 1302 x 1302 | 0 px |
+| First restored Live | `(21,428)-(1323,1730)` | 1302 x 1302 | 0 px |
+| Resumed progression | `(21,428)-(1323,1730)` | 1302 x 1302 | 0 px |
+| Reversed Random start | `(21,428)-(1323,1730)` | 1302 x 1302 | 0 px |
+| Reversed Random progression | `(21,428)-(1323,1730)` | 1302 x 1302 | 0 px |
+
+The setup/Resume entry contains no board; it is not assigned a fabricated board
+rectangle. Exact equality was also asserted while waiting through engine thinking
+and results. Fresh full-context screenshots were inspected: no new clipping,
+renderer substitution, baseline anomaly, board movement or compositing artifact
+was found. Existing accepted setup/opening and 3D/Public Lumen evidence was carried
+forward unchanged rather than recreated.
+
+### Focused verification and package
+
+- ArenaSetupTest: 9 passed; ArenaRuntimeCoordinatorTest: 6 passed;
+  ArenaSnapshotCodecTest: 2 passed. Total **17 passed, 0 failed, 0 skipped**.
+- Fresh native prepare/reversed-assignment invocation: **1 passed** (22.128 s).
+- Separate force-stop/reopen native restoration invocation: **1 passed** (15.576 s).
+- Updated debug-test assembly: **passed**. `git diff --check`: **passed**.
+- Existing personal APK rescanned: **39 complete styles / 468 canonical piece
+  PNGs / 8 supported board PNGs**. Installed APK SHA-256 matched
+  `0bb1183662946a0ae76b1bbfbe16c4eb29c99ffd6735c76d2bd80c465541de81`.
+- Existing public APK rescanned: **0 private pieces, 0 private boards, 0 generated
+  staging entries, 0 personal-source path leaks**. No public rebuild was required
+  for this QA-only change. No source scripts/ZIPs/venv or tracked private assets
+  were found in either scan.
+- CI for the newly durable original QA commit: run
+  [33640080424](https://github.com/unl0cks/LumenChess/actions/runs/33640080424),
+  checkpoint **passed**; full/play-device/engine-device **skipped by branch
+  policy**, not passes. Historical multi-hour gates were **not rerun** in this
+  final evidence pass. The native tests above executed locally on API 37.
+- CodeRabbit: **not run**, no supported callable integration. The focused QA diff
+  was reviewed directly; no production defect or correction was identified.
+
+Replacement package: `LumenChess-M20-final-review-62e1787.zip`, native/test-equivalent
+to the QA source above. Size **13,435,625 bytes**; SHA-256:
+
+`1bf173454b81a1fe193f7fccfc2e5fee7d6ea15a9d9856ce4be74b0d47d527fb`
+
+It contains **29 ZIP members / 28 manifest members / 0 mismatches**: nine accepted
+native images, nine fresh native images, exact IDs/configuration/snapshot/bounds
+metadata, two native test logs, README and SHA-256 manifest. No private source
+assets, APKs or unnecessary absolute local paths are packaged. The archive stays
+local for manual review and is not uploaded to GitHub.
+
+The two requested evidence gaps are now demonstrated. **M20 remains pending the
+user's final manual approval.** No promotion/merge, M21, M22, release or signed
+final APK is authorized by this checkpoint.
