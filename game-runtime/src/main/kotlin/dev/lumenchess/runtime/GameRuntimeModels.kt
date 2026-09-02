@@ -39,6 +39,46 @@ data class RuntimeControllers(
     }
 }
 
+/** A presentation-facing control lease owned by the authoritative runtime.
+ *
+ * A null move count means that control remains manual until an explicit release. A lease is
+ * deliberately separate from [RuntimeController.HUMAN] so ordinary Play sessions keep their
+ * existing semantics and so the Arena UI cannot become a second move counter.
+ */
+data class ManualControlLease(
+    val remainingMoves: Int? = null,
+) {
+    init {
+        require(remainingMoves == null || remainingMoves > 0) {
+            "A manual control lease must have a positive move count or be unlimited"
+        }
+    }
+}
+
+enum class ManualClockPolicy {
+    LOCKED,
+    COUNT_TIME,
+}
+
+data class RuntimeManualControl(
+    val white: ManualControlLease? = null,
+    val black: ManualControlLease? = null,
+    val clockPolicy: ManualClockPolicy = ManualClockPolicy.LOCKED,
+) {
+    fun forSide(side: Color): ManualControlLease? = when (side) {
+        Color.WHITE -> white
+        Color.BLACK -> black
+    }
+
+    val isActive: Boolean get() = white != null || black != null
+    val clocksLocked: Boolean get() = isActive && clockPolicy == ManualClockPolicy.LOCKED
+
+    fun withSide(side: Color, lease: ManualControlLease?): RuntimeManualControl = when (side) {
+        Color.WHITE -> copy(white = lease)
+        Color.BLACK -> copy(black = lease)
+    }
+}
+
 sealed interface RuntimeTerminal {
     data class Timeout(val loser: Color) : RuntimeTerminal
     data class Resignation(val loser: Color) : RuntimeTerminal
@@ -78,6 +118,7 @@ data class RuntimeState(
     val terminal: RuntimeTerminal?,
     val processedEventIds: Set<RuntimeEventId>,
     val nextEngineSearchId: Long,
+    val manualControl: RuntimeManualControl = RuntimeManualControl(),
 )
 
 data class RuntimeSnapshot(
@@ -92,6 +133,7 @@ data class RuntimeSnapshot(
     val terminal: RuntimeTerminal?,
     val processedEventIds: Set<RuntimeEventId>,
     val nextEngineSearchId: Long,
+    val manualControl: RuntimeManualControl = RuntimeManualControl(),
 )
 
 sealed interface RuntimeEvent {
@@ -117,6 +159,11 @@ sealed interface RuntimeEvent {
         override val id: RuntimeEventId,
         val side: Color,
         val controller: RuntimeController,
+    ) : RuntimeEvent
+    /** Atomically replaces the manually controlled side set and its clock policy. */
+    data class SetManualControl(
+        override val id: RuntimeEventId,
+        val manualControl: RuntimeManualControl,
     ) : RuntimeEvent
     data class EngineHostDied(override val id: RuntimeEventId) : RuntimeEvent
     data class EngineHostRecovered(override val id: RuntimeEventId) : RuntimeEvent

@@ -11,6 +11,7 @@ import dev.lumenchess.engine.api.EngineMoveValidator
 import dev.lumenchess.engine.api.EngineSearchId
 import dev.lumenchess.engine.api.PositionRevision
 import dev.lumenchess.runtime.clock.ClockSide
+import dev.lumenchess.runtime.clock.ClockTransition
 import dev.lumenchess.runtime.clock.DeterministicGameClock
 
 internal object GameRuntimeReducer {
@@ -40,6 +41,7 @@ internal object GameRuntimeReducer {
             is RuntimeEvent.Pause -> pause(settledState)
             is RuntimeEvent.Resume -> resume(settledState, clock)
             is RuntimeEvent.ChangeController -> changeController(settledState, event)
+            is RuntimeEvent.SetManualControl -> setManualControl(settledState, event, clock)
             is RuntimeEvent.EngineHostDied -> hostDied(settledState)
             is RuntimeEvent.EngineHostRecovered -> hostRecovered(settledState)
             is RuntimeEvent.Resign -> terminalTransition(
@@ -67,7 +69,11 @@ internal object GameRuntimeReducer {
         if (state.terminal != null) return RuntimeTransition(state, disposition = RuntimeDisposition.TERMINAL)
         if (state.started && !state.paused) return RuntimeTransition(state, disposition = RuntimeDisposition.IGNORED)
 
-        val startedClock = clock.start(state.clock)
+        val startedClock = if (state.manualControl.clocksLocked) {
+            ClockTransition(state.clock.copy(running = false, lastSampleMillis = null))
+        } else {
+            clock.start(state.clock)
+        }
         if (startedClock.timeoutOccurred != null) {
             return terminalTransition(
                 state.copy(
@@ -203,7 +209,11 @@ internal object GameRuntimeReducer {
         clock: DeterministicGameClock,
     ): RuntimeTransition {
         if (!state.paused) return RuntimeTransition(state, disposition = RuntimeDisposition.IGNORED)
-        val resumedClock = clock.resume(state.clock)
+        val resumedClock = if (state.manualControl.clocksLocked) {
+            ClockTransition(state.clock.copy(running = false, lastSampleMillis = null))
+        } else {
+            clock.resume(state.clock)
+        }
         if (resumedClock.timeoutOccurred != null) {
             return terminalTransition(
                 state.copy(clock = resumedClock.state, paused = false),
@@ -241,6 +251,51 @@ internal object GameRuntimeReducer {
         return RuntimeTransition(next, effects, persist = true)
     }
 
+    private fun setManualControl(
+        state: RuntimeState,
+        event: RuntimeEvent.SetManualControl,
+        clock: DeterministicGameClock,
+    ): RuntimeTransition {
+        val manual = event.manualControl
+        val controllers = RuntimeControllers(
+            white = if (manual.white != null) RuntimeController.HUMAN else RuntimeController.ENGINE,
+            black = if (manual.black != null) RuntimeController.HUMAN else RuntimeController.ENGINE,
+        )
+        var next = state.copy(
+            controllers = controllers,
+            manualControl = manual,
+            queuedPremove = null,
+        )
+        val effects = mutableListOf<RuntimeEffect>()
+        if (state.controllers.forSide(state.position.sideToMove) == RuntimeController.ENGINE &&
+            controllers.forSide(state.position.sideToMove) == RuntimeController.HUMAN
+        ) {
+            state.pendingEngineSearch?.let {
+                effects += RuntimeEffect.CancelEngineSearch(it.searchId)
+                next = next.copy(pendingEngineSearch = null)
+            }
+        }
+
+        if (manual.clocksLocked) {
+            next = next.copy(clock = next.clock.copy(running = false, lastSampleMillis = null))
+        } else if (next.started && !next.paused && !next.clock.running) {
+            val started = clock.start(next.clock)
+            if (started.timeoutOccurred != null) {
+                return terminalTransition(
+                    next.copy(clock = started.state),
+                    RuntimeTerminal.Timeout(started.timeoutOccurred.toColor()),
+                    persist = true,
+                )
+            }
+            next = next.copy(clock = started.state)
+        }
+
+        val scheduled = maybeStartEngine(next)
+        next = scheduled.state
+        effects += scheduled.effects
+        return RuntimeTransition(next, effects, persist = true)
+    }
+
     private fun hostDied(state: RuntimeState): RuntimeTransition {
         if (!state.engineHostAvailable && state.pendingEngineSearch == null) {
             return RuntimeTransition(state, disposition = RuntimeDisposition.IGNORED)
@@ -269,7 +324,17 @@ internal object GameRuntimeReducer {
     ): RuntimeTransition {
         val addition = state.gameTree.addMove(state.currentNodeId, move)
         val nextPosition = addition.tree.node(addition.nodeId).position
-        val switchedClock = clock.switchTurn(state.clock)
+        val switchedClock = if (state.manualControl.clocksLocked) {
+            ClockTransition(
+                state.clock.copy(
+                    activeSide = state.clock.activeSide.opposite,
+                    running = false,
+                    lastSampleMillis = null,
+                ),
+            )
+        } else {
+            clock.switchTurn(state.clock)
+        }
         if (switchedClock.timeoutOccurred != null) {
             return terminalTransition(
                 state.copy(clock = switchedClock.state),
@@ -278,6 +343,15 @@ internal object GameRuntimeReducer {
             )
         }
 
+        val mover = state.position.sideToMove
+        val manualAfterMove = state.manualControl.consume(mover)
+        val controllersAfterMove = if (
+            state.manualControl.forSide(mover) != null && manualAfterMove.forSide(mover) == null
+        ) {
+            state.controllers.withSide(mover, RuntimeController.ENGINE)
+        } else {
+            state.controllers
+        }
         var next = state.copy(
             position = nextPosition,
             gameTree = addition.tree,
@@ -285,7 +359,23 @@ internal object GameRuntimeReducer {
             clock = switchedClock.state,
             positionRevision = PositionRevision(state.positionRevision.value + 1L),
             pendingEngineSearch = null,
+            controllers = controllersAfterMove,
+            manualControl = manualAfterMove,
         )
+
+        // A finite lease expires as part of the same authoritative move reduction. If that was
+        // the last lease, start the normal clock at the resulting side-to-move boundary.
+        if (state.manualControl.clocksLocked && !next.manualControl.isActive && next.started && !next.paused) {
+            val unlocked = clock.start(next.clock)
+            if (unlocked.timeoutOccurred != null) {
+                return terminalTransition(
+                    next.copy(clock = unlocked.state),
+                    RuntimeTerminal.Timeout(unlocked.timeoutOccurred.toColor()),
+                    persist = true,
+                )
+            }
+            next = next.copy(clock = unlocked.state)
+        }
 
         val terminal = when (Rules.termination(nextPosition)) {
             Termination.CHECKMATE -> RuntimeTerminal.Checkmate(nextPosition.sideToMove.opposite)
@@ -301,11 +391,15 @@ internal object GameRuntimeReducer {
             if (queued.side == next.position.sideToMove && queued.queuedAtRevision == state.positionRevision) {
                 val legalPremove = MoveGenerator.legalMoves(next.position).firstOrNull { it == queued.move }
                 if (legalPremove != null) {
-                    val charged = clock.charge(
-                        next.clock,
-                        queued.side.toClockSide(),
-                        DEFAULT_PREMOVE_COST_MILLIS,
-                    )
+                    val charged = if (next.manualControl.clocksLocked) {
+                        ClockTransition(next.clock)
+                    } else {
+                        clock.charge(
+                            next.clock,
+                            queued.side.toClockSide(),
+                            DEFAULT_PREMOVE_COST_MILLIS,
+                        )
+                    }
                     next = next.copy(
                         clock = charged.state,
                         queuedPremove = null,
@@ -421,4 +515,14 @@ internal object GameRuntimeReducer {
 
     private fun Color.toClockSide(): ClockSide =
         if (this == Color.WHITE) ClockSide.WHITE else ClockSide.BLACK
+
+    private fun RuntimeManualControl.consume(side: Color): RuntimeManualControl {
+        val lease = forSide(side) ?: return this
+        val remaining = lease.remainingMoves
+        return if (remaining == null || remaining > 1) {
+            if (remaining == null) this else withSide(side, ManualControlLease(remaining - 1))
+        } else {
+            withSide(side, null)
+        }
+    }
 }

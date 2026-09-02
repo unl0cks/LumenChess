@@ -1,9 +1,11 @@
 package dev.lumenchess.runtime
 
 import dev.lumenchess.core.chess.GameTree
+import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Position
 import dev.lumenchess.engine.api.PositionRevision
 import dev.lumenchess.runtime.clock.ClockConfig
+import dev.lumenchess.runtime.clock.ClockSide
 import dev.lumenchess.runtime.clock.DeterministicGameClock
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
 
@@ -75,8 +77,18 @@ class GameRuntime private constructor(
             timeSource: MonotonicTimeSource,
             controllers: RuntimeControllers,
             engineHostAvailable: Boolean = true,
+            manualControl: RuntimeManualControl = RuntimeManualControl(),
         ): GameRuntime {
-            val clock = DeterministicGameClock(timeSource).create(clockConfig)
+            require(manualControl.white == null || controllers.white == RuntimeController.HUMAN) {
+                "White manual control requires a human controller"
+            }
+            require(manualControl.black == null || controllers.black == RuntimeController.HUMAN) {
+                "Black manual control requires a human controller"
+            }
+            val clock = DeterministicGameClock(timeSource).create(
+                clockConfig,
+                if (initialPosition.sideToMove == Color.WHITE) ClockSide.WHITE else ClockSide.BLACK,
+            )
             val tree = GameTree.create(initialPosition)
             return GameRuntime(
                 initialState = RuntimeState(
@@ -94,6 +106,7 @@ class GameRuntime private constructor(
                     terminal = null,
                     processedEventIds = emptySet(),
                     nextEngineSearchId = 1L,
+                    manualControl = manualControl,
                 ),
                 timeSource = timeSource,
             )
@@ -119,6 +132,7 @@ class GameRuntime private constructor(
                 terminal = snapshot.terminal,
                 processedEventIds = snapshot.processedEventIds.toSet(),
                 nextEngineSearchId = snapshot.nextEngineSearchId,
+                manualControl = snapshot.manualControl,
             ),
             timeSource = timeSource,
         )
@@ -137,4 +151,5 @@ private fun RuntimeState.toSnapshot(): RuntimeSnapshot = RuntimeSnapshot(
     terminal = terminal,
     processedEventIds = processedEventIds.toSet(),
     nextEngineSearchId = nextEngineSearchId,
+    manualControl = manualControl,
 )
