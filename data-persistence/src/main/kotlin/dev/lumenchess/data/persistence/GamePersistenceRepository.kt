@@ -248,7 +248,8 @@ class GamePersistenceRepository(
         return gameId
     }
 
-    private suspend fun loadGameInternal(id: PersistentGameId): LoadedCanonicalGame? {
+    /** The caller must own a Room transaction spanning this load and any related writes. */
+    internal suspend fun loadGameInternal(id: PersistentGameId): LoadedCanonicalGame? {
         val game = database.gameDao().gameById(id.value) ?: return null
         val variant = enumValueOrMappingError<Variant>(game.variant, "variant")
         val startPosition = try {

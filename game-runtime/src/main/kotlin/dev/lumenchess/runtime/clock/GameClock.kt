@@ -5,6 +5,7 @@ import kotlin.math.max
 data class ClockConfig(
     val initialMillis: Long,
     val incrementMillis: Long,
+    val enabled: Boolean = true,
 ) {
     init {
         require(initialMillis >= 0L) { "Initial clock time cannot be negative" }
@@ -28,6 +29,7 @@ data class ClockState(
     val running: Boolean,
     val lastSampleMillis: Long?,
     val timedOutSide: ClockSide?,
+    val enabled: Boolean = true,
 ) {
     init {
         require(whiteRemainingMillis >= 0L) { "White clock cannot be negative" }
@@ -37,6 +39,7 @@ data class ClockState(
             "A running clock must have exactly one last monotonic sample"
         }
         require(timedOutSide == null || !running) { "A timed-out clock cannot keep running" }
+        require(enabled || (!running && timedOutSide == null)) { "An untimed game cannot run or time out a clock" }
     }
 
     fun remaining(side: ClockSide): Long = when (side) {
@@ -76,9 +79,11 @@ class DeterministicGameClock(
         running = false,
         lastSampleMillis = null,
         timedOutSide = null,
+        enabled = config.enabled,
     )
 
     fun start(state: ClockState): ClockTransition {
+        if (!state.enabled) return ClockTransition(state)
         if (state.timedOutSide != null || state.running) return ClockTransition(state)
         if (state.remaining(state.activeSide) == 0L) return timeout(state, state.activeSide)
         return ClockTransition(
@@ -104,6 +109,7 @@ class DeterministicGameClock(
     }
 
     fun switchTurn(state: ClockState): ClockTransition {
+        if (!state.enabled) return ClockTransition(state.copy(activeSide = state.activeSide.opposite))
         if (state.timedOutSide != null) return ClockTransition(state)
         val now = if (state.running) timeSource.nowMillis() else null
         val settled = if (now != null) settleAt(state, now) else ClockTransition(state)
@@ -143,6 +149,7 @@ class DeterministicGameClock(
         millis: Long,
     ): ClockTransition {
         require(millis >= 0L) { "Clock charge cannot be negative" }
+        if (!state.enabled) return ClockTransition(state)
         if (state.timedOutSide != null) return ClockTransition(state)
 
         val now = if (state.running) timeSource.nowMillis() else null
