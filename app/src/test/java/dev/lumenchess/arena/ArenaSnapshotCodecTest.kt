@@ -17,6 +17,10 @@ import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.play.PlayEngineGateway
 import dev.lumenchess.play.PlayTimeControl
 import dev.lumenchess.runtime.RuntimeSnapshot
+import dev.lumenchess.runtime.RuntimeController
+import dev.lumenchess.runtime.ManualClockPolicy
+import dev.lumenchess.runtime.ManualControlLease
+import dev.lumenchess.runtime.RuntimeManualControl
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -123,6 +127,31 @@ class ArenaSnapshotCodecTest {
         assertEquals(RuntimeController.ENGINE, decoded.snapshot.controllers.white)
         assertEquals(RuntimeController.ENGINE, decoded.snapshot.controllers.black)
         assertTrue(decoded.snapshot.manualControl == dev.lumenchess.runtime.RuntimeManualControl())
+    }
+
+    @Test
+    fun manualLeasesAndClockPolicyRoundTripAfterAcceptedMoves() {
+        val setup = ArenaSetupResolver.resolve(
+            ArenaSetupConfig(manualOpening = ArenaManualOpeningSetup(
+                sides = ArenaManualSide.BOTH,
+                moveLimitText = "3",
+                clockPolicy = ManualClockPolicy.COUNT_TIME,
+            )),
+            randomInt = { 0 },
+        )
+        val coordinator = ArenaRuntimeCoordinator.create(setup, MonotonicTimeSource { 1_000 }, NoopEngine, NoopEngine, NoopPersistence)
+        coordinator.start()
+        coordinator.humanMove(dev.lumenchess.core.chess.Move.parseUci("e2e4"))
+        coordinator.setManualControl(coordinator.state.manualControl.copy(black = ManualControlLease()))
+        val snapshot = coordinator.snapshotForRestore()
+        val decoded = ArenaSnapshotCodec.decode(loaded(snapshot, ArenaSnapshotCodec.encode(snapshot, setup)))
+
+        assertEquals(RuntimeManualControl(ManualControlLease(2), ManualControlLease(), ManualClockPolicy.COUNT_TIME), decoded.snapshot.manualControl)
+        assertEquals(snapshot.controllers, decoded.snapshot.controllers)
+        assertEquals(snapshot.position, decoded.snapshot.position)
+        assertEquals(snapshot.positionRevision, decoded.snapshot.positionRevision)
+        assertTrue(decoded.snapshot.paused)
+        assertFalse(decoded.snapshot.clock.running)
     }
 
     private fun loaded(

@@ -234,4 +234,48 @@ class ManualControlRuntimeTest {
         assertFalse(started.state.clock.running)
         assertEquals(60_000L, runtime.state.clock.blackRemainingMillis)
     }
+
+    @Test
+    fun returningOneSidePreservesOtherLeaseAndReturningBothRestartsCurrentClockOnce() {
+        val time = FakeTime()
+        val control = RuntimeManualControl(white = lease(), black = lease())
+        val runtime = runtime(time, controllers = RuntimeControllers(RuntimeController.HUMAN, RuntimeController.HUMAN), manualControl = control)
+        start(runtime)
+        time.advanceBy(8_000)
+        val partial = runtime.dispatch(RuntimeEvent.SetManualControl(RuntimeEventId(2), control.copy(white = null)))
+        assertEquals(RuntimeController.ENGINE, partial.state.controllers.white)
+        assertEquals(RuntimeController.HUMAN, partial.state.controllers.black)
+        assertEquals(lease(), partial.state.manualControl.black)
+        assertFalse(partial.state.clock.running)
+        val search = partial.effects.filterIsInstance<RuntimeEffect.StartEngineSearch>().single()
+        time.advanceBy(2_000)
+        val replied = runtime.dispatch(RuntimeEvent.EngineCompleted(RuntimeEventId(3), EngineSearchResult(search.searchId, search.positionRevision, "e2e4")))
+        assertEquals(60_000L, replied.state.clock.whiteRemainingMillis)
+        assertFalse(replied.state.clock.running)
+        val released = runtime.dispatch(RuntimeEvent.SetManualControl(RuntimeEventId(4), RuntimeManualControl()))
+        assertEquals(ClockSide.BLACK, released.state.clock.activeSide)
+        assertTrue(released.state.clock.running)
+        time.advanceBy(1_000)
+        val settled = runtime.dispatch(RuntimeEvent.ClockCheck(RuntimeEventId(5)))
+        assertEquals(59_000L, settled.state.clock.blackRemainingMillis)
+        assertEquals(60_000L, settled.state.clock.whiteRemainingMillis)
+    }
+
+    @Test
+    fun changingManualClockPolicySettlesElapsedTimeWithoutRewindOrDoubleCharge() {
+        val time = FakeTime()
+        val locked = RuntimeManualControl(white = lease(), black = lease())
+        val runtime = runtime(time, controllers = RuntimeControllers(RuntimeController.HUMAN, RuntimeController.HUMAN), manualControl = locked)
+        start(runtime)
+        time.advanceBy(5_000)
+        runtime.dispatch(RuntimeEvent.SetManualControl(RuntimeEventId(2), locked.copy(clockPolicy = ManualClockPolicy.COUNT_TIME)))
+        time.advanceBy(1_250)
+        val relocked = runtime.dispatch(RuntimeEvent.SetManualControl(RuntimeEventId(3), locked))
+        assertEquals(58_750L, relocked.state.clock.whiteRemainingMillis)
+        time.advanceBy(5_000)
+        val moved = runtime.dispatch(RuntimeEvent.HumanMove(RuntimeEventId(4), move("e2e4")))
+        assertEquals(58_750L, moved.state.clock.whiteRemainingMillis)
+        assertEquals(60_000L, moved.state.clock.blackRemainingMillis)
+        assertFalse(moved.state.clock.running)
+    }
 }

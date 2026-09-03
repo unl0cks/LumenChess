@@ -104,7 +104,7 @@ class ArenaManualControlTest {
 
         assertEquals("2", encoded["lumen.arena.m20.version"])
         assertEquals("HUMAN", encoded["lumen.arena.m20.whiteController"])
-        assertEquals("UNLIMITED", encoded["lumen.arena.m20.manualWhite"])
+        assertEquals("3", encoded["lumen.arena.m20.manualWhite"])
         assertEquals("LOCKED", encoded["lumen.arena.m20.manualClockPolicy"])
     }
 

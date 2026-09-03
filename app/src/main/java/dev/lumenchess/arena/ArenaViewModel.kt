@@ -23,7 +23,6 @@ import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.play.PlayTimeControl
 import dev.lumenchess.runtime.RuntimeState
 import dev.lumenchess.runtime.RuntimeController
-import dev.lumenchess.runtime.RuntimeDisposition
 import dev.lumenchess.runtime.ManualClockPolicy
 import dev.lumenchess.runtime.ManualControlLease
 import dev.lumenchess.runtime.RuntimeManualControl
@@ -198,7 +197,8 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             runtime.controllers.forSide(runtime.position.sideToMove) != RuntimeController.HUMAN
         ) return
         val result = coordinator?.humanMove(move) ?: return
-        if (result.disposition == RuntimeDisposition.APPLIED) {
+        // A committed mating move is TERMINAL, while a timeout can be TERMINAL without a move.
+        if (result.state.positionRevision != runtime.positionRevision) {
             mutableUiState.value = mutableUiState.value.copy(lastMoveWasHuman = true)
         }
         refreshRuntimeProjection(checkTimeout = false)
@@ -354,8 +354,9 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         override fun onEngineResult(result: EngineSearchResult) {
+            val previousRevision = coordinator?.state?.positionRevision
             val dispatchResult = coordinator?.onEngineResult(side, result)
-            if (dispatchResult?.disposition == RuntimeDisposition.APPLIED) {
+            if (dispatchResult != null && dispatchResult.state.positionRevision != previousRevision) {
                 mutableUiState.value = mutableUiState.value.copy(lastMoveWasHuman = false)
             }
             refreshRuntimeProjection(checkTimeout = false)
