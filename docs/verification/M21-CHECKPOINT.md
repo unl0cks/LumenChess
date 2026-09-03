@@ -169,3 +169,33 @@ the actual run separately rather than predeclaring a future CI result here.
 
 **M21 awaits manual approval.** No merge/promotion, M22, release or signed/final
 APK is included. P5/P6 and the M20 product composition were not redesigned.
+
+## Manual approval and promotion authorization — 2026-09-03
+
+The user manually approved **M21 — Manual Takeover**, candidate
+`b65426c3d28ad3742bb605a87285f62221f348be`, after independently inspecting the
+actual API-37 review package: **23 ZIP members / 22 declared evidence members /
+0 checksum or size mismatches**. This approval supersedes the historical review
+boundary above; no additional M21 visual review is required.
+
+Approved evidence covers engines-only, White/Black/Both takeover and return,
+finite/until-release leases, locked/counting clocks, Standard/Chess960,
+Stockfish 18/Reckless 0.9.0, and force-stop/restoration with finite lease expiry
+and correct engine handoff. Neo remained the effective renderer. Arena bounds
+remained **(21,428)–(1323,1730), 1302 × 1302 px, 0 px delta**. Public/private
+packaging and tracked-asset isolation passed, with no P5/P6 regression observed.
+
+The narrow terminal-move attribution correction described above is included:
+presentation source follows an actual committed revision, including terminal
+moves, without changing runtime authority, clocks, legality, or approved motion.
+The completed verification comprises **293 JVM and 130 native regression passes**,
+the separately enabled Neo review/restoration lane, lint and debug assemblies.
+GitHub run **33731590683** completed successfully for the approved candidate:
+`checkpoint` **PASS**; `full`, `engine-device`, `play-device` **SKIPPED BY POLICY**.
+No skipped job is counted as a pass.
+
+The user explicitly authorizes history-preserving promotion to `main`, followed
+by one cumulative main verification gate. After that gate is green, M22 may
+begin on a separate branch from verified main, using its recovered authoritative
+scope. This approval record changes documentation only. No release/signed APK,
+M22 promotion, or M23 work is authorized.
