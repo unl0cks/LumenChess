@@ -82,6 +82,27 @@ package `LumenChess-P6.4-Neo-corrected-review-48ab1c44.zip` has SHA-256
 `56aac1e4622e7da7732780e1219e573ff43ab4c03c7095000f64c16009ba38cb`;
 all 19 manifest entries matched their declared sizes and digests.
 
+#### Historical evidence correction accepted — 2026-09-08
+
+Earlier Neo-labeled full-Live P6.4 evidence was invalid due to QA state
+contamination: the preceding persistence QA restored `lumen-vector`, which the
+later capture inherited. This was a capture/labeling error, not a production
+renderer defect.
+
+The user manually reviewed and accepted the replacement package
+`LumenChess-P6.4-Neo-verified-48ab1c44.zip`, SHA-256
+`93212729458e40cd352c3bac6abb89c02bbc249ea501ee74f0ed693131da4fb3`.
+All 23 ZIP members and 22 manifest-declared evidence files passed integrity
+review with zero size/checksum mismatches. Native pixels confirmed actual Neo
+(`private.chesscom.ejgfv`), distinct cross-renderer identities, silhouette-following
+shadow, continuous sampled settle/return, and stable 1278x1278 Live board bounds.
+The disclosed variable-video-cadence limitation was accepted.
+
+This corrects only the evidence record for the already-approved immutable
+implementation `48ab1c4469c34b05c08b935ff160edf8f2e0175f`; it changes no P6.3,
+P6.4, or P6.5 behavior and does not reopen completed/promoted P6 or supersede
+later milestone work. The private package and imagery remain outside Git.
+
 ## Architecture retained
 
 - `core-chess` remains the legality authority.
