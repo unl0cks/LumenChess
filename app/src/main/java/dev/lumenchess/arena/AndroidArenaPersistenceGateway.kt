@@ -4,6 +4,9 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import dev.lumenchess.data.persistence.GamePersistenceMetadata
+import dev.lumenchess.data.persistence.BranchOrigin
+import dev.lumenchess.data.persistence.BranchPersistenceRepository
+import dev.lumenchess.core.chess.GameTree
 import dev.lumenchess.data.persistence.GameSourceType
 import dev.lumenchess.data.persistence.LiveGamePersistenceRepository
 import dev.lumenchess.data.persistence.LumenDatabase
@@ -33,6 +36,7 @@ class AndroidArenaPersistenceGateway(
         fun onPersisted(gameId: String) {}
         fun onRestoreLoaded(game: RestoredArenaGame?) {}
         fun onPersistenceFailure(error: Throwable) {}
+        fun onVariationSaved(appendedNodes: Int) {}
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -62,11 +66,11 @@ class AndroidArenaPersistenceGateway(
                             timeControl = TimeControlMetadata(
                                 baseMillis = setup.clockConfig.initialMillis,
                                 incrementMillis = setup.clockConfig.incrementMillis,
-                                raw = "${setup.clockConfig.initialMillis}+${setup.clockConfig.incrementMillis}",
+                                raw = if (setup.clockConfig.enabled) "${setup.clockConfig.initialMillis}+${setup.clockConfig.incrementMillis}" else "untimed",
                             ),
                         ),
                         restoreMetadata = ArenaSnapshotCodec.encode(snapshot, setup),
-                        sourceType = GameSourceType.ENGINE_ARENA,
+                        sourceType = if (setup.branchOrigin == null) GameSourceType.ENGINE_ARENA else GameSourceType.BRANCH,
                         whiteParticipant = setup.white.participant(),
                         blackParticipant = setup.black.participant(),
                     )
@@ -80,11 +84,13 @@ class AndroidArenaPersistenceGateway(
         }
     }
 
-    fun loadLastRestorableArena() {
+    fun loadLastRestorableArena() = loadArena(preferences.getString(KEY_LAST_ARENA_GAME_ID, null))
+
+    fun loadArena(id: String?) {
         if (closed.get()) return
         executor.execute {
             try {
-                val restored = preferences.getString(KEY_LAST_ARENA_GAME_ID, null)?.let { raw ->
+                val restored = id?.let { raw ->
                     runSuspendBlocking { liveRepository.load(PersistentGameId(raw)) }?.let(ArenaSnapshotCodec::decode)
                 }
                 handler.post { listener?.onRestoreLoaded(restored) }
@@ -94,6 +100,33 @@ class AndroidArenaPersistenceGateway(
                     listener?.onRestoreLoaded(null)
                 }
             }
+        }
+    }
+
+    // This queue follows every earlier runtime snapshot write: anchors never race their save.
+    fun captureBranchOrigin(mainlinePly: Int, onResult: (Result<BranchOrigin>) -> Unit) {
+        if (closed.get()) return
+        executor.execute {
+            try {
+                val origin = runSuspendBlocking {
+                    BranchPersistenceRepository(database).captureOrigin(
+                        PersistentGameId(requireNotNull(gameId) { "Original game has not been saved" }), mainlinePly,
+                    )
+                }
+                handler.post { if (!closed.get()) onResult(Result.success(origin)) }
+            } catch (error: Throwable) {
+                handler.post { if (!closed.get()) onResult(Result.failure(error)) }
+            }
+        }
+    }
+
+    fun saveVariation(origin: BranchOrigin, tree: GameTree) {
+        if (closed.get()) return
+        executor.execute {
+            try {
+                val count = runSuspendBlocking { BranchPersistenceRepository(database).saveAsVariation(origin, tree) }
+                handler.post { listener?.onVariationSaved(count) }
+            } catch (error: Throwable) { handler.post { listener?.onPersistenceFailure(error) } }
         }
     }
 

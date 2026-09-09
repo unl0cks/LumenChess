@@ -11,6 +11,7 @@ import dev.lumenchess.board.ChessboardOrientation
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.Variant
+import dev.lumenchess.data.persistence.BranchOrigin
 import dev.lumenchess.engine.api.EngineSearchInfo
 import dev.lumenchess.engine.api.EngineSearchResult
 import dev.lumenchess.engine.api.EngineSessionId
@@ -51,6 +52,9 @@ data class ArenaUiState(
     val message: String? = null,
     val sessionGeneration: Long = 0L,
     val lastMoveWasHuman: Boolean = false,
+    val historyPly: Int? = null,
+    val branchDraft: BranchOrigin? = null,
+    val branchOperationPending: Boolean = false,
 )
 
 /** Android presentation bridge for Arena. Canonical chess state remains inside [ArenaRuntimeCoordinator]. */
@@ -70,6 +74,8 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private var screenStarted = false
     private var pausedForLifecycle = false
     private var sessionGeneration = 0L
+    private var pendingBranchCapture: Any? = null
+    private var pendingOriginalReturn: AndroidArenaPersistenceGateway? = null
 
     private val clockTicker = object : Runnable {
         override fun run() {
@@ -99,6 +105,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     fun updateChess960Index(index: Int) = updateSetup { copy(chess960Index = index) }
     fun updateColorAssignment(value: ArenaColorAssignment) = updateSetup { copy(colorAssignment = value) }
     fun updateTimeControl(value: PlayTimeControl) = updateSetup { copy(timeControl = value) }
+    fun updateUntimed(value: Boolean) = updateSetup { copy(untimed = value) }
     fun updateOpeningMode(value: ArenaOpeningMode) = updateSetup {
         copy(
             variant = if (value == ArenaOpeningMode.RANDOM_CHESS960) Variant.CHESS960 else variant,
@@ -131,7 +138,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     fun startNewArena() {
         val config = mutableUiState.value.setup
         if (ArenaSetupValidator.validate(config) !is ArenaSetupValidation.Valid) return
-        startResolvedArena(ArenaSetupResolver.resolve(config), restored = null)
+        startResolvedArena(ArenaSetupResolver.resolve(config).copy(branchOrigin = mutableUiState.value.branchDraft), restored = null)
     }
 
     fun resumeLastArena() {
@@ -146,7 +153,9 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resume() {
+        cancelBranchNavigation()
         pausedForLifecycle = false
+        mutableUiState.value = mutableUiState.value.copy(historyPly = null)
         coordinator?.resume()
         refreshRuntimeProjection(checkTimeout = false)
     }
@@ -191,6 +200,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         val runtime = current.runtime ?: return
         if (
             current.mode != ArenaScreenMode.LIVE ||
+            current.historyPly != null ||
             current.sessionGeneration != expectedSession ||
             runtime.positionRevision.value != expectedRevision ||
             runtime.paused || runtime.terminal != null ||
@@ -205,6 +215,10 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun stopArena() {
+        restoreProbe?.setListener(null)
+        restoreProbe?.close()
+        restoreProbe = null
+        val wasSandbox = mutableUiState.value.resolvedSetup?.branchOrigin != null || mutableUiState.value.branchDraft != null
         coordinator?.let { current ->
             if (current.state.started && !current.state.paused && current.state.terminal == null) current.pause()
         }
@@ -212,6 +226,8 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         stopLiveAdapters()
         mutableUiState.value = mutableUiState.value.copy(
             mode = ArenaScreenMode.SETUP,
+            setup = if (wasSandbox) ArenaSetupConfig() else mutableUiState.value.setup,
+            setupValidation = ArenaSetupValidation.Valid,
             resolvedSetup = null,
             runtime = null,
             clock = null,
@@ -220,6 +236,9 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             blackEngineStatus = "Not connected",
             gameId = null,
             message = null,
+            historyPly = null,
+            branchDraft = null,
+            branchOperationPending = false,
         )
         loadRestorableArena()
     }
@@ -234,6 +253,104 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun browseHistory() {
+        val current = coordinator ?: return
+        cancelBranchNavigation()
+        pause()
+        mutableUiState.value = mutableUiState.value.copy(
+            historyPly = current.state.gameTree.mainline().size, message = null,
+        )
+    }
+
+    fun stepHistory(delta: Int) {
+        cancelBranchNavigation()
+        val ui = mutableUiState.value
+        val ply = ui.historyPly ?: return
+        val size = ui.runtime?.gameTree?.mainline()?.size ?: return
+        mutableUiState.value = ui.copy(historyPly = (ply + delta).coerceIn(0, size))
+    }
+
+    fun closeHistory() {
+        cancelBranchNavigation()
+        mutableUiState.value = mutableUiState.value.copy(historyPly = null)
+    }
+
+    fun branchHere() {
+        val ui = mutableUiState.value
+        val ply = ui.historyPly ?: return
+        if (ui.branchOperationPending) return
+        val persistence = persistenceGateway ?: return
+        val setup = ui.resolvedSetup ?: return
+        val request = Any()
+        pendingBranchCapture = request
+        mutableUiState.value = ui.copy(branchOperationPending = true, message = "Preparing sandbox…")
+        persistence.captureBranchOrigin(ply) { result ->
+            // A newer selection, Resume, or lifecycle/session transition owns the screen now.
+            if (persistenceGateway !== persistence || pendingBranchCapture !== request) return@captureBranchOrigin
+            pendingBranchCapture = null
+            result.fold(
+                onSuccess = { origin ->
+                    val config = setup.forBranch(origin)
+                    stopLiveAdapters()
+                    mutableUiState.value = mutableUiState.value.copy(
+                        mode = ArenaScreenMode.SETUP, setup = config,
+                        setupValidation = ArenaSetupValidator.validate(config), branchDraft = origin,
+                        branchOperationPending = false, restorableGame = null, runtime = null,
+                        resolvedSetup = null, clock = null, evaluation = null, historyPly = null, gameId = null, message = null,
+                    )
+                },
+                onFailure = { error ->
+                    mutableUiState.value = mutableUiState.value.copy(
+                        branchOperationPending = false,
+                        message = "Could not prepare sandbox: ${error.message.orEmpty()}",
+                    )
+                },
+            )
+        }
+    }
+
+    fun saveVariation() {
+        val ui = mutableUiState.value
+        val origin = ui.resolvedSetup?.branchOrigin ?: return
+        val tree = coordinator?.state?.gameTree ?: return
+        if (ui.branchOperationPending) return
+        if (tree.mainline().isEmpty()) {
+            mutableUiState.value = ui.copy(message = "Play a move before saving a variation.")
+            return
+        }
+        mutableUiState.value = ui.copy(branchOperationPending = true, message = "Saving variation…")
+        persistenceGateway?.saveVariation(origin, tree)
+    }
+
+    fun returnToOriginal() {
+        val ui = mutableUiState.value
+        val origin = ui.branchDraft ?: ui.resolvedSetup?.branchOrigin ?: return
+        if (ui.branchOperationPending) return
+        pause()
+        mutableUiState.value = mutableUiState.value.copy(branchOperationPending = true, message = "Loading original…")
+        val generation = sessionGeneration
+        restoreProbe?.setListener(null)
+        restoreProbe?.close()
+        val probe = AndroidArenaPersistenceGateway(getApplication())
+        restoreProbe = probe
+        pendingOriginalReturn = probe
+        probe.setListener(object : AndroidArenaPersistenceGateway.Listener {
+            override fun onRestoreLoaded(game: RestoredArenaGame?) {
+                if (restoreProbe !== probe || pendingOriginalReturn !== probe || sessionGeneration != generation) return
+                finishOriginalReturn(probe)
+                if (game == null) {
+                    mutableUiState.value = mutableUiState.value.copy(branchOperationPending = false, message = "Original game is unavailable.")
+                } else startResolvedArena(game.setup, game, resumeRestored = false, resetNewGameSetup = true)
+            }
+            override fun onPersistenceFailure(error: Throwable) {
+                if (restoreProbe !== probe || pendingOriginalReturn !== probe || sessionGeneration != generation) return
+                finishOriginalReturn(probe)
+                mutableUiState.value = mutableUiState.value.copy(branchOperationPending = false, message = "Could not load original: ${error.message.orEmpty()}")
+            }
+        })
+        probe.loadArena(origin.gameId.value)
+    }
+
     fun onScreenStarted() {
         if (screenStarted) return
         screenStarted = true
@@ -246,6 +363,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onScreenStopped() {
         if (!screenStarted) return
+        cancelBranchNavigation()
         screenStarted = false
         val current = coordinator ?: return
         if (current.state.started && !current.state.paused && current.state.terminal == null) {
@@ -269,8 +387,9 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
     }
 
-    private fun startResolvedArena(setup: ResolvedArenaSetup, restored: RestoredArenaGame?) {
+    private fun startResolvedArena(setup: ResolvedArenaSetup, restored: RestoredArenaGame?, resumeRestored: Boolean = true, resetNewGameSetup: Boolean = false) {
         sessionGeneration += 1L
+        val generation = sessionGeneration
         stopLiveAdapters()
         restoreProbe?.setListener(null)
         restoreProbe?.close()
@@ -306,20 +425,32 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         persistenceGateway = persistence
         persistence.setListener(object : AndroidArenaPersistenceGateway.Listener {
             override fun onPersisted(gameId: String) {
+                if (persistenceGateway !== persistence) return
                 mutableUiState.value = mutableUiState.value.copy(gameId = gameId)
             }
 
             override fun onPersistenceFailure(error: Throwable) {
+                if (persistenceGateway !== persistence) return
                 mutableUiState.value = mutableUiState.value.copy(
                     message = "Could not save Arena game: ${error.message.orEmpty()}",
+                    branchOperationPending = false,
+                )
+            }
+
+            override fun onVariationSaved(appendedNodes: Int) {
+                if (persistenceGateway !== persistence || sessionGeneration != generation) return
+                mutableUiState.value = mutableUiState.value.copy(
+                    branchOperationPending = false,
+                    message = if (appendedNodes == 0) "Saved variation is already up to date." else "Saved $appendedNodes move(s) as a variation. Original mainline unchanged.",
                 )
             }
         })
-        white.setListener(engineListener(Color.WHITE, setup.white.engine))
-        black.setListener(engineListener(Color.BLACK, setup.black.engine))
+        white.setListener(engineListener(Color.WHITE, setup.white.engine, generation))
+        black.setListener(engineListener(Color.BLACK, setup.black.engine, generation))
 
         mutableUiState.value = mutableUiState.value.copy(
             mode = ArenaScreenMode.LIVE,
+            setup = if (resetNewGameSetup) ArenaSetupConfig() else mutableUiState.value.setup,
             resolvedSetup = setup,
             restorableGame = null,
             runtime = runtimeCoordinator.state,
@@ -331,8 +462,11 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             message = null,
             sessionGeneration = sessionGeneration,
             lastMoveWasHuman = false,
+            historyPly = null,
+            branchDraft = null,
+            branchOperationPending = false,
         )
-        if (restored == null) runtimeCoordinator.start() else if (restored.snapshot.terminal == null) runtimeCoordinator.resume()
+        if (restored == null) runtimeCoordinator.start() else if (resumeRestored && restored.snapshot.terminal == null) runtimeCoordinator.resume()
         white.connect()
         black.connect()
         mainHandler.removeCallbacks(clockTicker)
@@ -340,20 +474,23 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         refreshRuntimeProjection(checkTimeout = false)
     }
 
-    private fun engineListener(side: Color, engine: PlayEngine) = object : AndroidPlayEngineGateway.Listener {
+    private fun engineListener(side: Color, engine: PlayEngine, generation: Long) = object : AndroidPlayEngineGateway.Listener {
         override fun onEngineHostRecovered() {
+            if (generation != sessionGeneration || coordinator == null) return
             setEngineStatus(side, "${engine.displayName} ready")
             coordinator?.onEngineHostRecovered(side)
             refreshRuntimeProjection(checkTimeout = false)
         }
 
         override fun onEngineHostDied() {
+            if (generation != sessionGeneration || coordinator == null) return
             setEngineStatus(side, "${engine.displayName} restarting…")
             coordinator?.onEngineHostDied(side)
             refreshRuntimeProjection(checkTimeout = false)
         }
 
         override fun onEngineResult(result: EngineSearchResult) {
+            if (generation != sessionGeneration || coordinator == null) return
             val previousRevision = coordinator?.state?.positionRevision
             val dispatchResult = coordinator?.onEngineResult(side, result)
             if (dispatchResult != null && dispatchResult.state.positionRevision != previousRevision) {
@@ -363,10 +500,12 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         override fun onEngineInfo(info: EngineSearchInfo) {
+            if (generation != sessionGeneration || coordinator == null) return
             coordinator?.onEngineInfo(side, info)
         }
 
         override fun onEngineFailure(failure: EngineHostFailure) {
+            if (generation != sessionGeneration || coordinator == null) return
             setEngineStatus(side, "${engine.displayName}: ${failure.code.name.lowercase()}")
             mutableUiState.value = mutableUiState.value.copy(message = failure.message)
         }
@@ -432,7 +571,22 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         probe.loadLastRestorableArena()
     }
 
+    private fun finishOriginalReturn(probe: AndroidArenaPersistenceGateway) {
+        pendingOriginalReturn = null
+        if (restoreProbe === probe) restoreProbe = null
+        probe.setListener(null)
+        probe.close()
+    }
+
+    private fun cancelBranchNavigation() {
+        if (pendingBranchCapture == null && pendingOriginalReturn == null) return
+        pendingBranchCapture = null
+        pendingOriginalReturn?.let(::finishOriginalReturn)
+        mutableUiState.value = mutableUiState.value.copy(branchOperationPending = false, message = null)
+    }
+
     private fun stopLiveAdapters() {
+        cancelBranchNavigation()
         mainHandler.removeCallbacks(clockTicker)
         whiteGateway?.setListener(null)
         blackGateway?.setListener(null)

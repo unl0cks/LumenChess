@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,6 +97,8 @@ fun ArenaRoute(
 @Composable
 private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifier: Modifier) {
     val setup = ui.setup
+    val branching = ui.branchDraft != null
+    BackHandler(enabled = branching, onBack = viewModel::returnToOriginal)
     val validationReason = when (val validation = ui.setupValidation) {
         ArenaSetupValidation.Valid -> null
         is ArenaSetupValidation.Invalid -> validation.reason
@@ -110,12 +113,13 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
         spacing = 12,
     ) {
         Text(
-            "Engine Arena",
+            if (branching) "New sandbox" else "Engine Arena",
             style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
             color = LumenColors.OnSurface,
         )
         Text(
-            "Independent engines, one authoritative game.",
+            if (branching) "Continue this position independently. The original stays unchanged unless you save a variation."
+            else "Independent engines, one authoritative game.",
             style = MaterialTheme.typography.bodyMedium,
             color = LumenColors.OnSurfaceMuted,
         )
@@ -127,6 +131,7 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
             ArenaEngineControls(Color.BLACK, setup.black, viewModel)
         }
         ArenaSection("Game", "arena-game-options") {
+            if (!branching) {
             ArenaChoiceRow(
                 choices = listOf(Variant.STANDARD to "Standard", Variant.CHESS960 to "Chess960"),
                 selected = setup.variant,
@@ -143,6 +148,11 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
                 selected = setup.colorAssignment,
                 onSelect = viewModel::updateColorAssignment,
             )
+            } else {
+                Text("${setup.variant.name.lowercase().replaceFirstChar { it.uppercase() }} · selected position", color = LumenColors.OnSurfaceMuted)
+                ArenaChoiceRow(listOf(false to "Timed", true to "Without clocks"), setup.untimed, viewModel::updateUntimed)
+            }
+            if (!setup.untimed) {
             Text("Time control", style = MaterialTheme.typography.labelMedium, color = LumenColors.OnSurfaceMuted)
             ArenaChoiceRow(
                 choices = listOf(
@@ -153,7 +163,9 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
                 selected = setup.timeControl,
                 onSelect = viewModel::updateTimeControl,
             )
+            }
         }
+        if (!branching) {
         ArenaSection("Opening", "arena-opening-options") {
             ArenaChoiceColumn(
                 choices = listOf(
@@ -212,6 +224,7 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
                 )
             }
         }
+        }
 
         ArenaSection("Manual control", "arena-manual-options") {
             Text(
@@ -246,6 +259,7 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
                         setup.manualOpening.moveLimitText,
                     ) { viewModel.updateManualMoveLimitText(it) }
                 }
+                if (!setup.untimed) {
                 Text("Clock policy", style = MaterialTheme.typography.labelMedium, color = LumenColors.OnSurfaceMuted)
                 ArenaChoiceRow(
                     choices = listOf(
@@ -255,6 +269,7 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
                     selected = setup.manualOpening.clockPolicy,
                     onSelect = viewModel::updateManualClockPolicy,
                 )
+                }
             }
         }
 
@@ -274,7 +289,7 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
                 testTag = "arena-resume",
             ) {
                 Column {
-                    Text("Resume Arena", color = LumenColors.OnSurface, fontWeight = FontWeight.SemiBold)
+                    Text(if (restored.setup.branchOrigin == null) "Resume Arena" else "Resume sandbox", color = LumenColors.OnSurface, fontWeight = FontWeight.SemiBold)
                     Text(
                         "${restored.setup.white.engine.displayName} vs ${restored.setup.black.engine.displayName}",
                         color = LumenColors.OnSurfaceMuted,
@@ -291,8 +306,9 @@ private fun ArenaSetupScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifi
             testTag = "arena-start",
             contentAlignment = Alignment.Center,
         ) {
-            Text("Start Arena", color = LumenColors.OnSurface, fontWeight = FontWeight.SemiBold)
+            Text(if (branching) "Start sandbox" else "Start Arena", color = LumenColors.OnSurface, fontWeight = FontWeight.SemiBold)
         }
+        if (branching) ArenaAction("Cancel · original game", "arena-branch-cancel", viewModel::returnToOriginal, Modifier.fillMaxWidth().height(46.dp))
         Spacer(Modifier.height(12.dp))
     }
 }
@@ -405,7 +421,10 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
     val runtime = ui.runtime ?: return
     val setup = ui.resolvedSetup ?: return
     BackHandler(onBack = viewModel::stopArena)
-    val lastMove = runtime.gameTree.mainline().lastOrNull()?.move
+    val mainline = runtime.gameTree.mainline()
+    val historicalNode = ui.historyPly?.let { if (it == 0) runtime.gameTree.root else mainline.getOrNull(it - 1) }
+    val displayedPosition = historicalNode?.position ?: runtime.position
+    val lastMove = if (historicalNode != null) historicalNode.move else mainline.lastOrNull()?.move
     var presentedRevision by remember { mutableLongStateOf(runtime.positionRevision.value) }
     var showManualControl by remember { mutableStateOf(false) }
     val revisionDelta = (runtime.positionRevision.value - presentedRevision).coerceAtLeast(0L)
@@ -413,7 +432,7 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
         BoardMovePresentationClassifier.classify(revisionDelta, lastMoverIsHuman = ui.lastMoveWasHuman)
     }
     val inputEnabled = runtime.controllers.forSide(runtime.position.sideToMove) == RuntimeController.HUMAN &&
-        !runtime.paused && runtime.terminal == null
+        !runtime.paused && runtime.terminal == null && ui.historyPly == null
     SideEffect { presentedRevision = runtime.positionRevision.value }
 
     Column(
@@ -427,7 +446,7 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
         val upperSide = if (ui.orientation == ChessboardOrientation.WHITE) Color.BLACK else Color.WHITE
         val lowerSide = upperSide.opposite
         ArenaParticipantRow(upperSide, ui, runtime, setup)
-        ArenaEvaluationBar(ui.evaluation)
+        ArenaEvaluationBar(if (ui.historyPly == null) ui.evaluation else null)
         Box(
             Modifier
                 .fillMaxWidth()
@@ -435,8 +454,11 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
                 .border(1.dp, LumenColors.OutlineStrong.copy(alpha = .92f))
                 .testTag("arena-board-stage"),
         ) {
+            // Historical positions are read-only snapshots, not new moves. Recreate only the
+            // board's disposable presentation state when browsing or switching sandbox sessions.
+            key(ui.sessionGeneration, ui.historyPly) {
             LumenChessboard(
-                position = runtime.position,
+                position = displayedPosition,
                 onMove = { move ->
                     viewModel.onBoardMove(
                         move = move,
@@ -453,13 +475,29 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
                     movePresentation = movePresentation,
                 ),
             )
+            }
         }
         ArenaParticipantRow(lowerSide, ui, runtime, setup)
         ui.message?.let {
-            Text(it, color = LumenColors.Destructive, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+            Text(it, color = if (it.startsWith("Saved")) LumenColors.OnSurfaceMuted else LumenColors.Destructive, style = MaterialTheme.typography.bodySmall, maxLines = 2)
         }
         runtime.terminal?.let {
             Text(it.presentationLabel(), color = LumenColors.OnSurface, fontWeight = FontWeight.SemiBold)
+        }
+        if (ui.historyPly != null) {
+            Text("History · ply ${ui.historyPly} of ${mainline.size} · game paused", color = LumenColors.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth().height(44.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ArenaAction("Previous", "arena-history-prev", { viewModel.stepHistory(-1) }, Modifier.weight(1f))
+                ArenaAction("Next", "arena-history-next", { viewModel.stepHistory(1) }, Modifier.weight(1f))
+                ArenaAction("Live", "arena-history-close", viewModel::closeHistory, Modifier.weight(1f))
+            }
+            ArenaAction(if (ui.branchOperationPending) "Preparing…" else "Branch from here", "arena-branch-here", viewModel::branchHere, Modifier.fillMaxWidth().height(46.dp))
+        } else if (setup.branchOrigin != null) {
+            Text("Sandbox · separate from original", color = LumenColors.AccentBlueBright, style = MaterialTheme.typography.labelMedium, modifier = Modifier.testTag("arena-sandbox-label"))
+            Row(Modifier.fillMaxWidth().height(46.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ArenaAction("Save as Variation", "arena-save-variation", viewModel::saveVariation, Modifier.weight(1.2f))
+                ArenaAction("Original game", "arena-original", viewModel::returnToOriginal, Modifier.weight(1f))
+            }
         }
         Spacer(Modifier.weight(1f))
         Row(Modifier.fillMaxWidth().height(54.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -471,6 +509,7 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
                 Modifier.weight(1f),
             )
             ArenaAction("Control", "arena-control", { showManualControl = true }, Modifier.weight(1f))
+            ArenaAction("Branch", "arena-branch", viewModel::browseHistory, Modifier.weight(1f))
             ArenaAction("Stop", "arena-stop", viewModel::stopArena, Modifier.weight(1f))
         }
     }
@@ -544,6 +583,7 @@ private fun ArenaManualControlDialog(
                     selected = null,
                     onSelect = onReturn,
                 )
+                if (runtime.clock.enabled) {
                 Text("Clock policy", color = LumenColors.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
                 ArenaChoiceRow(
                     choices = listOf(
@@ -562,6 +602,7 @@ private fun ArenaManualControlDialog(
                         )
                     },
                 )
+                }
             }
             LumenDerivativeSurface(
                 role = DerivativeSurfaceRole.NEUTRAL_ROW,
@@ -580,7 +621,7 @@ private fun manualControlDescription(runtime: RuntimeState): String {
     }
     return if (labels.isEmpty()) "Choose a side to control. Clocks pause by default." else {
         "You control ${labels.joinToString(" and ")}. " +
-            if (runtime.manualControl.clockPolicy == ManualClockPolicy.LOCKED) "Clocks paused." else "Clocks running."
+            if (!runtime.clock.enabled) "Untimed game." else if (runtime.manualControl.clockPolicy == ManualClockPolicy.LOCKED) "Clocks paused." else "Clocks running."
     }
 }
 
@@ -620,7 +661,7 @@ private fun ArenaParticipantRow(
             )
         }
         LumenClock(
-            arenaClockText(millis),
+            if (runtime.clock.enabled) arenaClockText(millis) else "Untimed",
             active = active && !runtime.paused && runtime.clock.running,
             light = side == Color.WHITE,
             modifier = Modifier.width(94.dp).height(44.dp).testTag("arena-${side.name.lowercase()}-clock"),
