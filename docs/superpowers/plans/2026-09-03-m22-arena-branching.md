@@ -1,5 +1,11 @@
 # M22 — Arena branching implementation plan
 
+**Execution record (2026-09-09):** Implementation and local cumulative verification
+are complete. The checklist below is the original test-first plan; executed results,
+native restoration/bounds evidence, and limitations are recorded in
+`docs/verification/M22-CHECKPOINT.md`. Final publication/artifact identities accompany
+the manual-review delivery. No M22 promotion or M23 work is included.
+
 **Goal:** Sandbox-first Arena branches from historical positions, with explicit
 Save as Variation and no implicit rewrite of the original game.
 
