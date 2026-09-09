@@ -29,6 +29,41 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ArenaSnapshotCodecTest {
+    @Test
+    fun untimedSandboxRestoresStableOriginAndManualControllersWithoutClock() {
+        val origin = dev.lumenchess.data.persistence.BranchOrigin(
+            PersistentGameId("original-game"), "persistent-node", Fen.serialize(dev.lumenchess.core.chess.Position.initial()),
+        )
+        val setup = ArenaSetupResolver.resolve(ArenaSetupConfig(
+            untimed = true,
+            manualOpening = ArenaManualOpeningSetup(ArenaManualSide.BOTH, ArenaManualLimitMode.UNTIL_RELEASE),
+        )).copy(branchOrigin = origin)
+        val coordinator = ArenaRuntimeCoordinator.create(setup, MonotonicTimeSource { 1_000 }, NoopEngine, NoopEngine, NoopPersistence)
+        coordinator.start()
+        coordinator.humanMove(dev.lumenchess.core.chess.Move.parseUci("e2e4"))
+        val snapshot = coordinator.snapshotForRestore()
+        val decoded = ArenaSnapshotCodec.decode(loaded(snapshot, ArenaSnapshotCodec.encode(snapshot, setup), GameSourceType.BRANCH))
+        assertEquals(origin, decoded.setup.branchOrigin)
+        assertFalse(decoded.setup.clockConfig.enabled)
+        assertFalse(decoded.snapshot.clock.enabled)
+        assertFalse(decoded.snapshot.clock.running)
+        assertEquals(snapshot.position, decoded.snapshot.position)
+        assertEquals(snapshot.manualControl, decoded.snapshot.manualControl)
+        assertTrue(decoded.snapshot.paused)
+    }
+
+    @Test
+    fun oldTimedArenaWithoutClockFlagRemainsTimed() {
+        val setup = ArenaSetupResolver.resolve(ArenaSetupConfig())
+        val coordinator = ArenaRuntimeCoordinator.create(setup, MonotonicTimeSource { 1_000 }, NoopEngine, NoopEngine, NoopPersistence)
+        val snapshot = coordinator.snapshotForRestore()
+        val metadata = ArenaSnapshotCodec.encode(snapshot, setup) - "lumen.arena.m20.clockEnabled"
+        val decoded = ArenaSnapshotCodec.decode(loaded(snapshot, metadata))
+        assertTrue(decoded.snapshot.clock.enabled)
+        assertTrue(decoded.setup.clockConfig.enabled)
+        assertEquals(null, decoded.setup.branchOrigin)
+    }
+
     private object NoopEngine : PlayEngineGateway {
         override fun startSearch(request: EngineSearchRequest) = Unit
         override fun cancelSearch(searchId: EngineSearchId) = Unit

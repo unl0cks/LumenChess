@@ -165,6 +165,8 @@ class ArenaRuntimeCoordinator private constructor(
 
     private fun engineMoveTimeMillis(side: Color): Long {
         val clock = state.clock
+        // Untimed does not mean unbounded engine work. Keep the existing maximum search budget.
+        if (!clock.enabled) return 1_500L
         val remaining = when (side) {
             Color.WHITE -> clock.whiteRemainingMillis
             Color.BLACK -> clock.blackRemainingMillis

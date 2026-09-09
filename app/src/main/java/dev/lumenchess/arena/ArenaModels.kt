@@ -15,6 +15,7 @@ import dev.lumenchess.runtime.clock.ClockConfig
 import dev.lumenchess.runtime.ManualClockPolicy
 import dev.lumenchess.runtime.ManualControlLease
 import dev.lumenchess.runtime.RuntimeManualControl
+import dev.lumenchess.data.persistence.BranchOrigin
 
 enum class ArenaColorAssignment { FIXED, RANDOM }
 
@@ -84,6 +85,7 @@ data class ArenaSetupConfig(
     val timeControl: PlayTimeControl = PlayTimeControl(),
     val opening: ArenaOpeningSetup = ArenaOpeningSetup(),
     val manualOpening: ArenaManualOpeningSetup = ArenaManualOpeningSetup(),
+    val untimed: Boolean = false,
 )
 
 data class ResolvedArenaEngine(
@@ -108,6 +110,7 @@ data class ResolvedArenaSetup(
     val opening: ResolvedArenaOpening,
     val initialPosition: Position,
     val manualControl: RuntimeManualControl = RuntimeManualControl(),
+    val branchOrigin: BranchOrigin? = null,
 )
 
 sealed interface ArenaSetupValidation {
@@ -118,7 +121,7 @@ sealed interface ArenaSetupValidation {
 
 object ArenaSetupValidator {
     fun validate(setup: ArenaSetupConfig): ArenaSetupValidation {
-        if (setup.timeControl.initialMillis <= 0L) {
+        if (!setup.untimed && setup.timeControl.initialMillis <= 0L) {
             return ArenaSetupValidation.Invalid("Initial clock time must be positive")
         }
         if (setup.timeControl.incrementMillis < 0L) {
@@ -247,7 +250,8 @@ object ArenaSetupResolver {
             chess960Index = chess960Index,
             white = whiteConfig.resolve(),
             black = blackConfig.resolve(),
-            clockConfig = ClockConfig(setup.timeControl.initialMillis, setup.timeControl.incrementMillis),
+            clockConfig = if (setup.untimed) ClockConfig(0, 0, enabled = false)
+                else ClockConfig(setup.timeControl.initialMillis, setup.timeControl.incrementMillis),
             opening = resolvedOpening,
             initialPosition = resolvedOpening.position,
             manualControl = setup.manualOpening.toRuntimeControl(),

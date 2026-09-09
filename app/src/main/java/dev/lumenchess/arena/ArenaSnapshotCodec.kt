@@ -1,6 +1,9 @@
 package dev.lumenchess.arena
 
 import dev.lumenchess.core.chess.Color
+import dev.lumenchess.core.chess.Fen
+import dev.lumenchess.data.persistence.BranchOrigin
+import dev.lumenchess.data.persistence.PersistentGameId
 import dev.lumenchess.data.persistence.GameSourceType
 import dev.lumenchess.data.persistence.LoadedCanonicalGame
 import dev.lumenchess.data.persistence.PersistenceMappingException
@@ -40,6 +43,12 @@ object ArenaSnapshotCodec {
         setup.chess960Index?.let { put(key("chess960Index"), it.toString()) }
         put(key("initialMillis"), setup.clockConfig.initialMillis.toString())
         put(key("incrementMillis"), setup.clockConfig.incrementMillis.toString())
+        put(key("clockEnabled"), snapshot.clock.enabled.toString())
+        setup.branchOrigin?.let { origin ->
+            put(key("branchGameId"), origin.gameId.value)
+            origin.nodeId?.let { put(key("branchNodeId"), it) }
+            put(key("branchFen"), origin.fen)
+        }
         put(key("openingMode"), setup.opening.mode.name)
         put(key("openingLabel"), setup.opening.label)
         setup.opening.familyId?.let { put(key("openingFamily"), it) }
@@ -63,7 +72,7 @@ object ArenaSnapshotCodec {
     fun decode(game: LoadedCanonicalGame): RestoredArenaGame {
         val metadata = game.sources
             .asSequence()
-            .filter { it.type == GameSourceType.ENGINE_ARENA }
+            .filter { it.type == GameSourceType.ENGINE_ARENA || it.type == GameSourceType.BRANCH }
             .map { it.metadata }
             .firstOrNull { it[key("version")] == VERSION || it[key("version")] == LEGACY_VERSION }
             ?: throw PersistenceMappingException("Game ${game.id.value} has no M20 Arena restore metadata")
@@ -71,6 +80,18 @@ object ArenaSnapshotCodec {
         val initialMillis = longValue(metadata, "initialMillis")
         val incrementMillis = longValue(metadata, "incrementMillis")
         val openingMode = enumValue<ArenaOpeningMode>(metadata, "openingMode")
+        val clockEnabled = metadata[key("clockEnabled")]?.let {
+            when (it) { "true" -> true; "false" -> false; else -> malformed("clockEnabled", it) }
+        } ?: true
+        val branchOrigin = metadata[key("branchGameId")]?.let { id ->
+            BranchOrigin(PersistentGameId(id), metadata[key("branchNodeId")], required(metadata, "branchFen"))
+        }
+        if (branchOrigin != null && branchOrigin.fen != Fen.serialize(game.tree.startPosition)) {
+            throw PersistenceMappingException("Stored sandbox origin disagrees with its initial position")
+        }
+        if (game.sources.any { it.type == GameSourceType.BRANCH } && branchOrigin == null) {
+            throw PersistenceMappingException("Stored Arena sandbox is missing its original game")
+        }
         val isCurrentVersion = metadata[key("version")] == VERSION
         val manualControl = if (isCurrentVersion) decodeManualControl(metadata) else RuntimeManualControl()
         val controllers = if (isCurrentVersion) {
@@ -93,7 +114,7 @@ object ArenaSnapshotCodec {
             },
             white = decodeEngine(metadata, "white"),
             black = decodeEngine(metadata, "black"),
-            clockConfig = ClockConfig(initialMillis, incrementMillis),
+            clockConfig = ClockConfig(initialMillis, incrementMillis, enabled = clockEnabled),
             opening = ResolvedArenaOpening(
                 mode = openingMode,
                 label = required(metadata, "openingLabel"),
@@ -103,6 +124,7 @@ object ArenaSnapshotCodec {
             ),
             initialPosition = game.tree.startPosition,
             manualControl = manualControl,
+            branchOrigin = branchOrigin,
         )
         val mainline = game.tree.mainline()
         val revision = longValue(metadata, "positionRevision")
@@ -118,6 +140,7 @@ object ArenaSnapshotCodec {
             running = false,
             lastSampleMillis = null,
             timedOutSide = metadata[key("clockTimedOut")]?.let { parseEnum<ClockSide>(it, "clockTimedOut") },
+            enabled = clockEnabled,
         )
         val processedIds = required(metadata, "processedEventIds")
             .takeIf { it.isNotBlank() }
