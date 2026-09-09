@@ -182,8 +182,10 @@ Manual opening and midgame takeover/return for either/both sides with locked clo
 ### M22 — Arena branching
 Sandbox-first branches, original immutable, explicit Save as Variation.
 
-Implementation and local cumulative verification complete; **manual review pending**.
-See [M22 checkpoint](../verification/M22-CHECKPOINT.md). No promotion or M23 start.
+Implementation, cumulative verification and **manual review approved** at
+`1f3abb2766fd2f4109971be2de30327f68f92a2c`.
+See [M22 checkpoint](../verification/M22-CHECKPOINT.md). Promotion is authorized;
+M23 begins only after the fresh promoted-main gate passes.
 
 ### M23 — Unified Games Library
 One canonical library with source tags/filtering/search and scalable queries.

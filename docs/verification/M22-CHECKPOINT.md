@@ -137,3 +137,32 @@ gate above is separate executed evidence.
 
 **M22 implementation is ready for manual review, not self-approved.** No merge,
 promotion, M23, release/signed APK, or historical P5/P6 reopening is included.
+
+## Manual approval and promotion authorization — 2026-09-09
+
+The user manually approved **M22 — Arena branching**, implementation
+`1f3abb2766fd2f4109971be2de30327f68f92a2c`, after inspecting the native review
+ZIP (30 members, 29 manifest-declared files, zero checksum/size mismatches;
+SHA-256 `4178c334d5fba4f0e22ce6ac23c83e8bce319cc5ad009a888e097ed2d96a49b8`).
+This supersedes the historical manual-review boundary above.
+
+Manual review accepted the native source/history/sandbox flow, original-game
+preservation, explicit Save as Variation, Standard and Chess960, Stockfish and
+Reckless progression, M21 manual takeover compatibility, process restoration,
+and stale-search/cancellation behavior. Actual Neo identity
+`private.chesscom.ejgfv`, zero-delta board stability across 54 samples, and
+public/private packaging boundaries were accepted. The documented zero-move
+original attachment boundary and native recording limitations remain explicit.
+
+Approved branch CI **34398043844** passed its checkpoint; branch-policy skipped
+jobs are not counted as passes. The independently executed cumulative local
+gate above remains part of the accepted evidence. This approval record changes
+documentation only; approved production and native evidence are not regenerated.
+
+The user authorizes a history-preserving fast-forward promotion to `main`,
+followed by one fresh main promotion gate. Once that gate is green, **M23 —
+Unified Games Library** is authorized on its own branch using the authoritative
+repository scope. M23 requires its own final manual review and must not be
+promoted automatically. P5/P6 remain closed; no M24 or release/signed APK is
+authorized by this record. The private native-review ZIP and imagery remain
+outside Git.
