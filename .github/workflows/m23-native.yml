@@ -52,7 +52,7 @@ jobs:
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 1
-          ./gradlew :data-persistence:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.lumenchess.data.persistence.GameLibraryRepositoryTest,dev.lumenchess.data.persistence.Migration2To3Test
+          ./gradlew :data-persistence:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.lumenchess.data.persistence.GameLibraryRepositoryTest,dev.lumenchess.data.persistence.Migration2To3Test,dev.lumenchess.data.persistence.Migration1To2Test,dev.lumenchess.data.persistence.RetentionPersistenceTest,dev.lumenchess.data.persistence.DeduplicationPersistenceTest,dev.lumenchess.data.persistence.BranchPersistenceRepositoryTest
           if [ -f app/src/androidTest/java/dev/lumenchess/games/GameLibraryUiTest.kt ]; then
             ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.lumenchess.games.GameLibraryUiTest
           fi
