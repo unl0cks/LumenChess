@@ -2,6 +2,7 @@ package dev.lumenchess.data.persistence
 
 import android.content.Context
 import androidx.room3.withWriteTransaction
+import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.lumenchess.core.chess.Pgn
@@ -93,6 +94,17 @@ class GameLibraryRepositoryTest {
         assertEquals(205, (first.entries + second.entries + third.entries).map { it.id }.toSet().size)
         assertNull(third.nextCursor)
         assertTrue(runCatching { library.page(limit = 0) }.exceptionOrNull() is IllegalArgumentException)
+
+        // Verify the schema supports the library's bounded newest-created key projection
+        // without sorting the whole library; do not constrain unrelated optimizer details.
+        val connection = AndroidSQLiteDriver().open(context.getDatabasePath(name).absolutePath)
+        try {
+            val details = connection.prepare("EXPLAIN QUERY PLAN SELECT id, createdAtEpochMillis FROM games ORDER BY createdAtEpochMillis DESC, id ASC LIMIT 101").use { statement ->
+                buildList { while (statement.step()) add(statement.getText(3)) }
+            }
+            assertTrue(details.toString(), details.any { it.contains("index_games_createdAtEpochMillis_id") })
+            assertFalse(details.toString(), details.any { it.contains("TEMP B-TREE", ignoreCase = true) })
+        } finally { connection.close() }
     }
 
     @Test fun twoEntryPageReturnsRemainingOneAndEmptyLibraryHasNoCursor() = runBlocking {
@@ -154,6 +166,25 @@ class GameLibraryRepositoryTest {
         assertEquals(2, library.page().entries.size)
     }
 
+    // Catches applying the disposable quota before excluding favorite/protected rows.
+    @Test fun positiveCountQuotaRetainsNewestOrdinaryAnalysisInAdditionToFlaggedGames() = runBlocking {
+        val favorite = save("Favorite", 1)
+        val protected = save("Protected", 2)
+        val oldest = save("Old ordinary", 3)
+        val newest = save("New ordinary", 4)
+        addReview(favorite, heavyTime = 40)
+        addReview(protected, heavyTime = 30)
+        addReview(oldest, heavyTime = 10)
+        addReview(newest, heavyTime = 20)
+        library.setFavorite(favorite, true)
+        library.setProtected(protected, true)
+
+        assertEquals(1, PersistenceRetention(database).prune(HeavyAnalysisRetentionPolicy(maxRetainedCount = 1)))
+        assertEquals(listOf("h-${newest.value}", "h-${protected.value}", "h-${favorite.value}"), database.reviewDao().heavyIdsOldestFirst())
+        assertEquals(0, PersistenceRetention(database).prune(HeavyAnalysisRetentionPolicy(maxRetainedCount = 1)))
+        assertEquals(4, library.page().entries.size)
+    }
+
     private suspend fun save(name: String, time: Long, vararg types: GameSourceType): PersistentGameId =
         GamePersistenceRepository(database).saveGame(PersistGameRequest(
             Pgn.parseGame("1. e4 {keep} e5 *"), GamePersistenceMetadata(createdAtEpochMillis = time),
@@ -161,10 +192,10 @@ class GameLibraryRepositoryTest {
             sources = types.map { GameSourceDraft(it) },
         ))
 
-    private suspend fun addReview(id: PersistentGameId) {
+    private suspend fun addReview(id: PersistentGameId, heavyTime: Long = 1) {
         val node = database.gameDao().nodeIdsForGame(id.value).first()
         database.reviewDao().insertReview(ReviewEntity("r-${id.value}", id.value, "model", "engine", null, null, "COMPLETE", 1, 1, 2, 2))
         database.reviewDao().insertPly(ReviewPlyEntity("p-${id.value}", id.value, "r-${id.value}", node, null, null, null, null, null, null, null, null, null, null))
-        database.reviewDao().insertHeavy(ReviewHeavyAnalysisEntity("h-${id.value}", "p-${id.value}", "pv", "e4", 1))
+        database.reviewDao().insertHeavy(ReviewHeavyAnalysisEntity("h-${id.value}", "p-${id.value}", "pv", "e4", heavyTime))
     }
 }

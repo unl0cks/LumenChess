@@ -7,6 +7,7 @@ import androidx.sqlite.execSQL
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.core.chess.Fen
+import dev.lumenchess.core.chess.Pgn
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -35,9 +36,12 @@ class Migration2To3Test {
     private fun verify(version: Int) = runBlocking {
         val old = helper.createDatabase(version)
         old.execSQL("INSERT INTO participants VALUES ('person','HUMAN','White',NULL,NULL,1)")
-        val fingerprint = if (version == 2) ", 'fingerprint-preserved'" else ""
-        old.execSQL("INSERT INTO games VALUES ('standard','STANDARD','rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1','WHITE_WIN','RESIGNATION',30,NULL,20,1,60000,1000,'60+1','person',NULL$fingerprint)")
-        old.execSQL("INSERT INTO games VALUES ('chess960','CHESS960','7k/8/8/8/8/8/8/RK2R3 w EA - 0 1',NULL,NULL,10,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL$fingerprint)")
+        val standardFingerprint = GameContentFingerprint.compute(Pgn.parseGame("1. e4 e5 (1... c5 {keep note}) 1-0"))
+        val chess960Fingerprint = GameContentFingerprint.compute(Pgn.parseGame("[Variant \"Chess960\"]\n[SetUp \"1\"]\n[FEN \"7k/8/8/8/8/8/8/RK2R3 w EA - 0 1\"]\n\n*"))
+        val standardFingerprintColumn = if (version == 2) ", '$standardFingerprint'" else ""
+        val chess960FingerprintColumn = if (version == 2) ", '$chess960Fingerprint'" else ""
+        old.execSQL("INSERT INTO games VALUES ('standard','STANDARD','rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1','WHITE_WIN','RESIGNATION',30,NULL,20,1,60000,1000,'60+1','person',NULL$standardFingerprintColumn)")
+        old.execSQL("INSERT INTO games VALUES ('chess960','CHESS960','7k/8/8/8/8/8/8/RK2R3 w EA - 0 1',NULL,NULL,10,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL$chess960FingerprintColumn)")
         old.execSQL("INSERT INTO game_headers VALUES ('standard','Event','Keep Cup',0)")
         old.execSQL("INSERT INTO game_nodes VALUES ('node-e4','standard',NULL,0,12,28,NULL,'e4')")
         old.execSQL("INSERT INTO game_nodes VALUES ('node-e5','standard','node-e4',0,52,36,NULL,'e5')")
@@ -61,7 +65,8 @@ class Migration2To3Test {
         assertEquals("account", text(latest, "SELECT sourceAccountScope FROM game_sources WHERE id='source'"))
         assertEquals("+0.2", text(latest, "SELECT value FROM game_node_annotations WHERE nodeId='node-c5'"))
         if (version == 2) {
-            assertEquals("fingerprint-preserved", text(latest, "SELECT contentFingerprint FROM games WHERE id='standard'"))
+            assertEquals(standardFingerprint, text(latest, "SELECT contentFingerprint FROM games WHERE id='standard'"))
+            assertEquals(chess960Fingerprint, text(latest, "SELECT contentFingerprint FROM games WHERE id='chess960'"))
             assertEquals("person", text(latest, "SELECT participantId FROM participant_external_identities WHERE externalParticipantId='remote-person'"))
         }
         latest.close()
