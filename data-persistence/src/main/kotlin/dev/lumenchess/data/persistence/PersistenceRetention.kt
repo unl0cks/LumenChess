@@ -49,6 +49,7 @@ class PersistenceRetention internal constructor(
             "participants" to RetentionClass.CANONICAL_DURABLE,
             "participant_external_identities" to RetentionClass.CANONICAL_DURABLE,
             "games" to RetentionClass.CANONICAL_DURABLE,
+            "game_library_flags" to RetentionClass.CANONICAL_DURABLE,
             "game_headers" to RetentionClass.CANONICAL_DURABLE,
             "game_nodes" to RetentionClass.CANONICAL_DURABLE,
             "game_node_comments" to RetentionClass.CANONICAL_DURABLE,

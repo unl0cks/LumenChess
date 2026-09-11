@@ -47,6 +47,7 @@ data class ParticipantExternalIdentityEntity(
         Index("createdAtEpochMillis"),
         Index("playedAtEpochMillis"),
         Index("contentFingerprint"),
+        Index(value = ["createdAtEpochMillis", "id"], orders = [Index.Order.DESC, Index.Order.ASC]),
     ],
 )
 data class GameEntity(
@@ -65,6 +66,16 @@ data class GameEntity(
     val whiteParticipantId: String?,
     val blackParticipantId: String?,
     val contentFingerprint: String? = null,
+)
+
+@Entity(
+    tableName = "game_library_flags",
+    foreignKeys = [ForeignKey(entity = GameEntity::class, parentColumns = ["id"], childColumns = ["gameId"], onDelete = ForeignKey.CASCADE)],
+)
+data class GameLibraryFlagsEntity(
+    @PrimaryKey val gameId: String,
+    val isFavorite: Boolean = false,
+    val isProtected: Boolean = false,
 )
 
 @Entity(

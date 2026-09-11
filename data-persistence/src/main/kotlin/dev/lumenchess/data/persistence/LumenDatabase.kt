@@ -11,6 +11,7 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         ParticipantEntity::class,
         ParticipantExternalIdentityEntity::class,
         GameEntity::class,
+        GameLibraryFlagsEntity::class,
         GameHeaderEntity::class,
         GameNodeEntity::class,
         GameNodeCommentEntity::class,
@@ -24,11 +25,12 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
         SavedPositionEntity::class,
         RatingEventEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class LumenDatabase : RoomDatabase() {
     abstract fun gameDao(): GameDao
+    abstract fun gameLibraryDao(): GameLibraryDao
     abstract fun participantDao(): ParticipantDao
     abstract fun sourceDao(): SourceDao
     abstract fun reviewDao(): ReviewDao
@@ -42,7 +44,7 @@ object LumenDatabaseFactory {
     fun open(context: Context, name: String = DEFAULT_NAME): LumenDatabase =
         Room.databaseBuilder(context.applicationContext, LumenDatabase::class.java, name)
             .setDriver(AndroidSQLiteDriver())
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
 
     fun inMemory(context: Context): LumenDatabase =

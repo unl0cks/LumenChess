@@ -101,8 +101,8 @@ interface ReviewDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insertHeavy(entity: ReviewHeavyAnalysisEntity)
     @Query("DELETE FROM review_heavy_analysis WHERE reviewPlyId IN (SELECT id FROM review_plies WHERE reviewId = :reviewId)") suspend fun deleteHeavyForReview(reviewId: String): Int
     @Query("SELECT id FROM review_heavy_analysis ORDER BY createdAtEpochMillis, id") suspend fun heavyIdsOldestFirst(): List<String>
-    @Query("SELECT id FROM review_heavy_analysis WHERE createdAtEpochMillis < :cutoffEpochMillis ORDER BY createdAtEpochMillis, id LIMIT :limit") suspend fun heavyIdsOlderThan(cutoffEpochMillis: Long, limit: Int): List<String>
-    @Query("SELECT id FROM review_heavy_analysis ORDER BY createdAtEpochMillis DESC, id DESC LIMIT :limit OFFSET :maxRetainedCount") suspend fun heavyIdsBeyondNewest(maxRetainedCount: Int, limit: Int): List<String>
+    @Query("SELECT h.id FROM review_heavy_analysis h WHERE h.createdAtEpochMillis < :cutoffEpochMillis AND NOT EXISTS (SELECT 1 FROM review_plies p JOIN game_library_flags f ON f.gameId = p.gameId WHERE p.id = h.reviewPlyId AND (f.isFavorite = 1 OR f.isProtected = 1)) ORDER BY h.createdAtEpochMillis, h.id LIMIT :limit") suspend fun heavyIdsOlderThan(cutoffEpochMillis: Long, limit: Int): List<String>
+    @Query("SELECT h.id FROM review_heavy_analysis h WHERE NOT EXISTS (SELECT 1 FROM review_plies p JOIN game_library_flags f ON f.gameId = p.gameId WHERE p.id = h.reviewPlyId AND (f.isFavorite = 1 OR f.isProtected = 1)) ORDER BY h.createdAtEpochMillis DESC, h.id DESC LIMIT :limit OFFSET :maxRetainedCount") suspend fun heavyIdsBeyondNewest(maxRetainedCount: Int, limit: Int): List<String>
     @Query("DELETE FROM review_heavy_analysis WHERE id IN (:ids)") suspend fun deleteHeavyByIds(ids: List<String>): Int
     @Query("SELECT COUNT(*) FROM reviews WHERE gameId = :gameId") suspend fun countReviewsForGame(gameId: String): Int
     @Query("SELECT COUNT(*) FROM review_plies WHERE gameId = :gameId") suspend fun countReviewPliesForGame(gameId: String): Int

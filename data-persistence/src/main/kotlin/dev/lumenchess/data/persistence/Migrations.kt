@@ -3,6 +3,11 @@ package dev.lumenchess.data.persistence
 import androidx.room3.migration.Migration
 import androidx.sqlite.execSQL
 
+val MIGRATION_2_3 = Migration(2, 3) { connection ->
+    connection.execSQL("CREATE TABLE IF NOT EXISTS `game_library_flags` (`gameId` TEXT NOT NULL, `isFavorite` INTEGER NOT NULL, `isProtected` INTEGER NOT NULL, PRIMARY KEY(`gameId`), FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+    connection.execSQL("CREATE INDEX IF NOT EXISTS `index_games_createdAtEpochMillis_id` ON `games` (`createdAtEpochMillis` DESC, `id` ASC)")
+}
+
 val MIGRATION_1_2 = Migration(1, 2) { connection ->
     connection.execSQL("ALTER TABLE `games` ADD COLUMN `contentFingerprint` TEXT")
     connection.execSQL(
