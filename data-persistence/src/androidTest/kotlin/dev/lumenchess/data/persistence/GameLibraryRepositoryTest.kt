@@ -1,8 +1,8 @@
 package dev.lumenchess.data.persistence
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.room3.withWriteTransaction
-import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.lumenchess.core.chess.Pgn
@@ -97,10 +97,10 @@ class GameLibraryRepositoryTest {
 
         // Verify the schema supports the library's bounded newest-created key projection
         // without sorting the whole library; do not constrain unrelated optimizer details.
-        val connection = AndroidSQLiteDriver().open(context.getDatabasePath(name).absolutePath)
+        val connection = SQLiteDatabase.openDatabase(context.getDatabasePath(name).absolutePath, null, SQLiteDatabase.OPEN_READONLY)
         try {
-            val details = connection.prepare("EXPLAIN QUERY PLAN SELECT id, createdAtEpochMillis FROM games ORDER BY createdAtEpochMillis DESC, id ASC LIMIT 101").use { statement ->
-                buildList { while (statement.step()) add(statement.getText(3)) }
+            val details = connection.rawQuery("EXPLAIN QUERY PLAN SELECT id, createdAtEpochMillis FROM games ORDER BY createdAtEpochMillis DESC, id ASC LIMIT 101", null).use { cursor ->
+                buildList { while (cursor.moveToNext()) add(cursor.getString(3)) }
             }
             assertTrue(details.toString(), details.any { it.contains("index_games_createdAtEpochMillis_id") })
             assertFalse(details.toString(), details.any { it.contains("TEMP B-TREE", ignoreCase = true) })
