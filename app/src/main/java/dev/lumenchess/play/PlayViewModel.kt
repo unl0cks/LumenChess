@@ -43,6 +43,7 @@ data class PlayUiState(
     val clock: ClockReading? = null,
     val engineStatus: String = "Not connected",
     val gameId: String? = null,
+    val ownershipReady: Boolean = false,
     val message: String? = null,
 )
 
@@ -122,6 +123,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             clock = null,
             engineStatus = "Not connected",
             gameId = null,
+            ownershipReady = false,
             message = null,
         )
         loadRestorableGame()
@@ -238,7 +240,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
         persistence.setListener(
             object : AndroidPlayPersistenceGateway.Listener {
                 override fun onPersisted(gameId: String) {
-                    mutableUiState.value = mutableUiState.value.copy(gameId = gameId)
+                    mutableUiState.value = mutableUiState.value.copy(gameId = gameId, ownershipReady = true)
                 }
 
                 override fun onPersistenceFailure(error: Throwable) {
@@ -283,6 +285,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             runtime = runtimeCoordinator.state,
             engineStatus = "Connecting ${setup.engine.displayName}…",
             gameId = restored?.gameId,
+            ownershipReady = restored != null,
             message = null,
         )
         if (restored == null) {
@@ -338,7 +341,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             object : AndroidPlayPersistenceGateway.Listener {
                 override fun onRestoreLoaded(game: RestoredPlayGame?) {
                     if (restoreProbe !== probe || mutableUiState.value.mode != PlayScreenMode.SETUP) return
-                    mutableUiState.value = mutableUiState.value.copy(restorableGame = game)
+                    mutableUiState.value = mutableUiState.value.copy(restorableGame = game, ownershipReady = true)
                 }
 
                 override fun onPersistenceFailure(error: Throwable) {

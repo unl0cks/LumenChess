@@ -89,7 +89,7 @@ class P5DerivativeScreenshotQaTest {
         waitForTag("arena-setup")
         capture("13-arena-tab.png")
         composeRule.onNodeWithTag("main-tab-games").performClick()
-        waitForTag("derivative-future-preview")
+        waitForTag("library-list")
         capture("14-games-tab.png")
         composeRule.onNodeWithTag("main-tab-insights").performClick()
         waitForTag("derivative-future-preview")

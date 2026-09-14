@@ -49,6 +49,7 @@ data class ArenaUiState(
     val blackEngineStatus: String = "Not connected",
     val orientation: ChessboardOrientation = ChessboardOrientation.WHITE,
     val gameId: String? = null,
+    val ownershipReady: Boolean = false,
     val message: String? = null,
     val sessionGeneration: Long = 0L,
     val lastMoveWasHuman: Boolean = false,
@@ -235,6 +236,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             whiteEngineStatus = "Not connected",
             blackEngineStatus = "Not connected",
             gameId = null,
+            ownershipReady = false,
             message = null,
             historyPly = null,
             branchDraft = null,
@@ -297,6 +299,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
                         setupValidation = ArenaSetupValidator.validate(config), branchDraft = origin,
                         branchOperationPending = false, restorableGame = null, runtime = null,
                         resolvedSetup = null, clock = null, evaluation = null, historyPly = null, gameId = null, message = null,
+                        ownershipReady = true,
                     )
                 },
                 onFailure = { error ->
@@ -426,7 +429,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         persistence.setListener(object : AndroidArenaPersistenceGateway.Listener {
             override fun onPersisted(gameId: String) {
                 if (persistenceGateway !== persistence) return
-                mutableUiState.value = mutableUiState.value.copy(gameId = gameId)
+                mutableUiState.value = mutableUiState.value.copy(gameId = gameId, ownershipReady = true)
             }
 
             override fun onPersistenceFailure(error: Throwable) {
@@ -459,6 +462,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             whiteEngineStatus = "Connecting ${setup.white.engine.displayName}…",
             blackEngineStatus = "Connecting ${setup.black.engine.displayName}…",
             gameId = restored?.gameId,
+            ownershipReady = restored != null,
             message = null,
             sessionGeneration = sessionGeneration,
             lastMoveWasHuman = false,
@@ -556,7 +560,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         probe.setListener(object : AndroidArenaPersistenceGateway.Listener {
             override fun onRestoreLoaded(game: RestoredArenaGame?) {
                 if (restoreProbe === probe && mutableUiState.value.mode == ArenaScreenMode.SETUP) {
-                    mutableUiState.value = mutableUiState.value.copy(restorableGame = game)
+                    mutableUiState.value = mutableUiState.value.copy(restorableGame = game, ownershipReady = true)
                 }
             }
 

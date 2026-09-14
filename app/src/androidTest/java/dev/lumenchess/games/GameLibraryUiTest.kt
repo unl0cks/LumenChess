@@ -3,6 +3,9 @@ package dev.lumenchess.games
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
@@ -186,7 +189,12 @@ class GameLibraryUiTest {
         val id = save("Owned")
         val vm = model()
         loaded(vm)
-        compose.runOnUiThread { vm.requestDelete(id); vm.setReservedGameIds(setOf(id.value)); vm.confirmDelete() }
+        compose.runOnUiThread {
+            vm.setOwnership(emptySet(), ready = true)
+            vm.requestDelete(id)
+            vm.setOwnership(setOf(id.value), ready = true)
+            vm.confirmDelete()
+        }
         assertNotNull(runBlocking { repository.loadGame(id) })
         assertNotNull(vm.uiState.value.actionError)
         assertFalse(vm.uiState.value.canRetryAction)
@@ -288,5 +296,60 @@ class GameLibraryUiTest {
         compose.waitUntil(10_000) { vm.uiState.value.entries.singleOrNull()?.isFavorite == true }
         assertEquals(id, vm.uiState.value.entries.single().id)
         assertFalse(vm.uiState.value.canRetryAction)
+    }
+
+    @Test fun pendingOwnershipProbeBlocksDeleteUntilTheRestoredGameIsReserved() {
+        val restoredId = save("Pending restoration")
+        val ordinaryId = save("Ordinary game", created = 101)
+        val vm = model()
+        var playReady by mutableStateOf(false)
+        var arenaReady by mutableStateOf(false)
+        var reserved by mutableStateOf(emptySet<String>())
+        compose.setContent { LumenTheme {
+            GameLibraryRoute(vm, reservedGameIds = reserved, ownershipReady = playReady && arenaReady)
+        } }
+        loaded(vm)
+        // A real canonical reconstruction has finished, but its ownership result is still queued.
+        val pendingRestore = runBlocking { store.load(restoredId)!! }
+        compose.onNodeWithTag("library-card-${restoredId.value}").performTouchInput { longClick() }
+        compose.onNodeWithTag("library-favorite").assertIsEnabled()
+        compose.onNodeWithTag("library-protect").assertIsEnabled()
+        compose.onNodeWithTag("library-delete").assertIsNotEnabled()
+        compose.onNodeWithTag("library-actions-close").performClick()
+        compose.runOnIdle { vm.requestDelete(restoredId); vm.confirmDelete() }
+        assertNotNull(runBlocking { repository.loadGame(restoredId) })
+        assertNotNull(vm.uiState.value.actionError)
+        assertFalse(vm.uiState.value.canRetryAction)
+        // Finishing only one owner's probe must not open a deletion window for the other owner.
+        compose.runOnIdle { playReady = true }
+        compose.waitForIdle()
+        compose.runOnIdle { vm.requestDelete(restoredId); vm.confirmDelete() }
+        assertNotNull(runBlocking { repository.loadGame(restoredId) })
+        assertFalse(vm.uiState.value.canRetryAction)
+        // Publish the delayed ID and completion together, just as the owning view model does.
+        compose.runOnIdle { reserved = setOf(pendingRestore.id.value); arenaReady = true }
+        compose.waitForIdle()
+        compose.onNodeWithTag("library-card-${restoredId.value}").performTouchInput { longClick() }
+        compose.onNodeWithTag("library-delete").assertIsNotEnabled()
+        compose.onNodeWithTag("library-actions-close").performClick()
+        compose.runOnIdle { vm.requestDelete(restoredId); vm.confirmDelete() }
+        assertNotNull(runBlocking { repository.loadGame(restoredId) })
+        // Ownership can change while the confirmation is open. Both the confirmation control and
+        // direct execution must use the latest atomically published readiness/ID snapshot.
+        compose.onNodeWithTag("library-card-${ordinaryId.value}").performTouchInput { longClick() }
+        compose.onNodeWithTag("library-delete").assertIsEnabled().performClick()
+        compose.runOnIdle { reserved = setOf(pendingRestore.id.value, ordinaryId.value) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("library-delete-confirm").assertIsNotEnabled()
+        compose.runOnIdle { vm.confirmDelete() }
+        assertNotNull(runBlocking { repository.loadGame(ordinaryId) })
+        assertNotNull(vm.uiState.value.actionError)
+        compose.runOnIdle { reserved = setOf(pendingRestore.id.value) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("library-card-${ordinaryId.value}").performTouchInput { longClick() }
+        compose.onNodeWithTag("library-delete").assertIsEnabled().performClick()
+        compose.onNodeWithTag("library-delete-confirm").performClick()
+        compose.waitUntil(10_000) { vm.uiState.value.entries.none { it.id == ordinaryId } }
+        assertNull(runBlocking { repository.loadGame(ordinaryId) })
     }
 }

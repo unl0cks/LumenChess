@@ -24,9 +24,14 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-fun GameLibraryRoute(viewModel: GameLibraryViewModel, modifier: Modifier = Modifier, reservedGameIds: Set<String> = emptySet()) {
+fun GameLibraryRoute(
+    viewModel: GameLibraryViewModel,
+    modifier: Modifier = Modifier,
+    reservedGameIds: Set<String> = emptySet(),
+    ownershipReady: Boolean = true,
+) {
     val ui by viewModel.uiState
-    SideEffect { viewModel.setReservedGameIds(reservedGameIds) }
+    SideEffect { viewModel.setOwnership(reservedGameIds, ownershipReady) }
     LaunchedEffect(viewModel) { viewModel.refresh() }
     BackHandler(enabled = ui.selectedGameId != null, onBack = viewModel::backToList)
     if (ui.selectedGameId != null) {
@@ -128,23 +133,29 @@ private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, 
                     Text(entry.playerNames(), style = MaterialTheme.typography.titleMedium, color = LumenColors.OnSurface)
                     LumenDerivativeAction(if (entry.isFavorite) "Remove favorite" else "Favorite", { vm.toggleFavorite(entry) }, Modifier.fillMaxWidth(), enabled = !ui.actionPending, testTag = "library-favorite")
                     LumenDerivativeAction(if (entry.isProtected) "Remove protection" else "Protect", { vm.toggleProtected(entry) }, Modifier.fillMaxWidth(), enabled = !ui.actionPending, testTag = "library-protect")
-                    val reserved = entry.id.value in ui.reservedGameIds
-                    LumenDerivativeAction("Delete", { vm.requestDelete(entry.id) }, Modifier.fillMaxWidth(), enabled = !reserved && !ui.actionPending, testTag = "library-delete")
-                    if (reserved) LibraryNote("Owned by the current Play or Arena session. Deletion is unavailable while this game can still be saved or resumed.")
+                    val deletionBlocked = !ui.ownershipReady || entry.id.value in ui.reservedGameIds
+                    LumenDerivativeAction("Delete", { vm.requestDelete(entry.id) }, Modifier.fillMaxWidth(), enabled = !deletionBlocked && !ui.actionPending, testTag = "library-delete")
+                    if (deletionBlocked) LibraryNote("Owned by, or still being checked by, the current Play or Arena session. Deletion is unavailable while this game can still be saved or resumed.")
                     LibraryUnavailableActions()
                     LumenDerivativeAction("Close", vm::dismissActions, Modifier.fillMaxWidth(), testTag = "library-actions-close")
                 }
             }
         }
     }
-    ui.deleteId?.let {
+    ui.deleteId?.let { id ->
         Dialog(onDismissRequest = vm::cancelDelete) {
             LumenDerivativeSurface(DerivativeSurfaceRole.PREVIEW_PANEL) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Delete saved game?", style = MaterialTheme.typography.titleLarge, color = LumenColors.OnSurface)
                     LibraryNote("This permanently deletes this game and its saved review data. Favorite and Protect prevent automatic cleanup, but do not prevent this confirmed deletion.")
                     LumenDerivativeAction("Cancel", vm::cancelDelete, Modifier.fillMaxWidth(), testTag = "library-delete-cancel")
-                    LumenDerivativeAction("Delete game", vm::confirmDelete, Modifier.fillMaxWidth(), testTag = "library-delete-confirm")
+                    LumenDerivativeAction(
+                        "Delete game",
+                        vm::confirmDelete,
+                        Modifier.fillMaxWidth(),
+                        enabled = ui.ownershipReady && id.value !in ui.reservedGameIds && !ui.actionPending,
+                        testTag = "library-delete-confirm",
+                    )
                 }
             }
         }

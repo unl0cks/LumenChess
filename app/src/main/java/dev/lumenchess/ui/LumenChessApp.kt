@@ -124,6 +124,7 @@ fun LumenChessApp() {
                                 modifier = Modifier.fillMaxSize(),
                                 reservedGameIds = setOfNotNull(playUi.gameId, playUi.restorableGame?.gameId,
                                     arenaUi.gameId, arenaUi.restorableGame?.gameId),
+                                ownershipReady = playUi.ownershipReady && arenaUi.ownershipReady,
                             )
                             MainTab.Settings -> when(destination) {
                                 SettingsDestination.ROOT -> SettingsScreen(

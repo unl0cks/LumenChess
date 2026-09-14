@@ -55,6 +55,7 @@ data class GameLibraryUiState(
     val contextEntry: LibraryEntry? = null,
     val deleteId: PersistentGameId? = null,
     val reservedGameIds: Set<String> = emptySet(),
+    val ownershipReady: Boolean = false,
     val actionPending: Boolean = false,
     val actionError: String? = null,
     val canRetryAction: Boolean = false,
@@ -203,7 +204,10 @@ class GameLibraryViewModel internal constructor(
         mutableUi.value = uiState.value.copy(flipped = value)
     }
 
-    fun setReservedGameIds(ids: Set<String>) { mutableUi.value = uiState.value.copy(reservedGameIds = ids.toSet()) }
+    fun setReservedGameIds(ids: Set<String>) = setOwnership(ids, ready = true)
+    fun setOwnership(ids: Set<String>, ready: Boolean) {
+        mutableUi.value = uiState.value.copy(reservedGameIds = ids.toSet(), ownershipReady = ready)
+    }
     fun showActions(entry: LibraryEntry) {
         retryAction = null
         mutableUi.value = uiState.value.copy(contextEntry = entry, actionError = null, canRetryAction = false)
@@ -213,18 +217,22 @@ class GameLibraryViewModel internal constructor(
     fun toggleProtected(entry: LibraryEntry) = mutate { store.protect(entry.id, !entry.isProtected) }
     fun requestDelete(id: PersistentGameId) {
         retryAction = null
+        if (!canDelete(id)) {
+            blockDeletion()
+            return
+        }
         mutableUi.value = uiState.value.copy(contextEntry = null, deleteId = id, actionError = null, canRetryAction = false)
     }
     fun cancelDelete() { mutableUi.value = uiState.value.copy(deleteId = null) }
     fun confirmDelete() {
         val id = uiState.value.deleteId ?: return
-        if (id.value in uiState.value.reservedGameIds) {
-            mutableUi.value = uiState.value.copy(deleteId = null, actionError = "This game belongs to the current Play or Arena session and cannot be deleted yet.")
+        if (!canDelete(id)) {
+            blockDeletion()
             return
         }
         mutate {
             // Re-check at execution as the active session can change while a dialog is open.
-            check(id.value !in uiState.value.reservedGameIds)
+            if (!canDelete(id)) throw OwnershipUnavailableException()
             store.delete(id)
         }
     }
@@ -241,11 +249,34 @@ class GameLibraryViewModel internal constructor(
                 retryAction = null
                 refresh()
             } catch (cancelled: CancellationException) { throw cancelled
+            } catch (_: OwnershipUnavailableException) {
+                retryAction = null
+                blockDeletion()
             } catch (_: Exception) {
                 mutableUi.value = uiState.value.copy(actionPending = false, canRetryAction = true, actionError = "Could not update this game. Try again.")
             }
         }
     }
+
+    private fun canDelete(id: PersistentGameId): Boolean =
+        uiState.value.ownershipReady && id.value !in uiState.value.reservedGameIds
+
+    private fun blockDeletion() {
+        val message = if (uiState.value.ownershipReady) {
+            "This game belongs to the current Play or Arena session and cannot be deleted yet."
+        } else {
+            "Play or Arena is still determining game ownership. Deletion is unavailable until that finishes."
+        }
+        mutableUi.value = uiState.value.copy(
+            contextEntry = null,
+            deleteId = null,
+            actionPending = false,
+            actionError = message,
+            canRetryAction = false,
+        )
+    }
+
+    private class OwnershipUnavailableException : IllegalStateException()
 
     override fun onCleared() { pageJob?.cancel(); openJob?.cancel(); store.close() }
 }
