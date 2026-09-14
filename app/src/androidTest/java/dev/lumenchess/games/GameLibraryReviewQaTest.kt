@@ -15,6 +15,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.BuildConfig
 import dev.lumenchess.MainActivity
 import dev.lumenchess.arena.ArenaSnapshotCodec
+import dev.lumenchess.arena.ArenaScreenMode
 import dev.lumenchess.arena.ArenaViewModel
 import dev.lumenchess.board.PieceSetCatalog
 import dev.lumenchess.core.chess.*
@@ -78,6 +79,19 @@ class GameLibraryReviewQaTest {
         val origin = withDb { ArenaSnapshotCodec.decode(GamePersistenceRepository(it).loadGame(branchId)!!).setup.branchOrigin!! }
         assertEquals(arenaId, origin.gameId)
         assertNotNull(origin.nodeId)
+        // Live Arena hides the bottom tabs. Stop an already-paused session to return to setup;
+        // this closes its adapters without dispatching another pause or modifying saved games.
+        assertTrue(arena.uiState.value.runtime!!.paused)
+        val arenaBeforeExit = canonical(arenaId).toString()
+        val branchBeforeExit = canonical(branchId).toString()
+        tag("arena-stop").performClick()
+        rule.waitUntil(10_000) {
+            arena.uiState.value.mode == ArenaScreenMode.SETUP && arena.uiState.value.ownershipReady
+        }
+        assertNull(arena.uiState.value.runtime)
+        assertEquals(arenaBeforeExit, canonical(arenaId).toString())
+        assertEquals(branchBeforeExit, canonical(branchId).toString())
+        tag("main-tab-games").assertIsDisplayed()
 
         // Synthetic metadata is explicitly labelled; no external account/import operation is implied.
         val standard = seed("M23 fixture 100%_ Standard", Pgn.parseGame("1. e4 e5 (1... c5) 2. Nf3 *"),
