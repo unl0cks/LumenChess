@@ -57,12 +57,7 @@ jobs:
             ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.lumenchess.games.GameLibraryUiTest
           fi
           if [ -f app/src/androidTest/java/dev/lumenchess/games/GameLibraryReviewQaTest.kt ]; then
-            adb install -r app/build/outputs/apk/debug/app-debug.apk
-            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -r -e m23LibraryQa true -e class dev.lumenchess.games.GameLibraryReviewQaTest dev.lumenchess.test/androidx.test.runner.AndroidJUnitRunner | tee "$RUNNER_TEMP/m23-native-result.txt"
-            grep -Eq '^OK \([1-9][0-9]* tests?\)' "$RUNNER_TEMP/m23-native-result.txt"
-            adb pull /sdcard/Android/data/dev.lumenchess/files/m23-library-native/. m23-library-native/
-            test -s m23-library-native/board-bounds.json
+            bash scripts/run-m23-native-review.sh
           fi
       - name: Upload public-only results and native evidence
         if: always()
@@ -74,6 +69,5 @@ jobs:
             app/build/outputs/androidTest-results/
             m23-library-native/
             ${{ runner.temp }}/m23-emulator.log
-            ${{ runner.temp }}/m23-native-result.txt
           if-no-files-found: warn
           retention-days: 14

@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   checkpoint:
-    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'checkpoint(M23):')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -375,7 +375,8 @@ jobs:
       (github.event_name == 'push' &&
        (startsWith(github.event.head_commit.message, 'checkpoint(M15):') ||
         startsWith(github.event.head_commit.message, 'checkpoint(M19):') ||
-        startsWith(github.event.head_commit.message, 'checkpoint(M20):')))
+        startsWith(github.event.head_commit.message, 'checkpoint(M20):') ||
+        startsWith(github.event.head_commit.message, 'checkpoint(M23):')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -409,20 +410,32 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
+          import hashlib
+          import json
 
           apk = Path("app/build/outputs/apk/debug/app-debug.apk")
           assert apk.is_file(), apk
           with ZipFile(apk) as archive:
               names = archive.namelist()
+              forbidden = [b"chess.com-boards-and-pieces", b"lumenpersonalassets", b"c:\\users\\"]
+              for name in names:
+                  if name.endswith(('.dex', '.xml', '.arsc', '.json', '.txt', '.properties')):
+                      payload = archive.read(name).lower()
+                      assert not any(token in payload for token in forbidden), name
           leaked_entries = [
               name for name in names
               if name.startswith("assets/pieces/") or name.startswith("assets/boards/")
           ]
           assert not leaked_entries, leaked_entries[:20]
           payload = apk.read_bytes().lower()
-          forbidden = [b"chess.com-boards-and-pieces", b"lumenpersonalassets", b"c:\\users\\"]
           hits = [token.decode("ascii") for token in forbidden if token in payload]
           assert not hits, hits
+          Path("public-apk-audit.json").write_text(json.dumps({
+              "apk": str(apk), "bytes": apk.stat().st_size,
+              "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
+              "privateAssetEntries": leaked_entries, "privateSourceTokenHits": hits,
+              "decompressedMetadataScan": "PASS", "result": "PASS",
+          }, indent=2) + "\n")
           print("Public APK privacy scan: 0 generated personal entries; 0 local-source tokens")
           PY
       - name: Verify native engine ABIs and 16 KiB ELF alignment
@@ -516,6 +529,29 @@ jobs:
             test "$(find m20-arena-native -type f -name '*.png' | wc -l | tr -d ' ')" = "7"
             test -f m20-arena-native/board-bounds.txt
           fi
+          if [ "${{ startsWith(github.event.head_commit.message, 'checkpoint(M23):') }}" = "true" ]; then
+            bash scripts/run-m23-native-review.sh
+          fi
+      - name: Upload M23 cumulative results and public native evidence
+        if: always() && github.event_name == 'push' && startsWith(github.event.head_commit.message, 'checkpoint(M23):')
+        uses: actions/upload-artifact@v4
+        with:
+          name: m23-final-verification-${{ github.sha }}
+          path: |
+            m23-library-native/
+            public-apk-audit.json
+            core-chess/build/test-results/
+            game-runtime/build/test-results/
+            engine-api/build/test-results/
+            engine-host/build/test-results/
+            app/build/test-results/
+            engine-host/build/outputs/androidTest-results/
+            data-persistence/build/outputs/androidTest-results/
+            app/build/outputs/androidTest-results/
+            app/build/reports/lint-results-debug.xml
+            data-persistence/build/reports/lint-results-debug.xml
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload M20 native Arena evidence
         if: always() && github.event_name == 'push' && startsWith(github.event.head_commit.message, 'checkpoint(M20):')
         uses: actions/upload-artifact@v4
