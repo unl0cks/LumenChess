@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +34,8 @@ import dev.lumenchess.customization.BoardThemeCatalog
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTheme
+import dev.lumenchess.games.GameLibraryRoute
+import dev.lumenchess.games.GameLibraryViewModel
 import dev.lumenchess.play.PlayScreenMode
 import dev.lumenchess.play.PlayViewModel
 import dev.lumenchess.play.ReferencePlayRoute
@@ -55,7 +58,7 @@ private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HA
 
 @Composable
 fun LumenChessApp() {
-    var currentTab by remember { mutableStateOf(MainTab.Play) }
+    var currentTab by rememberSaveable { mutableStateOf(MainTab.Play) }
     var settingsDestination by remember { mutableStateOf(SettingsDestination.ROOT) }
     var playFocusedSubpage by remember { mutableStateOf(false) }
     val playViewModel:PlayViewModel=viewModel()
@@ -115,6 +118,12 @@ fun LumenChessApp() {
                             MainTab.Arena -> ArenaRoute(
                                 viewModel=arenaViewModel,
                                 modifier=Modifier.fillMaxSize(),
+                            )
+                            MainTab.Games -> GameLibraryRoute(
+                                viewModel = viewModel(factory = GameLibraryViewModel.Factory),
+                                modifier = Modifier.fillMaxSize(),
+                                reservedGameIds = setOfNotNull(playUi.gameId, playUi.restorableGame?.gameId,
+                                    arenaUi.gameId, arenaUi.restorableGame?.gameId),
                             )
                             MainTab.Settings -> when(destination) {
                                 SettingsDestination.ROOT -> SettingsScreen(
