@@ -256,7 +256,7 @@ class GameLibraryReviewQaTest {
             .put("beforePid", expected.getInt("pid")).put("afterPid", Process.myPid())
             .put("separateProcess", true).put("repositoryRestorationVerified", true)
             .put("uiSavedStateRestorationClaimed", false)
-            .put("restorationMethod", "Host force-stop, new MainActivity, explicit UI reopening of saved canonical records. Activity saved-state restoration is covered separately by GameLibraryUiTest.")
+            .put("restorationMethod", "Host force-stop, new MainActivity, explicit UI reopening of saved canonical records. SavedStateHandle reconstruction and Compose saved-state restoration are covered separately by GameLibraryUiTest.")
             .put("records", verified).put("captures", captures))
     }
 
