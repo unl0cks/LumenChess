@@ -37,9 +37,13 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class GameLibraryReviewQaTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
-    private val library get() = ViewModelProvider(rule.activity)[GameLibraryViewModel::class.java]
-    private val arena get() = ViewModelProvider(rule.activity)[ArenaViewModel::class.java]
-    private val ui get() = library.uiState.value
+    private lateinit var library: GameLibraryViewModel
+    private val ui get() = rule.runOnUiThread { library.uiState.value }
+    private val arenaUi get() = rule.runOnUiThread {
+        val store = rule.activity.viewModelStore
+        val key = store.keys().single { store[it] is ArenaViewModel }
+        (store[key] as ArenaViewModel).uiState.value
+    }
     private val style = "lumen-vector"
     private var reference: Rect? = null
     private var bounds = JSONArray()
@@ -66,29 +70,29 @@ class GameLibraryReviewQaTest {
         tag("arena-branch").performClick()
         tag("arena-history-prev").performClick()
         tag("arena-branch-here").performClick()
-        rule.waitUntil(10_000) { arena.uiState.value.branchDraft != null }
+        rule.waitUntil(10_000) { arenaUi.branchDraft != null }
         choose("Without clocks", "arena-game-options")
         tag("arena-start").performScrollTo().performClick()
         arenaMove("d7", "d6")
         val branchId = savedArenaId()
         tag("arena-pause").performClick()
         tag("arena-save-variation").performClick()
-        rule.waitUntil(10_000) { arena.uiState.value.message?.startsWith("Saved") == true }
-        assertNull(arena.uiState.value.runtime!!.pendingEngineSearch)
-        assertFalse(arena.uiState.value.runtime!!.clock.enabled)
+        rule.waitUntil(10_000) { arenaUi.message?.startsWith("Saved") == true }
+        assertNull(arenaUi.runtime!!.pendingEngineSearch)
+        assertFalse(arenaUi.runtime!!.clock.enabled)
         val origin = withDb { ArenaSnapshotCodec.decode(GamePersistenceRepository(it).loadGame(branchId)!!).setup.branchOrigin!! }
         assertEquals(arenaId, origin.gameId)
         assertNotNull(origin.nodeId)
         // Live Arena hides the bottom tabs. Stop an already-paused session to return to setup;
         // this closes its adapters without dispatching another pause or modifying saved games.
-        assertTrue(arena.uiState.value.runtime!!.paused)
+        assertTrue(arenaUi.runtime!!.paused)
         val arenaBeforeExit = canonical(arenaId).toString()
         val branchBeforeExit = canonical(branchId).toString()
         tag("arena-stop").performClick()
         rule.waitUntil(10_000) {
-            arena.uiState.value.mode == ArenaScreenMode.SETUP && arena.uiState.value.ownershipReady
+            arenaUi.let { it.mode == ArenaScreenMode.SETUP && it.ownershipReady }
         }
-        assertNull(arena.uiState.value.runtime)
+        assertNull(arenaUi.runtime)
         assertEquals(arenaBeforeExit, canonical(arenaId).toString())
         assertEquals(branchBeforeExit, canonical(branchId).toString())
         tag("main-tab-games").assertIsDisplayed()
@@ -270,19 +274,19 @@ class GameLibraryReviewQaTest {
     }
 
     private fun arenaMove(from: String, to: String) {
-        rule.waitUntil(10_000) { arena.uiState.value.runtime != null }
-        val revision = arena.uiState.value.runtime!!.positionRevision
+        rule.waitUntil(10_000) { arenaUi.runtime != null }
+        val revision = arenaUi.runtime!!.positionRevision
         tag("square-$from").performClick(); tag("square-$to").performClick()
-        rule.waitUntil(10_000) { arena.uiState.value.runtime!!.positionRevision != revision }
-        assertNull(arena.uiState.value.runtime!!.pendingEngineSearch)
+        rule.waitUntil(10_000) { arenaUi.runtime!!.positionRevision != revision }
+        assertNull(arenaUi.runtime!!.pendingEngineSearch)
     }
 
     private fun savedArenaId(): PersistentGameId {
-        rule.waitUntil(10_000) { arena.uiState.value.gameId != null }
-        val id = PersistentGameId(arena.uiState.value.gameId!!)
+        rule.waitUntil(10_000) { arenaUi.gameId != null }
+        val id = PersistentGameId(arenaUi.gameId!!)
         rule.waitUntil(10_000) {
             withDb { db -> GamePersistenceRepository(db).loadGame(id)?.let {
-                ArenaSnapshotCodec.decode(it).snapshot.positionRevision == arena.uiState.value.runtime!!.positionRevision
+                ArenaSnapshotCodec.decode(it).snapshot.positionRevision == arenaUi.runtime!!.positionRevision
             } == true }
         }
         return id
@@ -365,7 +369,21 @@ class GameLibraryReviewQaTest {
         card(id).performClick()
         rule.waitUntil(10_000) { ui.game?.id == id && !ui.opening }
     }
-    private fun loaded() { rule.waitUntil(10_000) { !ui.loading }; rule.waitForIdle(); assertNull(ui.listError) }
+    private fun loaded() {
+        // A tab click schedules AnimatedContent composition. Wait for the real route before
+        // touching its activity-owned model; a default provider cannot construct this model.
+        rule.waitUntil(10_000) { rule.onAllNodesWithTag("library-list").fetchSemanticsNodes().size == 1 }
+        if (!::library.isInitialized) rule.runOnUiThread {
+            val store = rule.activity.viewModelStore
+            val key = store.keys().single { store[it] is GameLibraryViewModel } as String
+            val existing = store[key] as GameLibraryViewModel
+            library = ViewModelProvider(rule.activity, GameLibraryViewModel.Factory)[key, GameLibraryViewModel::class.java]
+            assertSame("QA must observe the instance already composed by the actual route", existing, library)
+        }
+        rule.waitUntil(10_000) { !ui.loading }
+        rule.waitForIdle()
+        assertNull(ui.listError)
+    }
     private fun filter(value: LibraryFilter) {
         tag("library-filters").performScrollToNode(hasTestTag("library-filter-${value.name}"))
         tag("library-filter-${value.name}").performClick(); loaded()
