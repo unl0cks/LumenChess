@@ -21,6 +21,7 @@ import dev.lumenchess.board.PieceSetCatalog
 import dev.lumenchess.core.chess.*
 import dev.lumenchess.data.persistence.*
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
+import dev.lumenchess.settings.AppAppearance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
@@ -57,7 +58,9 @@ class GameLibraryReviewQaTest {
     }
 
     @Test fun captureLibraryAndPrepareRestore() {
-        runBlocking { DataStoreAppearanceSettingsRepository.from(rule.activity).update { it.withPieceSet(style) } }
+        runBlocking { DataStoreAppearanceSettingsRepository.from(rule.activity).update {
+            it.withPieceSet(style).copy(appearance = AppAppearance.DARK)
+        } }
         // These two records are real product saves: native board input, manual Arena and M22 branch UI.
         tag("main-tab-arena").performClick()
         choose("Standard", "arena-game-options")
@@ -313,11 +316,15 @@ class GameLibraryReviewQaTest {
     private fun capture(name: String, board: Boolean = false, dialog: Boolean = false) {
         rule.waitForIdle()
         assertEquals(style, storedStyle())
+        assertEquals(AppAppearance.DARK, runBlocking {
+            DataStoreAppearanceSettingsRepository.from(rule.activity).settings.first().appearance
+        })
         val resolved = PieceSetCatalog.definition(storedStyle()).id
         assertEquals(style, resolved)
         val event = JSONObject().put("name", name).put("pid", Process.myPid())
             .put("storedPieceSetId", storedStyle()).put("resolvedPieceSetId", resolved)
             .put("captureMethod", "Compose captureToImage: actual MainActivity")
+            .put("appearance", AppAppearance.DARK.name)
         if (board) {
             val stage = tag("library-board-stage")
             val actual = stage.fetchSemanticsNode().boundsInRoot
