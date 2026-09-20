@@ -1,6 +1,14 @@
 # M23 — Unified Games Library
 
-Status: implemented and verified; **awaiting manual M23 review, not approved or promoted**.
+Status: **manually approved**; promotion authorized, pending the fresh promoted-main gate.
+
+## Manual approval — 2026-09-20
+
+The user reviewed and accepted `LumenChess-M23-native-review-872d028a.zip` for candidate `872d028ab82d1e2375f66908493a60eb7bb64974`. All 41 declared evidence members passed SHA-256 and byte-size verification, with zero mismatches. The gated implementation/test SHA is `bbe90deb32b28b863acbce4afb55c9ffef4f871e`; the candidate adds documentation only.
+
+Accepted: the Unified Games Library and source-neutral canonical cards; bounded paging/scalable queries; All / Local / Engine Arena / Chess.com / Lichess / Imported / Branches / Favorites filters; literal search; persistent Favorite / Protect; retention protection and guarded deletion architecture; read-only canonical saved-game navigation; Standard history/variations; Chess960 history/metadata; orientation/flip; retained list context; actual M22 Arena/branch records; separate-process repository reopening/restoration; Public Lumen renderer identity; 1246×1246 Library board bounds with 0px delta; and public APK privacy.
+
+The stored Arena clock token shown literally (for example `600000+0`) is explicitly accepted as non-blocking. Promotion does not change that formatting. Review, Analyze, Export and Library branch editing remain unavailable in M23; this approval does not claim them implemented. No native evidence is regenerated for promotion.
 
 ## Authority and baseline
 
@@ -51,4 +59,4 @@ Evidence distinguishes SavedStateHandle reconstruction/Compose saved-state tests
 
 ## Boundaries
 
-P5/P6 closed. M20/M21/M22 chess behavior preserved. No board/piece/feedback/motion redesign, no private assets tracked, no M24, no M23 merge/promotion, and no release/signed APK.
+P5/P6 closed. M20/M21/M22 chess behavior preserved. No board/piece/feedback/motion redesign and no private assets tracked. M23 promotion is authorized; M24 may begin after the promoted-main gate passes. No release/signed APK is authorized.
