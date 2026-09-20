@@ -1,6 +1,6 @@
 # M23 — Unified Games Library
 
-Status: implementation verification in progress; **not manually approved or promoted**.
+Status: implemented and verified; **awaiting manual M23 review, not approved or promoted**.
 
 ## Authority and baseline
 
@@ -24,7 +24,7 @@ M22 approval was recorded and fast-forward promoted at `ca875e719e8cc36d6269696a
 
 - Focused API-37 run [34823937886](https://github.com/unl0cks/LumenChess/actions/runs/34823937886), `c71a8b2`: **34/34 persistence and 10/10 Library UI PASS**. Includes v1/v2 migrations, retention, dedup, M22 branch persistence, canonical Standard/Chess960 viewing, list restoration and stale query/open protection.
 - Proportional Android CI [34823937755](https://github.com/unl0cks/LumenChess/actions/runs/34823937755): PASS. This is not the final cumulative native gate.
-- Subsequent ownership-readiness regression compiled RED before the API existed and GREEN after `c1d2d68`; new native execution remains pending.
+- Ownership-readiness regression compiled RED before the API existed and GREEN after `c1d2d68`; its subsequent focused and cumulative native executions passed.
 - QA harness `256ee35` compiled successfully; runner `265ae7f` resets only the disposable CI app before its first capture and retains data between the two process phases. Native run 34906102336 was cancelled during setup after source inspection found a QA-only hidden-navigation precondition; it is not a test failure or a passing evidence run.
 - Independent persistence and UI task reviews resolved the invalid migration fixture, Android EXPLAIN diagnostic API, obsolete Games QA tag, and ownership-readiness race. No test thresholds were weakened.
 - CodeRabbit CLI review through `a9ab24c` completed with one Minor suggestion to disable animator scale. Not applied: the native evidence intentionally retains the established P6 animation-enabled device contract.
@@ -39,9 +39,15 @@ Actual captures use API 37, 1344×2992 at 489 dpi, Public Lumen (`lumen-vector`)
 
 The successful focused run recorded 18 settled Library-viewer samples at `[49,268,1295,1514]` (1246×1246 pixels), all four rectangle deltas exactly zero, across Standard/history/variation/flip/Chess960/Arena/branch and restored views. This is the Library layout lane, not a claim that its rectangle equals Live. Repository restoration passed with process IDs 5560 then 5848 and unchanged canonical trees, persistent identities, sources, flags and branch origin. Synthetic external-source metadata is labeled; the Arena and branch records were saved through actual product UI.
 
-Final cumulative JVM/native/lint/debug-assembly/privacy gate and final dark capture inspection remain pending. No release task is used.
+Final cumulative gate [34969249118](https://github.com/unl0cks/LumenChess/actions/runs/34969249118) passed at `bbe90deb32b28b863acbce4afb55c9ffef4f871e` in 23m56s. Downloaded reports: **302 JVM PASS** (app 129, core-chess 71, engine-api 36, engine-host 8, game-runtime 58); **172 native PASS** (app 85, persistence 68, engine-host 19), zero failures. The app report also contains 36 opt-in QA skips; these are not counted as passes. The two M23 QA methods then ran separately and passed. Historical screenshot-only suites were not regenerated.
 
-The final record will distinguish OS saved-state restoration tests from a host force-stop followed by canonical database reopening. Board rectangles, per-file evidence hashes, final cumulative results and public-package audit must be recorded before handoff.
+Lint/debug assemblies, native engine ABI/16-KiB alignment, committed schema history, and decompressed public APK privacy checks all passed. The debug APK audit found zero private entries and zero local-source tokens; no APK is included in the review ZIP. Personal packaging/piece resolution was not modified, so the prior 39-style/468-piece private catalog was not rebuilt or uploaded.
+
+The final dark native evidence proves renderer `lumen-vector`, 18 identical board rectangles `[49,268,1295,1514]`, and repository restoration from PID 8213 to PID 8413. Root visually inspected the actual native list, action dialog, Standard variation, Chess960, saved Arena variation and restored branch images. No obvious overlap, clipping or board-layout instability was observed. A non-blocking display limitation is disclosed: Arena's existing stored clock token (for example `600000+0`) is shown literally rather than reformatted into minutes.
+
+Standard, Chess960, Stockfish, Reckless, M20 Arena independence, M21 takeover/manual controls, M22 branch/cancellation behavior, Play stale-search/premove behavior, and P1 human/thinking/engine-result stability passed their existing cumulative tests. Runtime, engine and board-renderer source remain unchanged. No release task was used.
+
+Evidence distinguishes SavedStateHandle reconstruction/Compose saved-state tests from a host force-stop followed by canonical database reopening; it does not claim OS activity-state restoration from force-stop. The local review ZIP includes measured rectangles, per-file hashes, exact test results and the public-package audit. Final documentation-only closure does not change the gated production/test tree.
 
 ## Boundaries
 

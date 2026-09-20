@@ -190,6 +190,10 @@ M23 begins only after the fresh promoted-main gate passes.
 ### M23 — Unified Games Library
 One canonical library with source tags/filtering/search and scalable queries.
 
+Implementation and cumulative verification complete on `codex/m23-unified-games-library`;
+manual M23 review remains pending. Gate `34969249118` passed at `bbe90deb32b28b863acbce4afb55c9ffef4f871e`.
+See [M23 checkpoint](../verification/M23-CHECKPOINT.md). M23 is not promoted; M24 has not started.
+
 ### M24 — Imports/exports and starting positions
 PGN/FEN/file/clipboard, board editor, saved positions and odds tools.
 
