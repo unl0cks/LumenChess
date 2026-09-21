@@ -28,6 +28,9 @@ object PlaySnapshotCodec {
         put(key("strengthTarget"), encodeStrengthTarget(setup.strength.target))
         put(key("strengthSeed"), setup.strength.seed.toString())
         setup.chess960Index?.let { put(key("chess960Index"), it.toString()) }
+        if (Fen.serialize(setup.initialPosition) != Fen.serialize(if (setup.variant == dev.lumenchess.core.chess.Variant.STANDARD) dev.lumenchess.core.chess.Position.initial() else dev.lumenchess.core.chess.Chess960.startingPosition(setup.chess960Index!!))) {
+            put(key("startingFen"), Fen.serialize(setup.initialPosition))
+        }
         put(key("initialMillis"), setup.clockConfig.initialMillis.toString())
         put(key("incrementMillis"), setup.clockConfig.incrementMillis.toString())
 
@@ -74,6 +77,7 @@ object PlaySnapshotCodec {
             strengthTarget = strengthTarget,
             timeControl = PlayTimeControl(initialMillis, incrementMillis),
             strengthSeed = seed,
+            startingFen = metadata[key("startingFen")],
         )
         val setup = try {
             PlaySetupResolver.resolve(setupConfig)

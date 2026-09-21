@@ -97,6 +97,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateChess960Index(index: Int) = updateSetup { copy(chess960Index = index) }
+    fun updateStartingFen(value: String) = updateSetup { copy(startingFen = value.trim().takeIf { it.isNotEmpty() }) }
     fun updateEngine(engine: PlayEngine) = updateSetup { copy(engine = engine) }
     fun updateSide(side: PlaySide) = updateSetup { copy(side = side) }
     fun updateStrengthModel(model: EngineStrengthModel) = updateSetup { copy(strengthModel = model) }

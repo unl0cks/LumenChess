@@ -197,6 +197,7 @@ See [M23 checkpoint](../verification/M23-CHECKPOINT.md). Promotion is authorized
 
 ### M24 — Imports/exports and starting positions
 PGN/FEN/file/clipboard, board editor, saved positions and odds tools.
+Implementation candidate is on `codex/m24-imports-starting-positions`; see [M24 checkpoint](../verification/M24-CHECKPOINT.md). Manual review remains pending.
 
 ### M25 — Local opening identification
 Bundled CC0 Lichess opening data indexed by position/transposition.

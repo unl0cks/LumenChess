@@ -2,6 +2,7 @@ package dev.lumenchess.play
 
 import dev.lumenchess.core.chess.Chess960
 import dev.lumenchess.core.chess.Color
+import dev.lumenchess.core.chess.Fen
 import dev.lumenchess.core.chess.Position
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.engine.api.EngineCapabilities
@@ -39,6 +40,8 @@ data class PlaySetupConfig(
     val strengthTarget: EngineStrengthTarget = EngineStrengthTarget.Elo(1600),
     val timeControl: PlayTimeControl = PlayTimeControl(),
     val strengthSeed: Long = 0L,
+    /** Optional validated custom starting position; null means the normal variant start. */
+    val startingFen: String? = null,
 )
 
 data class ResolvedPlaySetup(
@@ -67,6 +70,11 @@ object PlaySetupValidator {
         }
         if (setup.variant == Variant.CHESS960 && setup.chess960Index !in 0..959) {
             return PlaySetupValidation.Invalid("Chess960 index must be between 0 and 959")
+        }
+        setup.startingFen?.let { raw ->
+            if (runCatching { Fen.parse(raw, setup.variant) }.isFailure) {
+                return PlaySetupValidation.Invalid("Starting FEN is invalid for ${setup.variant.name.lowercase()}")
+            }
         }
         if (!setup.engine.capabilities.supports(setup.variant)) {
             return PlaySetupValidation.Invalid("Selected engine does not support ${setup.variant}")
@@ -102,7 +110,8 @@ object PlaySetupResolver {
             humanSide = human,
             strength = EngineStrengthSettings(setup.strengthTarget, setup.strengthModel, setup.strengthSeed),
             clockConfig = ClockConfig(setup.timeControl.initialMillis, setup.timeControl.incrementMillis),
-            initialPosition = if (setup.variant == Variant.STANDARD) Position.initial() else Chess960.startingPosition(index!!),
+            initialPosition = setup.startingFen?.let { Fen.parse(it, setup.variant) }
+                ?: if (setup.variant == Variant.STANDARD) Position.initial() else Chess960.startingPosition(index!!),
         )
     }
 }

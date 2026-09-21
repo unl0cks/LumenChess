@@ -12,6 +12,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
@@ -23,10 +24,13 @@ import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.design.*
 import java.text.DateFormat
 import java.util.Date
+import android.content.ClipData
+import android.content.ClipboardManager
 
 /** Only presentation selection changes here; all displayed positions come from the loaded tree. */
 @Composable
 internal fun GameLibraryViewer(ui: GameLibraryUiState, vm: GameLibraryViewModel, modifier: Modifier) {
+    val context = LocalContext.current
     LumenDerivativePage(modifier, testTag = "library-viewer", verticalPadding = 4, spacing = 8) {
         LumenDerivativeTopBar("Saved game", vm::backToList, backTestTag = "library-back")
         val game = ui.game
@@ -101,7 +105,19 @@ internal fun GameLibraryViewer(ui: GameLibraryUiState, vm: GameLibraryViewModel,
                             }
                         }
                     }
-                    item { LibraryUnavailableActions() }
+                    item {
+                        LumenDerivativeAction("Copy PGN", {
+                            context.getSystemService(ClipboardManager::class.java).setPrimaryClip(
+                                ClipData.newPlainText("LumenChess PGN", dev.lumenchess.core.chess.Pgn.serialize(game.tree)),
+                            )
+                        }, Modifier.fillMaxWidth(), testTag = "library-export-pgn")
+                        LumenDerivativeAction("Copy FEN", {
+                            context.getSystemService(ClipboardManager::class.java).setPrimaryClip(
+                                ClipData.newPlainText("LumenChess FEN", Fen.serialize(node.position)),
+                            )
+                        }, Modifier.fillMaxWidth(), testTag = "library-copy-fen")
+                        LibraryNote("Review, Analyze, and the Library branch editor remain unavailable in this build.")
+                    }
                 }
             }
         }

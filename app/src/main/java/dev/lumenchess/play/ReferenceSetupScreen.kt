@@ -25,6 +25,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -122,6 +124,22 @@ internal fun ReferenceSetupScreen(
                 }
 
                 NewGameModeSection(ref, palette, ui.setup, viewModel::updateVariant, viewModel::updateChess960Index)
+                OutlinedTextField(
+                    value = ui.setup.startingFen.orEmpty(),
+                    onValueChange = { viewModel.updateStartingFen(it) },
+                    modifier = Modifier.fillMaxWidth().testTag("play-starting-fen"),
+                    label = { Text("Starting FEN (optional)") },
+                    placeholder = { Text("Normal start") },
+                    singleLine = false,
+                    minLines = 2,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = palette.text,
+                        unfocusedTextColor = palette.text,
+                        focusedBorderColor = palette.cyan,
+                        unfocusedBorderColor = palette.rowOutline,
+                        cursorColor = palette.cyan,
+                    ),
+                )
                 NewGameOpponentSection(
                     ref = ref,
                     palette = palette,
