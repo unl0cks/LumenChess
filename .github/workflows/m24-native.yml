@@ -1,0 +1,58 @@
+name: M24 focused native verification
+
+on:
+  push:
+    branches: [codex/m24-imports-starting-positions]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m24-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  m24-device:
+    if: startsWith(github.event.head_commit.message, 'test(M24):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools emulator
+      - name: Install API-37 toolchain
+        run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1" "system-images;android-37.0;google_apis_ps16k;x86_64" --channel=3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Run M24 native evidence
+        run: |
+          set -euo pipefail
+          echo "no" | avdmanager create avd --force --name m24-review --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          cat >> "$HOME/.android/avd/m24-review.avd/config.ini" <<'AVD'
+          hw.lcd.width=1344
+          hw.lcd.height=2992
+          hw.lcd.density=489
+          showDeviceFrame=no
+          AVD
+          "$ANDROID_HOME/emulator/emulator" -avd m24-review -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 > "$RUNNER_TEMP/m24-emulator.log" 2>&1 &
+          emulator_pid=$!; trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          timeout 300 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell wm size; adb shell wm density
+          bash scripts/run-m24-native-review.sh
+      - name: Upload M24 native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m24-native-${{ github.sha }}
+          path: |
+            m24-native/
+            app/build/outputs/androidTest-results/
+            app/build/reports/androidTests/
+            ${{ runner.temp }}/m24-emulator.log
+          if-no-files-found: warn
+          retention-days: 14
