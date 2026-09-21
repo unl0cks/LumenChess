@@ -90,7 +90,13 @@ internal fun BoardFirstReferenceLiveScreen(
     val setup = ui.resolvedSetup ?: return
     val humanSide = setup.humanSide
     val engineSide = humanSide.opposite
-    val orientation = if (humanSide == Color.WHITE) ChessboardOrientation.WHITE else ChessboardOrientation.BLACK
+    var boardFlipped by remember(setup.variant, setup.chess960Index) { mutableStateOf(false) }
+    val baseOrientation = if (humanSide == Color.WHITE) ChessboardOrientation.WHITE else ChessboardOrientation.BLACK
+    val orientation = if (boardFlipped) {
+        if (baseOrientation == ChessboardOrientation.WHITE) ChessboardOrientation.BLACK else ChessboardOrientation.WHITE
+    } else {
+        baseOrientation
+    }
     val humanTurn = runtime.position.sideToMove == humanSide &&
         runtime.controllers.forSide(humanSide) == RuntimeController.HUMAN
     val inputEnabled = humanTurn && !runtime.paused && runtime.terminal == null
@@ -115,7 +121,7 @@ internal fun BoardFirstReferenceLiveScreen(
     }
     val status = when {
         ui.message != null -> ui.message
-        runtime.terminal != null -> "Game over"
+        runtime.terminal != null -> runtime.terminal?.presentationLabel() ?: "Game over"
         queuedPremove != null -> "Premove ${queuedPremove.uci} queued"
         runtime.paused -> "Game paused"
         else -> null
@@ -134,7 +140,7 @@ internal fun BoardFirstReferenceLiveScreen(
             )
             .padding(horizontal = 7.dp, vertical = 5.dp)
             .testTag(PLAY_LIVE_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically),
     ) {
         val shellShape = RoundedCornerShape(7.dp)
         Column(
@@ -223,11 +229,17 @@ internal fun BoardFirstReferenceLiveScreen(
         if (visibility.showMoves || visibility.showInfo || visibility.showEvaluation || visibility.showEngineLines) {
             ReferenceLiveScreen(ui, viewModel, Modifier.fillMaxSize())
         } else {
-            Spacer(Modifier.weight(1f))
+            // Keep the action strip attached to the gameplay shell. A weighted spacer here
+            // made the sparse Live surface look like the board had ended early, leaving a
+            // large device-dependent dead zone before the actions. The board stage remains
+            // width-driven and fixed; this gap is presentation-only and cannot remeasure it.
+            Spacer(Modifier.height(8.dp))
             BoardFirstEssentialActions(
                 runtime = runtime,
                 hasPremove = queuedPremove != null,
                 showPauseButton = visibility.showPauseButton,
+                boardFlipped = boardFlipped,
+                onFlipBoard = { boardFlipped = !boardFlipped },
                 viewModel = viewModel,
                 modifier = Modifier.fillMaxWidth().height(72.dp).testTag("p5-live-action-strip"),
             )
@@ -383,13 +395,15 @@ private fun BoardFirstPremoveOverlay(
     )
 }
 
-private enum class BoardFirstActionGlyph { PAUSE, PLAY, FLAG, EXIT, CANCEL }
+private enum class BoardFirstActionGlyph { PAUSE, PLAY, FLAG, EXIT, CANCEL, FLIP }
 
 @Composable
 private fun BoardFirstEssentialActions(
     runtime: RuntimeState,
     hasPremove: Boolean,
     showPauseButton: Boolean,
+    boardFlipped: Boolean,
+    onFlipBoard: () -> Unit,
     viewModel: PlayViewModel,
     modifier: Modifier,
 ) {
@@ -427,7 +441,13 @@ private fun BoardFirstEssentialActions(
             )
         }
         BoardFirstAction(
-            label = "Exit",
+            label = if (boardFlipped) "White" else "Black",
+            glyph = BoardFirstActionGlyph.FLIP,
+            testTag = "p5-live-action-flip",
+            onClick = onFlipBoard,
+        )
+        BoardFirstAction(
+            label = if (runtime.terminal == null) "Exit" else "New game",
             glyph = BoardFirstActionGlyph.EXIT,
             testTag = "p5-live-action-exit",
             onClick = viewModel::backToSetup,
@@ -567,6 +587,30 @@ private fun BoardFirstActionGlyph(glyph: BoardFirstActionGlyph, tint: UiColor) {
             BoardFirstActionGlyph.CANCEL -> {
                 drawLine(tint, Offset(size.width * .27f, size.height * .27f), Offset(size.width * .73f, size.height * .73f), stroke, StrokeCap.Round)
                 drawLine(tint, Offset(size.width * .73f, size.height * .27f), Offset(size.width * .27f, size.height * .73f), stroke, StrokeCap.Round)
+            }
+            BoardFirstActionGlyph.FLIP -> {
+                drawArc(
+                    color = tint,
+                    startAngle = 205f,
+                    sweepAngle = 220f,
+                    useCenter = false,
+                    topLeft = Offset(size.width * .17f, size.height * .19f),
+                    size = androidx.compose.ui.geometry.Size(size.width * .66f, size.height * .62f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = StrokeCap.Round),
+                )
+                drawLine(tint, Offset(size.width * .20f, size.height * .38f), Offset(size.width * .18f, size.height * .20f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .20f, size.height * .38f), Offset(size.width * .37f, size.height * .34f), stroke, StrokeCap.Round)
+                drawArc(
+                    color = tint,
+                    startAngle = 25f,
+                    sweepAngle = 220f,
+                    useCenter = false,
+                    topLeft = Offset(size.width * .17f, size.height * .19f),
+                    size = androidx.compose.ui.geometry.Size(size.width * .66f, size.height * .62f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = StrokeCap.Round),
+                )
+                drawLine(tint, Offset(size.width * .80f, size.height * .62f), Offset(size.width * .82f, size.height * .80f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .80f, size.height * .62f), Offset(size.width * .63f, size.height * .66f), stroke, StrokeCap.Round)
             }
         }
     }
