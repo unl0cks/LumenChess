@@ -44,6 +44,7 @@ jobs:
               assert not bad, bad
           Path('m24-debug-apk.json').write_text(json.dumps({'sha256': hashlib.sha256(apk.read_bytes()).hexdigest(), 'bytes': apk.stat().st_size, 'name': apk.name, 'source': '${{ github.sha }}', 'privatePayloads': 0}, indent=2))
           PY
+          cat m24-debug-apk.json
       - uses: actions/upload-artifact@v4
         with:
           name: m24-public-debug-${{ github.sha }}
