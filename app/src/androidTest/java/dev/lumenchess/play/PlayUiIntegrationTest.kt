@@ -105,11 +105,16 @@ class PlayUiIntegrationTest {
         val liveRoot = composeRule.onNodeWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val board = boardBounds()
         val actions = composeRule.onNodeWithTag("p5-live-action-strip").fetchSemanticsNode().boundsInRoot
+        val shell = composeRule.onNodeWithTag("p5-live-shell").fetchSemanticsNode().boundsInRoot
 
         assertTrue("default board must remain square: $board", abs(board.width - board.height) <= 1f)
         assertTrue("default board width must remain P1-stable: $board in $liveRoot", board.width / liveRoot.width in 0.92f..1f)
-        val bottomInset = composeRule.activity.resources.displayMetrics.density * 6f
-        assertTrue("essential actions must be bottom-anchored to the Live root: actions=$actions, root=$liveRoot", liveRoot.bottom - actions.bottom <= bottomInset)
+        val density = composeRule.activity.resources.displayMetrics.density
+        val shellToActions = actions.top - shell.bottom
+        val topBreathingRoom = shell.top - liveRoot.top
+        val bottomBreathingRoom = liveRoot.bottom - actions.bottom
+        assertTrue("essential actions must stay attached to the gameplay shell: shell=$shell actions=$actions", shellToActions in 0f..(16f * density))
+        assertTrue("meaningful Live group should be vertically balanced: top=$topBreathingRoom bottom=$bottomBreathingRoom", abs(topBreathingRoom - bottomBreathingRoom) <= 32f * density)
 
         listOf("p5-live-lower-region", "p5-live-tabs", "p5-live-moves-rail").forEach { tag ->
             composeRule.onNodeWithTag(tag).assertDoesNotExist()

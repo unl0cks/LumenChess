@@ -69,6 +69,10 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     private var persistenceGateway: AndroidPlayPersistenceGateway? = null
     private var restoreProbe: AndroidPlayPersistenceGateway? = null
     private var screenStarted = false
+    private var trackedEngineSearchId: Long? = null
+    private var engineSearchStartedAtMillis: Long? = null
+    private var delayedEngineResult: EngineSearchResult? = null
+    private var delayedEngineResultRunnable: Runnable? = null
 
     private val clockTicker = object : Runnable {
         override fun run() {
@@ -265,8 +269,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 override fun onEngineResult(result: EngineSearchResult) {
-                    coordinator?.onEngineResult(result)
-                    refreshRuntimeProjection(checkTimeout = false)
+                    scheduleEngineResult(result)
                 }
 
                 override fun onEngineFailure(failure: EngineHostFailure) {
@@ -314,6 +317,8 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             reading = clockReader.read(state.clock)
         }
 
+        trackEngineSearch(state)
+
         // Commit presentation state first. Feedback observes this committed projection afterwards.
         mutableUiState.value = mutableUiState.value.copy(runtime = state, clock = reading)
         val feedbackState = state
@@ -321,6 +326,49 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
         feedbackHandler.post {
             feedbackObserver.onCommitted(feedbackState, settings)
         }
+    }
+
+    private fun trackEngineSearch(state: RuntimeState) {
+        val searchId = state.pendingEngineSearch?.searchId?.value
+        if (searchId == trackedEngineSearchId) return
+        trackedEngineSearchId = searchId
+        engineSearchStartedAtMillis = if (searchId == null) null else SystemClock.elapsedRealtime()
+    }
+
+    private fun scheduleEngineResult(result: EngineSearchResult) {
+        val current = coordinator ?: return
+        val pending = current.state.pendingEngineSearch
+        if (pending == null || pending.searchId.value != result.searchId.value ||
+            pending.positionRevision != result.positionRevision
+        ) {
+            // Runtime remains the final stale-result gate. Do not retain a presentation callback
+            // for a search that is no longer the active lease.
+            return
+        }
+
+        delayedEngineResultRunnable?.let(mainHandler::removeCallbacks)
+        delayedEngineResult = result
+        val elapsed = engineSearchStartedAtMillis?.let { SystemClock.elapsedRealtime() - it } ?: 0L
+        val delay = EngineResponseTimingPolicy.remainingMillis(current.setup.strength, elapsed)
+        if (delay == 0L) {
+            applyDelayedEngineResult()
+            return
+        }
+
+        val runnable = Runnable { applyDelayedEngineResult() }
+        delayedEngineResultRunnable = runnable
+        mainHandler.postDelayed(runnable, delay)
+    }
+
+    private fun applyDelayedEngineResult() {
+        val result = delayedEngineResult ?: return
+        delayedEngineResult = null
+        delayedEngineResultRunnable = null
+        val current = coordinator ?: return
+        val pending = current.state.pendingEngineSearch ?: return
+        if (pending.searchId.value != result.searchId.value || pending.positionRevision != result.positionRevision) return
+        current.onEngineResult(result)
+        refreshRuntimeProjection(checkTimeout = false)
     }
 
     private fun updateSetup(transform: PlaySetupConfig.() -> PlaySetupConfig) {
@@ -358,6 +406,11 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun stopLiveAdapters() {
         mainHandler.removeCallbacks(clockTicker)
+        delayedEngineResultRunnable?.let(mainHandler::removeCallbacks)
+        delayedEngineResultRunnable = null
+        delayedEngineResult = null
+        trackedEngineSearchId = null
+        engineSearchStartedAtMillis = null
         feedbackHandler.removeCallbacksAndMessages(null)
         feedbackObserver.resetBaseline(null)
         engineGateway?.setListener(null)
