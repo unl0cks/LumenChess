@@ -28,6 +28,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.lumenchess.board.ChessboardPresentationStyle
 import dev.lumenchess.board.PieceSetCatalog
 import dev.lumenchess.board.ProvideChessboardPresentationStyle
+import androidx.compose.runtime.saveable.Saver
+import dev.lumenchess.analysis.ui.AnalysisRequest
+import dev.lumenchess.analysis.ui.AnalysisRoute
+import dev.lumenchess.analysis.ui.AnalysisViewModel
 import dev.lumenchess.arena.ArenaRoute
 import dev.lumenchess.arena.ArenaScreenMode
 import dev.lumenchess.arena.ArenaViewModel
@@ -61,11 +65,31 @@ internal enum class MainTab(val label:String) {
 }
 private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS, ENGINES, ABOUT }
 
+/** Keeps an open Analysis / Review across configuration changes and process recreation. */
+private val AnalysisRequestSaver = Saver<AnalysisRequest?, List<Any?>>(
+    save = { request ->
+        when (request) {
+            null -> listOf("none")
+            is AnalysisRequest.LibraryGame -> listOf("game", request.gameId, request.review, request.startPly)
+            is AnalysisRequest.FromPosition -> listOf("position", request.fen, request.variant.name)
+        }
+    },
+    restore = { saved ->
+        when (saved.firstOrNull()) {
+            "game" -> AnalysisRequest.LibraryGame(saved[1] as String, saved[2] as Boolean, saved[3] as Int?)
+            "position" -> AnalysisRequest.FromPosition(saved[1] as String?, dev.lumenchess.core.chess.Variant.valueOf(saved[2] as String))
+            else -> null
+        }
+    },
+)
+
 @Composable
 fun LumenChessApp() {
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Play) }
     var settingsDestination by remember { mutableStateOf(SettingsDestination.ROOT) }
     var playFocusedSubpage by remember { mutableStateOf(false) }
+    var analysisRequest by rememberSaveable(stateSaver = AnalysisRequestSaver) { mutableStateOf<AnalysisRequest?>(null) }
+    val openAnalysis: (AnalysisRequest) -> Unit = { analysisRequest = it }
     val playViewModel:PlayViewModel=viewModel()
     val arenaViewModel:ArenaViewModel=viewModel()
     val playUi by playViewModel.uiState
@@ -107,13 +131,21 @@ fun LumenChessApp() {
             Scaffold(
                 containerColor=LumenColors.Background,
                 bottomBar={
-                    if(!livePlay&&!liveArena&&!focusedPlaySubpage) {
+                    if(!livePlay&&!liveArena&&!focusedPlaySubpage&&analysisRequest==null) {
                         LumenBottomNavigation(currentTab){currentTab=it}
                     }
                 },
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
-                    AnimatedContent(
+                    val openRequest = analysisRequest
+                    if (openRequest != null) {
+                        AnalysisRoute(
+                            viewModel = viewModel<AnalysisViewModel>(),
+                            request = openRequest,
+                            onClose = { analysisRequest = null },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else AnimatedContent(
                         targetState=currentTab to settingsDestination,
                         transitionSpec={
                             val tabDirection=targetState.first.ordinal.compareTo(initialState.first.ordinal)
@@ -130,6 +162,7 @@ fun LumenChessApp() {
                                 modifier=Modifier.fillMaxSize(),
                                 onFocusedSubpageChanged={playFocusedSubpage=it},
                                 onOpenArena={currentTab=MainTab.Arena},
+                                onOpenAnalysis=openAnalysis,
                             )
                             MainTab.Arena -> ArenaRoute(
                                 viewModel=arenaViewModel,
@@ -141,6 +174,7 @@ fun LumenChessApp() {
                                 reservedGameIds = setOfNotNull(playUi.gameId, playUi.restorableGame?.gameId,
                                     arenaUi.gameId, arenaUi.restorableGame?.gameId),
                                 ownershipReady = playUi.ownershipReady && arenaUi.ownershipReady,
+                                onOpenAnalysis = openAnalysis,
                             )
                             MainTab.Settings -> when(destination) {
                                 SettingsDestination.ROOT -> SettingsScreen(

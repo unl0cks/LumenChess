@@ -108,7 +108,10 @@ class AndroidPlayPersistenceGateway(
     }
 
     /** Ensures all prior persistence effects have finished before a test inspects Room. */
-    internal fun flushForTest(onFlushed: () -> Unit) {
+    internal fun flushForTest(onFlushed: () -> Unit) = flush(onFlushed)
+
+    /** Runs [onFlushed] on the main thread after every snapshot accepted so far has been written. */
+    fun flush(onFlushed: () -> Unit) {
         if (closed.get()) return
         executor.execute { handler.post(onFlushed) }
     }

@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import dev.lumenchess.analysis.ui.AnalysisRequest
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.data.persistence.*
 import dev.lumenchess.design.*
@@ -30,20 +31,26 @@ fun GameLibraryRoute(
     modifier: Modifier = Modifier,
     reservedGameIds: Set<String> = emptySet(),
     ownershipReady: Boolean = true,
+    onOpenAnalysis: (AnalysisRequest) -> Unit = {},
 ) {
     val ui by viewModel.uiState
     SideEffect { viewModel.setOwnership(reservedGameIds, ownershipReady) }
     LaunchedEffect(viewModel) { viewModel.refresh() }
     BackHandler(enabled = ui.selectedGameId != null, onBack = viewModel::backToList)
     if (ui.selectedGameId != null) {
-        GameLibraryViewer(ui, viewModel, modifier)
+        GameLibraryViewer(ui, viewModel, modifier, onOpenAnalysis)
     } else {
-        GameLibraryScreen(ui, viewModel, modifier)
+        GameLibraryScreen(ui, viewModel, modifier, onOpenAnalysis)
     }
 }
 
 @Composable
-private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, modifier: Modifier) {
+private fun GameLibraryScreen(
+    ui: GameLibraryUiState,
+    vm: GameLibraryViewModel,
+    modifier: Modifier,
+    onOpenAnalysis: (AnalysisRequest) -> Unit,
+) {
     val filterState = rememberLazyListState(ui.query.filter.ordinal)
     var importOpen by rememberSaveable { mutableStateOf(false) }
     if (importOpen) {
@@ -139,6 +146,18 @@ private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, 
             LumenDerivativeSurface(DerivativeSurfaceRole.PREVIEW_PANEL) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(entry.playerNames(), style = MaterialTheme.typography.titleMedium, color = LumenColors.OnSurface)
+                    // A game Play or Arena still owns may change; once it has a result it is final.
+                    val reviewable = entry.id.value !in ui.reservedGameIds || entry.result != null
+                    LumenDerivativeAction(
+                        if (entry.latestReviewState == ReviewState.COMPLETE) "Open Game Review" else "Game Review",
+                        { vm.dismissActions(); onOpenAnalysis(AnalysisRequest.LibraryGame(entry.id.value, review = true)) },
+                        Modifier.fillMaxWidth(), enabled = reviewable, testTag = "library-review",
+                    )
+                    LumenDerivativeAction(
+                        "Analyze",
+                        { vm.dismissActions(); onOpenAnalysis(AnalysisRequest.LibraryGame(entry.id.value)) },
+                        Modifier.fillMaxWidth(), enabled = reviewable, testTag = "library-analyze",
+                    )
                     LumenDerivativeAction(if (entry.isFavorite) "Remove favorite" else "Favorite", { vm.toggleFavorite(entry) }, Modifier.fillMaxWidth(), enabled = !ui.actionPending, testTag = "library-favorite")
                     LumenDerivativeAction(if (entry.isProtected) "Remove protection" else "Protect", { vm.toggleProtected(entry) }, Modifier.fillMaxWidth(), enabled = !ui.actionPending, testTag = "library-protect")
                     val deletionBlocked = !ui.ownershipReady || entry.id.value in ui.reservedGameIds

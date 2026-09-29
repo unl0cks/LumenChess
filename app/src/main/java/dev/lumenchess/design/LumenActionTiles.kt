@@ -43,7 +43,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /** Drawn action icons shared by the Live and Arena screens. Vector strokes only, never text glyphs. */
-enum class LumenActionGlyph { PAUSE, PLAY, FLAG, CANCEL, FLIP, DRAW, MENU, NEW_GAME, REMATCH, STOP, CONTROL, BRANCH }
+enum class LumenActionGlyph {
+    PAUSE, PLAY, FLAG, CANCEL, FLIP, DRAW, MENU, NEW_GAME, REMATCH, STOP, CONTROL, BRANCH,
+    FIRST, PREVIOUS, NEXT, LAST, ENGINE, REVIEW, SAVE, ANALYZE,
+}
 
 /** The recessed strip that holds a row of [LumenActionTile]s. */
 @Composable
@@ -248,6 +251,39 @@ fun LumenActionGlyphIcon(glyph: LumenActionGlyph, tint: Color, modifier: Modifie
                 )
                 drawCircle(tint, radius = stroke * 1.1f, center = Offset(w * .64f, h * .30f))
                 drawCircle(tint, radius = stroke * 1.1f, center = Offset(w * .36f, h * .80f))
+            }
+            LumenActionGlyph.FIRST -> {
+                line(.28f, .24f, .28f, .76f)
+                line(.70f, .24f, .40f, .50f); line(.40f, .50f, .70f, .76f)
+            }
+            LumenActionGlyph.PREVIOUS -> { line(.62f, .22f, .36f, .50f); line(.36f, .50f, .62f, .78f) }
+            LumenActionGlyph.NEXT -> { line(.38f, .22f, .64f, .50f); line(.64f, .50f, .38f, .78f) }
+            LumenActionGlyph.LAST -> {
+                line(.72f, .24f, .72f, .76f)
+                line(.30f, .24f, .60f, .50f); line(.60f, .50f, .30f, .76f)
+            }
+            LumenActionGlyph.ENGINE -> {
+                // A rising evaluation line in a frame: the engine is thinking about this position.
+                drawRoundRect(
+                    tint, topLeft = Offset(w * .18f, h * .22f), size = Size(w * .64f, h * .56f),
+                    cornerRadius = CornerRadius(stroke * 1.5f, stroke * 1.5f), style = Stroke(stroke),
+                )
+                line(.28f, .64f, .42f, .48f); line(.42f, .48f, .54f, .56f); line(.54f, .56f, .72f, .34f)
+            }
+            LumenActionGlyph.REVIEW -> {
+                // A magnifier over a move: look back at the game.
+                drawCircle(tint, radius = w * .20f, center = Offset(w * .44f, h * .42f), style = Stroke(stroke))
+                line(.58f, .57f, .78f, .78f)
+            }
+            LumenActionGlyph.SAVE -> {
+                // Arrow into a tray.
+                line(.50f, .20f, .50f, .60f); line(.50f, .60f, .36f, .46f); line(.50f, .60f, .64f, .46f)
+                line(.24f, .66f, .24f, .78f); line(.24f, .78f, .76f, .78f); line(.76f, .78f, .76f, .66f)
+            }
+            LumenActionGlyph.ANALYZE -> {
+                // Two candidate arrows from one square.
+                line(.30f, .74f, .66f, .30f); line(.66f, .30f, .50f, .32f); line(.66f, .30f, .64f, .46f)
+                line(.30f, .74f, .74f, .66f)
             }
         }
     }

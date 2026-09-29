@@ -1,5 +1,6 @@
 package dev.lumenchess.play
 
+import dev.lumenchess.analysis.ui.AnalysisRequest
 import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.activity.compose.BackHandler
@@ -91,6 +92,7 @@ internal fun BoardFirstReferenceLiveScreen(
     viewModel: PlayViewModel,
     modifier: Modifier,
     visibility: LivePresentationVisibility = DefaultLivePresentationVisibility,
+    onOpenAnalysis: (AnalysisRequest) -> Unit = {},
 ) {
     val runtime = ui.runtime ?: return
     val setup = ui.resolvedSetup ?: return
@@ -224,6 +226,12 @@ internal fun BoardFirstReferenceLiveScreen(
                 viewModel.backToSetup()
             },
             onClose = { dialog = LiveDialog.NONE },
+            onReview = if (terminal != null) {
+                {
+                    dialog = LiveDialog.NONE
+                    viewModel.whenGamePersisted { id -> onOpenAnalysis(AnalysisRequest.LibraryGame(id, review = true)) }
+                }
+            } else null,
         )
     }
 
@@ -234,6 +242,14 @@ internal fun BoardFirstReferenceLiveScreen(
             onRematch = viewModel::rematch,
             onNewGame = viewModel::backToSetup,
             onViewBoard = { resultDismissed = true },
+            onReview = {
+                resultDismissed = true
+                viewModel.whenGamePersisted { id -> onOpenAnalysis(AnalysisRequest.LibraryGame(id, review = true)) }
+            },
+            onAnalyze = {
+                resultDismissed = true
+                viewModel.whenGamePersisted { id -> onOpenAnalysis(AnalysisRequest.LibraryGame(id)) }
+            },
         )
     }
 }

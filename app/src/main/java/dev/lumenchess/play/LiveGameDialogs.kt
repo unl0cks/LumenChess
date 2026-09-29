@@ -87,6 +87,7 @@ internal fun LiveMenuDialog(
     onCopyFen: () -> Unit,
     onLeave: () -> Unit,
     onClose: () -> Unit,
+    onReview: (() -> Unit)? = null,
 ) {
     LiveDialogPanel("p5-live-menu-dialog", onClose) {
         LiveDialogTitle("Game")
@@ -103,6 +104,7 @@ internal fun LiveMenuDialog(
                 }
             }
         }
+        if (onReview != null) LumenDerivativeAction("Game Review", onReview, Modifier.fillMaxWidth(), testTag = "p5-live-menu-review")
         LumenDerivativeAction("Copy PGN", onCopyPgn, Modifier.fillMaxWidth(), testTag = "p5-live-menu-copy-pgn")
         LumenDerivativeAction("Copy FEN", onCopyFen, Modifier.fillMaxWidth(), testTag = "p5-live-menu-copy-fen")
         LumenDerivativeAction("Leave game", onLeave, Modifier.fillMaxWidth(), testTag = "p5-live-menu-leave")
@@ -117,11 +119,15 @@ internal fun LiveResultDialog(
     onRematch: () -> Unit,
     onNewGame: () -> Unit,
     onViewBoard: () -> Unit,
+    onReview: (() -> Unit)? = null,
+    onAnalyze: (() -> Unit)? = null,
 ) {
     val summary = liveResultSummary(terminal, humanSide)
     LiveDialogPanel("p5-live-result-dialog", onViewBoard) {
         LiveDialogTitle(summary.title)
         LiveDialogNote(summary.detail)
+        if (onReview != null) LumenDerivativeAction("Game Review", onReview, Modifier.fillMaxWidth(), testTag = "p5-live-result-review")
+        if (onAnalyze != null) LumenDerivativeAction("Analyze", onAnalyze, Modifier.fillMaxWidth(), testTag = "p5-live-result-analyze")
         LumenDerivativeAction("Rematch", onRematch, Modifier.fillMaxWidth(), testTag = "p5-live-result-rematch")
         LumenDerivativeAction("New game", onNewGame, Modifier.fillMaxWidth(), testTag = "p5-live-result-new")
         LumenDerivativeAction("View board", onViewBoard, Modifier.fillMaxWidth(), testTag = "p5-live-result-close")

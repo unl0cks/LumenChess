@@ -31,6 +31,8 @@ class AndroidPlayEngineGateway(
     private val engine: PlayEngine,
     val sessionId: EngineSessionId = EngineSessionId("play-${UUID.randomUUID()}"),
     private val slot: EngineSlot = EngineSlot.A,
+    /** Analysis wants every MultiPV line; Play and Arena show only the engine's best line. */
+    private val forwardAllLines: Boolean = false,
 ) : PlayEngineGateway, AutoCloseable {
     interface Listener {
         fun onEngineHostRecovered()
@@ -132,8 +134,8 @@ class AndroidPlayEngineGateway(
 
                 override fun onSearchInfo(sessionId: EngineSessionId, info: EngineSearchInfo) {
                     // Play and Arena show one evaluation: the engine's best line. Further MultiPV
-                    // lines (humanization candidates) are not presentation data here.
-                    if (info.multiPvRank != 1) return
+                    // lines (humanization candidates) are not presentation data there.
+                    if (!forwardAllLines && info.multiPvRank != 1) return
                     handler.post {
                         if (isActive(token) && sessionId == this@AndroidPlayEngineGateway.sessionId) {
                             listener?.onEngineInfo(info)

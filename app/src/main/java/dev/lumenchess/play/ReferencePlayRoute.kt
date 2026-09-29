@@ -1,5 +1,6 @@
 package dev.lumenchess.play
 
+import dev.lumenchess.analysis.ui.AnalysisRequest
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -32,6 +33,7 @@ fun ReferencePlayRoute(
     viewModel: PlayViewModel,
     onFocusedSubpageChanged: (Boolean) -> Unit = {},
     onOpenArena: () -> Unit = {},
+    onOpenAnalysis: (AnalysisRequest) -> Unit = {},
 ) {
     val ui by viewModel.uiState
     var page by rememberSaveable { mutableStateOf(ReferencePlayPage.OVERVIEW) }
@@ -69,7 +71,7 @@ fun ReferencePlayRoute(
     }
 
     when (ui.mode) {
-        PlayScreenMode.LIVE -> BoardFirstReferenceLiveScreen(ui, viewModel, modifier)
+        PlayScreenMode.LIVE -> BoardFirstReferenceLiveScreen(ui, viewModel, modifier, onOpenAnalysis = onOpenAnalysis)
         PlayScreenMode.SETUP -> AnimatedContent(
             targetState = page,
             modifier = modifier,

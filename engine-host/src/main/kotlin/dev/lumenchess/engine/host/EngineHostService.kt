@@ -175,6 +175,7 @@ abstract class EngineHostService : Service() {
 
 class EngineSlotAService : EngineHostService()
 class EngineSlotBService : EngineHostService()
+class EngineSlotCService : EngineHostService()
 
 private data class HostedBackend(
     val backend: UciBackend,

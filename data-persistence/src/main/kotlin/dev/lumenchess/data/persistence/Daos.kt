@@ -107,6 +107,40 @@ interface ReviewDao {
     @Query("SELECT COUNT(*) FROM reviews WHERE gameId = :gameId") suspend fun countReviewsForGame(gameId: String): Int
     @Query("SELECT COUNT(*) FROM review_plies WHERE gameId = :gameId") suspend fun countReviewPliesForGame(gameId: String): Int
     @Query("SELECT COUNT(*) FROM review_heavy_analysis") suspend fun countHeavy(): Int
+    @Query("SELECT COALESCE(SUM(LENGTH(payload)), 0) FROM review_heavy_analysis") suspend fun heavyPayloadBytes(): Long
+
+    @Query("SELECT * FROM reviews WHERE id = :id") suspend fun reviewById(id: String): ReviewEntity?
+    @Query("SELECT * FROM reviews WHERE gameId = :gameId ORDER BY updatedAtEpochMillis DESC, id DESC") suspend fun reviewsForGame(gameId: String): List<ReviewEntity>
+    @Query("SELECT * FROM reviews WHERE state = :state ORDER BY updatedAtEpochMillis DESC, id DESC") suspend fun reviewsInState(state: String): List<ReviewEntity>
+    @Query("UPDATE reviews SET state = :state, progressPly = :progressPly, updatedAtEpochMillis = :updatedAtEpochMillis, completedAtEpochMillis = :completedAtEpochMillis WHERE id = :id")
+    suspend fun updateReviewState(id: String, state: String, progressPly: Int, updatedAtEpochMillis: Long, completedAtEpochMillis: Long?): Int
+    @Query("DELETE FROM reviews WHERE id = :id") suspend fun deleteReview(id: String): Int
+
+    @Query("SELECT * FROM review_plies WHERE reviewId = :reviewId") suspend fun pliesForReview(reviewId: String): List<ReviewPlyEntity>
+    @Query("SELECT * FROM review_plies WHERE reviewId IN (:reviewIds)") suspend fun pliesForReviews(reviewIds: List<String>): List<ReviewPlyEntity>
+    @Query("SELECT * FROM review_plies WHERE reviewId = :reviewId AND nodeId = :nodeId") suspend fun plyForNode(reviewId: String, nodeId: String): ReviewPlyEntity?
+    @Query(
+        "UPDATE review_plies SET playedEvalCp = :playedEvalCp, playedMateIn = :playedMateIn, bestMoveFrom = :bestMoveFrom, " +
+            "bestMoveTo = :bestMoveTo, bestMovePromotionCode = :bestMovePromotionCode, classification = :classification, " +
+            "expectedPointsLoss = :expectedPointsLoss, depth = :depth, nodes = :nodes, timeMillis = :timeMillis WHERE id = :id",
+    )
+    suspend fun updatePly(
+        id: String,
+        playedEvalCp: Int?,
+        playedMateIn: Int?,
+        bestMoveFrom: Int?,
+        bestMoveTo: Int?,
+        bestMovePromotionCode: Int?,
+        classification: String?,
+        expectedPointsLoss: Double?,
+        depth: Int?,
+        nodes: Long?,
+        timeMillis: Long?,
+    ): Int
+
+    @Query("SELECT h.* FROM review_heavy_analysis h JOIN review_plies p ON p.id = h.reviewPlyId WHERE p.reviewId = :reviewId ORDER BY h.createdAtEpochMillis, h.id")
+    suspend fun heavyForReview(reviewId: String): List<ReviewHeavyAnalysisEntity>
+    @Query("DELETE FROM review_heavy_analysis WHERE reviewPlyId = :reviewPlyId AND format = :format") suspend fun deleteHeavyForPly(reviewPlyId: String, format: String): Int
 }
 
 @Dao
@@ -114,6 +148,9 @@ interface SavedPositionDao {
     @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insert(entity: SavedPositionEntity)
     @Query("SELECT * FROM saved_positions WHERE id = :id") suspend fun byId(id: String): SavedPositionEntity?
     @Query("SELECT * FROM saved_positions ORDER BY updatedAtEpochMillis DESC, id") suspend fun listAll(): List<SavedPositionEntity>
+    @Query("UPDATE saved_positions SET title = :title, notes = :notes, updatedAtEpochMillis = :updatedAtEpochMillis WHERE id = :id")
+    suspend fun rename(id: String, title: String, notes: String?, updatedAtEpochMillis: Long): Int
+    @Query("DELETE FROM saved_positions WHERE id = :id") suspend fun delete(id: String): Int
 }
 
 @Dao

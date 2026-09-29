@@ -275,6 +275,15 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     internal fun currentCoordinatorForTest(): PlayRuntimeCoordinator? = coordinator
     internal fun currentPersistenceForTest(): AndroidPlayPersistenceGateway? = persistenceGateway
 
+    /**
+     * Calls [action] with the saved game's id once every write of the current game has landed,
+     * so Review and Analysis always read the finished game.
+     */
+    fun whenGamePersisted(action: (String) -> Unit) {
+        val gateway = persistenceGateway ?: return
+        gateway.flush { gateway.gameId?.let(action) }
+    }
+
     override fun onCleared() {
         mainHandler.removeCallbacks(clockTicker)
         mainHandler.removeCallbacks(noticeClearer)
