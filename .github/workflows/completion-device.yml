@@ -25,6 +25,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'test(device):')
     runs-on: ubuntu-latest
     timeout-minutes: 50
+    env:
+      EMIT_IMAGES: ${{ github.event.inputs.emit_images || '01-play-overview 02-new-game-setup 03-live-start 04-engine-thinking 05-engine-replied 06-game-menu 10-result-you-lost 12-insights 13-live-low-clock 15-castle-b 16-promotion-picker 17-promotion-a 22-arena-live 19-arena-setup 20-games 21-settings' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -42,8 +44,6 @@ jobs:
           rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
       - uses: gradle/actions/setup-gradle@v4
       - name: Boot device and run the completion session
-        env:
-          EMIT_IMAGES: ${{ github.event.inputs.emit_images || '01-play-overview 02-new-game-setup 03-live-start 04-engine-thinking 05-engine-replied 06-game-menu 10-result-you-lost 12-insights 13-live-low-clock 15-castle-b 16-promotion-picker 17-promotion-a 22-arena-live 19-arena-setup 20-games 21-settings' }}
         run: |
           set -euo pipefail
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
@@ -62,6 +62,21 @@ jobs:
           adb shell settings put global transition_animation_scale 1
           adb shell settings put global animator_duration_scale 1
           bash scripts/run-completion-device.sh
+      - name: Publish measurements and failures as annotations
+        if: always()
+        run: |
+          python3 scripts/ci-annotations.py measurements completion-device/measurements.txt
+          python3 scripts/ci-annotations.py failures
+      - name: Publish screenshots as annotations (1/2)
+        if: always()
+        env:
+          ANNOTATE_SKIP: '0'
+        run: python3 scripts/ci-annotations.py images completion-device $EMIT_IMAGES
+      - name: Publish screenshots as annotations (2/2)
+        if: always()
+        env:
+          ANNOTATE_SKIP: '10'
+        run: python3 scripts/ci-annotations.py images completion-device $EMIT_IMAGES
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
