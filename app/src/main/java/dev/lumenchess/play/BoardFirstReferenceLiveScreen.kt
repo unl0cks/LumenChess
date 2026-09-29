@@ -81,8 +81,8 @@ import kotlin.math.floor
  * Sparse default Human-vs-Engine presentation.
  *
  * Runtime ownership is unchanged: this observes [PlayUiState] and commands [PlayViewModel].
- * Optional analysis/history surfaces remain in the richer reference implementation for the later
- * presentation-settings milestone, but are not emitted (and therefore reserve no space) by default.
+ * Analysis, move-list and information surfaces are not part of this screen at all, so they reserve
+ * no space; when the presentation settings add them they will be composed here, below the board.
  */
 @Composable
 internal fun BoardFirstReferenceLiveScreen(
@@ -143,8 +143,6 @@ internal fun BoardFirstReferenceLiveScreen(
         if (terminal != null) viewModel.backToSetup() else dialog = LiveDialog.LEAVE
     }
 
-    val analysisVisible = visibility.showMoves || visibility.showInfo ||
-        visibility.showEvaluation || visibility.showEngineLines
     val emphasizeStatus = terminal != null && ui.message == null && ui.notice == null
 
     BoxWithConstraints(
@@ -160,52 +158,35 @@ internal fun BoardFirstReferenceLiveScreen(
             )
             .testTag(PLAY_LIVE_TEST_TAG),
     ) {
-        if (analysisVisible) {
-            // Optional analysis/history surfaces are not emitted by default; when a future setting
-            // enables them they own the space below the board, so the group is top-aligned.
-            Column(
-                Modifier.fillMaxSize().padding(horizontal = LIVE_H_PADDING, vertical = LIVE_V_PADDING),
-                verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
-            ) {
-                BoardFirstShell(
-                    ui, setup, runtime, viewModel, orientation, inputEnabled, premoveEnabled, lastMove,
-                    queuedPremove, pendingPremoveOrigin, { pendingPremoveOrigin = it }, movePresentation,
-                    Modifier.fillMaxWidth(),
-                )
-                BoardFirstStatusSlot(status, ui.message != null, emphasizeStatus)
-                ReferenceLiveScreen(ui, viewModel, Modifier.fillMaxSize())
-            }
-        } else {
-            // One deliberate composition: the board is sized from the real constraints (width-led on
-            // phones, height-led on short screens so nothing is ever clipped) and the whole group of
-            // opponent card, board, player card, status slot and actions is centred as a unit. It
-            // depends only on the viewport, never on game state, so the board cannot move.
-            val widthLimit = maxWidth - LIVE_H_PADDING * 2 - SHELL_PADDING * 2
-            val chrome = SHELL_PADDING * 2 + PARTICIPANT_ROW_HEIGHT * 2 + SHELL_GAP * 2 +
-                STATUS_SLOT_HEIGHT + ACTION_STRIP_HEIGHT + GROUP_GAP * 2
-            val heightLimit = maxHeight - LIVE_V_PADDING * 2 - chrome
-            val boardSide = minOf(widthLimit, heightLimit).coerceAtLeast(MIN_BOARD_SIDE)
-            Column(
-                Modifier.align(Alignment.Center).width(boardSide + SHELL_PADDING * 2),
-                verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
-            ) {
-                BoardFirstShell(
-                    ui, setup, runtime, viewModel, orientation, inputEnabled, premoveEnabled, lastMove,
-                    queuedPremove, pendingPremoveOrigin, { pendingPremoveOrigin = it }, movePresentation,
-                    Modifier.fillMaxWidth(),
-                )
-                BoardFirstStatusSlot(status, ui.message != null, emphasizeStatus)
-                BoardFirstEssentialActions(
-                    runtime = runtime,
-                    hasPremove = queuedPremove != null,
-                    showPauseButton = visibility.showPauseButton,
-                    onFlipBoard = { boardFlipped = !boardFlipped },
-                    onResign = { dialog = LiveDialog.RESIGN },
-                    onMenu = { dialog = LiveDialog.MENU },
-                    viewModel = viewModel,
-                    modifier = Modifier.fillMaxWidth().height(ACTION_STRIP_HEIGHT).testTag("p5-live-action-strip"),
-                )
-            }
+        // One deliberate composition: the board is sized from the real constraints (width-led on
+        // phones, height-led on short screens so nothing is ever clipped) and the whole group of
+        // opponent card, board, player card, status slot and actions is centred as a unit. It
+        // depends only on the viewport, never on game state, so the board cannot move.
+        val widthLimit = maxWidth - LIVE_H_PADDING * 2 - SHELL_PADDING * 2
+        val chrome = SHELL_PADDING * 2 + PARTICIPANT_ROW_HEIGHT * 2 + SHELL_GAP * 2 +
+            STATUS_SLOT_HEIGHT + ACTION_STRIP_HEIGHT + GROUP_GAP * 2
+        val heightLimit = maxHeight - LIVE_V_PADDING * 2 - chrome
+        val boardSide = minOf(widthLimit, heightLimit).coerceAtLeast(MIN_BOARD_SIDE)
+        Column(
+            Modifier.align(Alignment.Center).width(boardSide + SHELL_PADDING * 2),
+            verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
+        ) {
+            BoardFirstShell(
+                ui, setup, runtime, viewModel, orientation, inputEnabled, premoveEnabled, lastMove,
+                queuedPremove, pendingPremoveOrigin, { pendingPremoveOrigin = it }, movePresentation,
+                Modifier.fillMaxWidth(),
+            )
+            BoardFirstStatusSlot(status, ui.message != null, emphasizeStatus)
+            BoardFirstEssentialActions(
+                runtime = runtime,
+                hasPremove = queuedPremove != null,
+                showPauseButton = visibility.showPauseButton,
+                onFlipBoard = { boardFlipped = !boardFlipped },
+                onResign = { dialog = LiveDialog.RESIGN },
+                onMenu = { dialog = LiveDialog.MENU },
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxWidth().height(ACTION_STRIP_HEIGHT).testTag("p5-live-action-strip"),
+            )
         }
     }
 
