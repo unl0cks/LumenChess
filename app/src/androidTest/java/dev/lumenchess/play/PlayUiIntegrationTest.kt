@@ -82,18 +82,18 @@ class PlayUiIntegrationTest {
         composeRule.onNodeWithTag("square-e2").performClick()
         composeRule.onNodeWithTag("square-e4").performClick()
 
-        composeRule.waitUntil(timeoutMillis = 5_000L) {
-            composeRule.onAllNodesWithTag(PLAY_PREMOVE_OVERLAY_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
-        }
-        val duringEngineThinking = boardBounds()
-        assertStableBounds(before, duringEngineThinking)
-
-        composeRule.waitUntil(timeoutMillis = 12_000L) {
+        // The engine's think time is seeded and varies by position, so a fast reply can already be on
+        // the board by the time the clicks return. Sample the bounds on every poll instead of waiting
+        // for a transient "thinking" state: whichever states occur, the board must not move.
+        var samples = 0
+        composeRule.waitUntil(timeoutMillis = 15_000L) {
+            assertStableBounds(before, boardBounds())
+            samples += 1
             val moveCount = viewModel.currentCoordinatorForTest()?.state?.gameTree?.mainline()?.size ?: beforeMoveCount
             moveCount >= beforeMoveCount + 2
         }
-        val afterEngineResult = boardBounds()
-        assertStableBounds(before, afterEngineResult)
+        assertTrue("the board was never sampled", samples > 0)
+        assertStableBounds(before, boardBounds())
     }
 
     @Test

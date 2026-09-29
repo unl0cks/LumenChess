@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.lumenchess.MainActivity
+import dev.lumenchess.board.GroundedPrecisionBoardMotion
 import dev.lumenchess.play.PLAY_LIVE_TEST_TAG
 import dev.lumenchess.play.PLAY_SETUP_TEST_TAG
 import dev.lumenchess.play.PLAY_START_TEST_TAG
@@ -51,6 +52,8 @@ class CompletionPassDeviceQaTest {
     @Test fun fullSession() {
         val vm = ViewModelProvider(compose.activity)[PlayViewModel::class.java]
         val metrics = compose.activity.resources.displayMetrics
+        val night = compose.activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        note("appearance: ${if (night == android.content.res.Configuration.UI_MODE_NIGHT_YES) "dark" else "light"} (system)")
         note("display ${metrics.widthPixels}x${metrics.heightPixels}px density=${metrics.density} " +
             "(${(metrics.widthPixels / metrics.density).toInt()}x${(metrics.heightPixels / metrics.density).toInt()}dp)")
 
@@ -59,6 +62,7 @@ class CompletionPassDeviceQaTest {
             shot("01-play-overview")
             compose.onNodeWithTag("play-overview-vs-engine").performClick()
             waitFor(PLAY_SETUP_TEST_TAG)
+            Thread.sleep(700)
             shot("02-new-game-setup")
             compose.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
             waitFor(PLAY_LIVE_TEST_TAG, 20_000)
@@ -144,13 +148,15 @@ class CompletionPassDeviceQaTest {
             compose.onNodeWithTag("p5-live-result-close").performClick()
         }
 
+        val motion = GroundedPrecisionBoardMotion
         step("castling motion") {
             startFromFen(vm, "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1")
             compose.onNodeWithTag("square-e1").performClick()
-            compose.onNodeWithTag("square-g1").performClick()
-            motionShots("15-castle")
-            Thread.sleep(600)
-            shot("15d-castled")
+            captureMotion("15-castle", motion.castlingDurationMillis) {
+                compose.onNodeWithTag("square-g1").performClick()
+            }
+            check(pollUntil(4_000) { rankOf(vm, 1) == "R4RK1" }) { "castling did not reach the position: ${vm.currentFen()}" }
+            note("castling result rank 1 = ${rankOf(vm, 1)}")
         }
 
         step("promotion") {
@@ -158,20 +164,23 @@ class CompletionPassDeviceQaTest {
             compose.onNodeWithTag("square-a7").performClick()
             compose.onNodeWithTag("square-a8").performClick()
             waitFor("promotion-choice-queen")
+            Thread.sleep(300)
             shot("16-promotion-picker")
-            compose.onNodeWithTag("promotion-choice-queen").performClick()
-            motionShots("17-promotion")
-            Thread.sleep(500)
-            shot("17d-promoted")
+            captureMotion("17-promotion", motion.humanMoveDurationMillis + motion.promotionDurationMillis) {
+                compose.onNodeWithTag("promotion-choice-queen").performClick()
+            }
+            check(pollUntil(4_000) { rankOf(vm, 8)?.contains('Q') == true }) { "promotion did not reach the position: ${vm.currentFen()}" }
+            note("promotion result rank 8 = ${rankOf(vm, 8)}")
         }
 
         step("capture motion") {
             startFromFen(vm, "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1")
             compose.onNodeWithTag("square-e4").performClick()
-            compose.onNodeWithTag("square-d5").performClick()
-            motionShots("18-capture")
-            Thread.sleep(500)
-            shot("18d-captured")
+            captureMotion("18-capture", motion.humanMoveDurationMillis) {
+                compose.onNodeWithTag("square-d5").performClick()
+            }
+            check(pollUntil(4_000) { rankOf(vm, 5) == "3P4" }) { "capture did not reach the position: ${vm.currentFen()}" }
+            note("capture result rank 5 = ${rankOf(vm, 5)}")
         }
 
         step("arena live game") {
@@ -205,6 +214,27 @@ class CompletionPassDeviceQaTest {
             shot("21-settings")
         }
 
+        step("light appearance") {
+            // The system default is followed, so the light palette is checked on the same screens.
+            shell("cmd uimode night no")
+            Thread.sleep(2_000)
+            compose.waitForIdle()
+            shot("30-light-settings")
+            waitFor("main-tab-play")
+            compose.onNodeWithTag("main-tab-play").performClick()
+            waitFor("p5-play-overview")
+            Thread.sleep(500)
+            shot("31-light-overview")
+            compose.runOnUiThread {
+                vm.updateTimeControl(PlayTimeControl(600_000L, 0L))
+                vm.updateStartingFen("")
+                vm.startNewGame()
+            }
+            waitFor(PLAY_LIVE_TEST_TAG, 20_000)
+            Thread.sleep(800)
+            shot("32-light-live")
+        }
+
         preserveEvidence()
         assertTrue("steps failed: ${failureDetails.joinToString(" | ")}", failures.isEmpty())
     }
@@ -234,15 +264,52 @@ class CompletionPassDeviceQaTest {
         waitFor("main-tab-play")
     }
 
-    /** Three rapid frames right after a move, to catch the piece mid-travel. */
-    private fun motionShots(prefix: String) {
-        Thread.sleep(40)
-        quickShot("$prefix-a")
-        Thread.sleep(50)
-        quickShot("$prefix-b")
-        Thread.sleep(50)
-        quickShot("$prefix-c")
+    private val transientMotionTags = listOf(
+        "traveling-piece", "castling-king", "castling-rook",
+        "promotion-outgoing-piece", "promotion-promoted-piece", "captured-piece-fade",
+    )
+
+    private fun visibleMotionOverlays() = transientMotionTags.filter { tag ->
+        compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
     }
+
+    /**
+     * Runs [trigger] with Compose's clock frozen, waits (in real time) for the runtime to publish the
+     * move and the board to start its motion plan, then steps the animation to 30%, 60% and 90% of
+     * [durationMillis] and screenshots each frame. Stepping the clock by hand is what makes mid-flight
+     * frames reproducible; free-running, a 200 ms slide is over before a screenshot can be taken.
+     */
+    private fun captureMotion(prefix: String, durationMillis: Int, trigger: () -> Unit) {
+        compose.mainClock.autoAdvance = false
+        try {
+            trigger()
+            val triggeredAt = SystemClock.elapsedRealtime()
+            var seen = emptyList<String>()
+            pollUntil(3_000) {
+                compose.mainClock.advanceTimeByFrame()
+                seen = visibleMotionOverlays()
+                Thread.sleep(10)
+                seen.isNotEmpty()
+            }
+            note("$prefix: overlays $seen after ${SystemClock.elapsedRealtime() - triggeredAt}ms, plan ${durationMillis}ms")
+            check(seen.isNotEmpty()) { "$prefix: the board never drew a travelling piece" }
+            var elapsed = 0L
+            listOf(0.30, 0.60, 0.90).forEachIndexed { index, fraction ->
+                val target = (durationMillis * fraction).toLong()
+                compose.mainClock.advanceTimeBy(target - elapsed)
+                elapsed = target
+                Thread.sleep(150) // let the drawn frame reach the display before capturing it
+                quickShot("$prefix-${'a' + index}")
+                note("$prefix frame ${'a' + index} at ${(fraction * 100).toInt()}%: overlays ${visibleMotionOverlays()}")
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+    }
+
+    private fun rankOf(vm: PlayViewModel, rank: Int): String? =
+        vm.currentFen()?.substringBefore(' ')?.split('/')?.getOrNull(8 - rank)
 
     private fun measureLiveLayout() {
         fun bounds(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot

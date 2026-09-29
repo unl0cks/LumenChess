@@ -2,15 +2,13 @@
 """Publishes CI evidence as workflow annotations.
 
 Annotations are attached to the check run and readable through the public check-runs API, so a
-failure (or a screenshot) can be inspected without downloading logs or artifacts.
+failure can be inspected without downloading logs or artifacts. (Messages are cut to 4096
+characters by the API, so screenshots travel in the job log instead.)
 
   ci-annotations.py failures            failing instrumentation tests, one error each plus a summary
   ci-annotations.py measurements FILE   the text of a measurements file as one notice
-  ci-annotations.py images DIR NAME...  small JPEGs as base64 notices (GitHub caps a step at 10)
 """
-import base64
 import glob
-import os
 import sys
 import xml.etree.ElementTree as ET
 
@@ -74,25 +72,6 @@ def cmd_measurements(path):
     emit("notice", "Measurements", text)
 
 
-def cmd_images(directory, names):
-    skip = int(os.environ.get("ANNOTATE_SKIP", "0"))
-    emitted = 0
-    for name in names[skip:]:
-        if emitted >= MAX_PER_STEP:
-            break
-        path = os.path.join(directory, f"{name}.jpg")
-        if not os.path.isfile(path):
-            emit("warning", f"IMG {name}", "missing")
-            emitted += 1
-            continue
-        data = open(path, "rb").read()
-        if len(data) * 4 // 3 > MAX_MESSAGE:
-            emit("warning", f"IMG {name}", f"too large ({len(data)} bytes)")
-        else:
-            emit("notice", f"IMG {name}", base64.b64encode(data).decode("ascii"))
-        emitted += 1
-
-
 def main(argv):
     if len(argv) < 2:
         print(__doc__)
@@ -102,8 +81,6 @@ def main(argv):
         cmd_failures()
     elif command == "measurements" and len(argv) >= 3:
         cmd_measurements(argv[2])
-    elif command == "images" and len(argv) >= 4:
-        cmd_images(argv[2], argv[3:])
     else:
         print(__doc__)
         return 2

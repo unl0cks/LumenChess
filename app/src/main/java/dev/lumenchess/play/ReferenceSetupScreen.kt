@@ -42,6 +42,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -222,11 +223,13 @@ private data class NewGameReferenceScale(
 private enum class NewGameGlyph { BOARD, CHESS960, ENGINE, WHITE, BLACK, RANDOM, CLOCK, TARGET, INFO, CHECK }
 
 private fun Modifier.newGameBackground(palette: LumenP5IdentityPalette): Modifier = drawWithCache {
+    // Near-black floor only for the approved dark graphite; a light palette stays light.
+    val floor = if (palette.appBackground.luminance() < .5f) Color(0xFF070A0C) else palette.appBackground
     val base = Brush.verticalGradient(
         colorStops = arrayOf(
             0f to palette.appBackgroundLift,
             .28f to palette.appBackground,
-            1f to Color(0xFF070A0C),
+            1f to floor,
         ),
     )
     onDrawBehind {

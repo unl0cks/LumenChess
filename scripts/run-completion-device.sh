@@ -4,6 +4,9 @@ set -uo pipefail
 mkdir -p completion-device
 status=0
 
+# The approved Lumen language is dark graphite; the session runs dark and re-checks light itself.
+adb shell cmd uimode night yes
+adb shell cmd uimode night
 ./gradlew :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.lumenchess.visual.CompletionPassDeviceQaTest \
   -Pandroid.testInstrumentationRunnerArguments.completionQa=true || status=1
@@ -15,6 +18,7 @@ echo "=== MEASUREMENTS ==="
 cat completion-device/measurements.txt 2>/dev/null || echo "(no measurements were written)"
 echo "=== END MEASUREMENTS ==="
 
+adb shell cmd uimode night no
 # Live contract, structure and library suites (these are the ones whose assertions changed).
 ./gradlew :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.lumenchess.play.PlayUiIntegrationTest,dev.lumenchess.design.P5ReferenceStructureTest,dev.lumenchess.games.GameLibraryUiTest \

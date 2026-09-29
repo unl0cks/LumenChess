@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -129,11 +130,14 @@ fun SettingsScreen(
 }
 
 private fun Modifier.approvedSettingsBackground(palette: LumenP5IdentityPalette): Modifier = drawWithCache {
+    // The approved dark graphite falls away to a near-black floor; a light palette stays light, as
+    // on the Play overview, instead of fading to black.
+    val floor = if (palette.appBackground.luminance() < .5f) Color(0xFF070A0C) else palette.appBackground
     val base = Brush.verticalGradient(
         colorStops = arrayOf(
             0f to palette.appBackgroundLift,
             .28f to palette.appBackground,
-            1f to Color(0xFF070A0C),
+            1f to floor,
         ),
     )
     val ambient = Brush.radialGradient(

@@ -206,10 +206,19 @@ internal fun GameSourceType.libraryLabel(): String = when (this) {
     GameSourceType.PGN_IMPORT -> "Imported"; GameSourceType.BRANCH -> "Branch"; GameSourceType.OTHER -> "Other"
 }
 
+/**
+ * "10+0" style time control. The recorded base and increment are authoritative when present; the
+ * stored raw string is whatever the writer recorded (Play and Arena record milliseconds, imported
+ * PGN records the tag as written), so it is only shown when there is nothing better.
+ */
 internal fun libraryTimeControl(metadata: GamePersistenceMetadata, headers: Map<String, String>): String? {
     val control = metadata.timeControl
-    return control?.raw ?: headers["TimeControl"] ?: control?.baseMillis?.let { base ->
-        val increment = control.incrementMillis
-        "${base / 1000}s" + (increment?.let { " + ${it / 1000}s" } ?: "")
+    val base = control?.baseMillis
+    if (base != null) {
+        if (base <= 0L) return "Untimed"
+        val increment = (control.incrementMillis ?: 0L) / 1_000L
+        val start = if (base % 60_000L == 0L) "${base / 60_000L}" else "${base / 1_000L}s"
+        return "$start+$increment"
     }
+    return control?.raw ?: headers["TimeControl"]
 }
