@@ -221,3 +221,31 @@ object BoardMovePresentationClassifier {
         else -> BoardMovePresentation.ENGINE
     }
 }
+
+/**
+ * Decides how each authoritative revision is presented, once. The answer is fixed when a revision
+ * first arrives and repeated for every later recomposition of that same revision.
+ *
+ * The screens used to derive it from "revisions since the last composition", which drops to zero on
+ * the very next recomposition (the Live clock recomposes every 100 ms). The presentation is a key of
+ * the board's motion effect, so the flip restarted the effect and snapped a human move or premove to
+ * its end after at most one clock tick.
+ */
+class BoardMovePresentationTracker(initialRevision: Long) {
+    private var presentedRevision = initialRevision
+    private var presentation = BoardMovePresentation.ENGINE
+
+    fun presentationFor(revision: Long, lastMoverIsHuman: Boolean): BoardMovePresentation {
+        if (revision != presentedRevision) {
+            val delta = revision - presentedRevision
+            // A lower revision means a different game (new game, rematch, restore): nothing to animate.
+            presentation = if (delta > 0L) {
+                BoardMovePresentationClassifier.classify(delta, lastMoverIsHuman)
+            } else {
+                BoardMovePresentation.ENGINE
+            }
+            presentedRevision = revision
+        }
+        return presentation
+    }
+}

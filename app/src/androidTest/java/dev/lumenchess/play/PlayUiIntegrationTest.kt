@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
 import dev.lumenchess.MainActivity
 import dev.lumenchess.board.CHESSBOARD_TEST_TAG
+import dev.lumenchess.board.GroundedPrecisionBoardMotion
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.runtime.RuntimeTerminal
@@ -94,6 +96,47 @@ class PlayUiIntegrationTest {
         }
         assertTrue("the board was never sampled", samples > 0)
         assertStableBounds(before, boardBounds())
+    }
+
+    /**
+     * Regression: the Live screen derived the move presentation from "revisions since the last
+     * composition", which flipped from HUMAN_TAP to ENGINE on the next recomposition. The presentation
+     * keys the board's motion effect, so any state change (the clock ticks every 100 ms) snapped a
+     * human move to its end before it could be seen.
+     */
+    @Test
+    fun humanMoveKeepsTravellingAcrossUnrelatedRecompositions() {
+        openSetup()
+        composeRule.onNodeWithText("Standard").performScrollTo().performClick()
+        composeRule.onNodeWithText("White").performScrollTo().performClick()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
+        waitForLiveScreen()
+        val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
+        val travel = GroundedPrecisionBoardMotion.humanMoveDurationMillis.toLong()
+        fun travellingPiece() = composeRule.onNodeWithTag("traveling-piece", useUnmergedTree = true)
+
+        composeRule.onNodeWithTag("square-e2").performClick()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNodeWithTag("square-e4").performClick()
+            // Pausing cancels the engine search, so no reply can legitimately supersede the move.
+            composeRule.runOnUiThread { viewModel.pause() }
+            composeRule.mainClock.advanceTimeByFrame()
+            travellingPiece().assertExists()
+
+            // An unrelated Live state change, exactly what each clock tick produces.
+            composeRule.runOnUiThread { viewModel.showNotice("recomposition") }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.mainClock.advanceTimeBy(travel / 3)
+            travellingPiece().assertExists()
+
+            composeRule.mainClock.advanceTimeBy(travel)
+            composeRule.mainClock.advanceTimeByFrame()
+            travellingPiece().assertDoesNotExist()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.onNodeWithContentDescription("e4, White pawn").assertExists()
     }
 
     @Test

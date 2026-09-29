@@ -23,9 +23,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.key
@@ -42,8 +40,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import dev.lumenchess.board.BoardMovePresentation
-import dev.lumenchess.board.BoardMovePresentationClassifier
+import dev.lumenchess.board.BoardMovePresentationTracker
 import dev.lumenchess.board.ChessboardHighlights
 import dev.lumenchess.board.ChessboardInput
 import dev.lumenchess.board.ChessboardOrientation
@@ -425,15 +422,11 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
     val historicalNode = ui.historyPly?.let { if (it == 0) runtime.gameTree.root else mainline.getOrNull(it - 1) }
     val displayedPosition = historicalNode?.position ?: runtime.position
     val lastMove = if (historicalNode != null) historicalNode.move else mainline.lastOrNull()?.move
-    var presentedRevision by remember { mutableLongStateOf(runtime.positionRevision.value) }
+    val presentationTracker = remember { BoardMovePresentationTracker(runtime.positionRevision.value) }
     var showManualControl by remember { mutableStateOf(false) }
-    val revisionDelta = (runtime.positionRevision.value - presentedRevision).coerceAtLeast(0L)
-    val movePresentation = if (revisionDelta == 0L) BoardMovePresentation.ENGINE else {
-        BoardMovePresentationClassifier.classify(revisionDelta, lastMoverIsHuman = ui.lastMoveWasHuman)
-    }
+    val movePresentation = presentationTracker.presentationFor(runtime.positionRevision.value, ui.lastMoveWasHuman)
     val inputEnabled = runtime.controllers.forSide(runtime.position.sideToMove) == RuntimeController.HUMAN &&
         !runtime.paused && runtime.terminal == null && ui.historyPly == null
-    SideEffect { presentedRevision = runtime.positionRevision.value }
 
     // The board group (participant cards, evaluation bar, board, actions) has a constant height and
     // is centred between two equal slots, so the board never moves. Everything that varies with mode

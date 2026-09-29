@@ -152,7 +152,7 @@ class CompletionPassDeviceQaTest {
         step("castling motion") {
             startFromFen(vm, "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1")
             compose.onNodeWithTag("square-e1").performClick()
-            captureMotion("15-castle", motion.castlingDurationMillis) {
+            captureMotion(vm, "15-castle", motion.castlingDurationMillis) {
                 compose.onNodeWithTag("square-g1").performClick()
             }
             check(pollUntil(4_000) { rankOf(vm, 1) == "R4RK1" }) { "castling did not reach the position: ${vm.currentFen()}" }
@@ -166,7 +166,7 @@ class CompletionPassDeviceQaTest {
             waitFor("promotion-choice-queen")
             Thread.sleep(300)
             shot("16-promotion-picker")
-            captureMotion("17-promotion", motion.humanMoveDurationMillis + motion.promotionDurationMillis) {
+            captureMotion(vm, "17-promotion", motion.humanMoveDurationMillis + motion.promotionDurationMillis) {
                 compose.onNodeWithTag("promotion-choice-queen").performClick()
             }
             check(pollUntil(4_000) { rankOf(vm, 8)?.contains('Q') == true }) { "promotion did not reach the position: ${vm.currentFen()}" }
@@ -176,7 +176,7 @@ class CompletionPassDeviceQaTest {
         step("capture motion") {
             startFromFen(vm, "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1")
             compose.onNodeWithTag("square-e4").performClick()
-            captureMotion("18-capture", motion.humanMoveDurationMillis) {
+            captureMotion(vm, "18-capture", motion.humanMoveDurationMillis) {
                 compose.onNodeWithTag("square-d5").performClick()
             }
             check(pollUntil(4_000) { rankOf(vm, 5) == "3P4" }) { "capture did not reach the position: ${vm.currentFen()}" }
@@ -274,15 +274,21 @@ class CompletionPassDeviceQaTest {
     }
 
     /**
-     * Runs [trigger] with Compose's clock frozen, waits (in real time) for the runtime to publish the
-     * move and the board to start its motion plan, then steps the animation to 30%, 60% and 90% of
-     * [durationMillis] and screenshots each frame. Stepping the clock by hand is what makes mid-flight
-     * frames reproducible; free-running, a 200 ms slide is over before a screenshot can be taken.
+     * Runs [trigger] with Compose's clock frozen, pauses the game so the engine's reply cannot
+     * supersede the move, waits (in real time) for the board to start its motion plan, then steps the
+     * animation to 30%, 60% and 90% of [durationMillis] and screenshots each frame. Stepping the clock
+     * by hand is what makes mid-flight frames reproducible; free-running, a 200 ms slide is over
+     * before a screenshot can be taken.
+     *
+     * The piece must still be travelling at 30% and 60%. Recompositions happen throughout (the Live
+     * clock ticks every 100 ms), so this also guards against a recomposition cutting the motion short.
      */
-    private fun captureMotion(prefix: String, durationMillis: Int, trigger: () -> Unit) {
+    private fun captureMotion(vm: PlayViewModel, prefix: String, durationMillis: Int, trigger: () -> Unit) {
         compose.mainClock.autoAdvance = false
+        val midFlight = mutableListOf<List<String>>()
         try {
             trigger()
+            compose.runOnUiThread { vm.pause() }
             val triggeredAt = SystemClock.elapsedRealtime()
             var seen = emptyList<String>()
             pollUntil(3_000) {
@@ -300,12 +306,15 @@ class CompletionPassDeviceQaTest {
                 elapsed = target
                 Thread.sleep(150) // let the drawn frame reach the display before capturing it
                 quickShot("$prefix-${'a' + index}")
-                note("$prefix frame ${'a' + index} at ${(fraction * 100).toInt()}%: overlays ${visibleMotionOverlays()}")
+                val overlays = visibleMotionOverlays()
+                if (index < 2) midFlight += overlays
+                note("$prefix frame ${'a' + index} at ${(fraction * 100).toInt()}%: overlays $overlays")
             }
         } finally {
             compose.mainClock.autoAdvance = true
         }
         compose.waitForIdle()
+        check(midFlight.all { it.isNotEmpty() }) { "$prefix: motion ended early, mid-flight overlays $midFlight" }
     }
 
     private fun rankOf(vm: PlayViewModel, rank: Int): String? =
