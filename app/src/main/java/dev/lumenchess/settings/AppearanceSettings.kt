@@ -63,6 +63,12 @@ internal object AppearanceSettingsCodec {
     const val FEEDBACK_SOUND_EVENTS = "feedback_sound_events"
     const val FEEDBACK_HAPTIC_EVENTS = "feedback_haptic_events"
     const val SOUND_PACK = "feedback_sound_pack"
+    /** Version of the feedback event list the stored event sets were written against. */
+    const val FEEDBACK_EVENT_SCHEMA = "feedback_event_schema"
+    private const val CURRENT_FEEDBACK_EVENT_SCHEMA = "2"
+    /** Events introduced after schema 1; stored sets from schema 1 never had a chance to include them. */
+    private val EVENTS_ADDED_IN_SCHEMA_2: Set<GameFeedbackEvent> =
+        setOf(GameFeedbackEvent.IllegalMove, GameFeedbackEvent.LowTime)
     private const val NO_PRESET = "__none__"
     private const val NO_EVENTS = "__none__"
     private val stableId = Regex("[a-z0-9][a-z0-9._-]{0,127}")
@@ -81,6 +87,7 @@ internal object AppearanceSettingsCodec {
         put(FEEDBACK_SOUND_EVENTS, encodeEvents(settings.feedbackSoundEvents))
         put(FEEDBACK_HAPTIC_EVENTS, encodeEvents(settings.feedbackHapticEvents))
         put(SOUND_PACK, settings.soundPackId)
+        put(FEEDBACK_EVENT_SCHEMA, CURRENT_FEEDBACK_EVENT_SCHEMA)
     }
 
     fun decode(raw: Map<String, String>): AppearanceSettings {
@@ -108,10 +115,21 @@ internal object AppearanceSettingsCodec {
             customDarkSquareArgb = raw[CUSTOM_DARK]?.let(::decodeArgb),
             feedbackSoundsEnabled = decodeBoolean(raw[FEEDBACK_SOUNDS_ENABLED], defaults.feedbackSoundsEnabled),
             feedbackHapticsEnabled = decodeBoolean(raw[FEEDBACK_HAPTICS_ENABLED], defaults.feedbackHapticsEnabled),
-            feedbackSoundEvents = decodeEvents(raw[FEEDBACK_SOUND_EVENTS], defaults.feedbackSoundEvents),
-            feedbackHapticEvents = decodeEvents(raw[FEEDBACK_HAPTIC_EVENTS], defaults.feedbackHapticEvents),
+            feedbackSoundEvents = decodeEvents(raw[FEEDBACK_SOUND_EVENTS], defaults.feedbackSoundEvents)
+                .withNewEvents(raw),
+            feedbackHapticEvents = decodeEvents(raw[FEEDBACK_HAPTIC_EVENTS], defaults.feedbackHapticEvents)
+                .withNewEvents(raw),
             soundPackId = raw[SOUND_PACK].validStableIdOr(defaults.soundPackId),
         )
+    }
+
+    /**
+     * Settings stored before an event existed turn it on, like a fresh install would; a player who
+     * had switched every event off keeps them all off.
+     */
+    private fun Set<GameFeedbackEvent>.withNewEvents(raw: Map<String, String>): Set<GameFeedbackEvent> {
+        if (raw[FEEDBACK_EVENT_SCHEMA] != null || isEmpty()) return this
+        return GameFeedbackEvent.all.filterTo(linkedSetOf()) { it in this || it in EVENTS_ADDED_IN_SCHEMA_2 }
     }
 
     private fun String?.validStableIdOr(fallback: String): String =
@@ -153,6 +171,8 @@ internal object AppearanceSettingsCodec {
         GameFeedbackEvent.Check -> "CHECK"
         GameFeedbackEvent.Castle -> "CASTLE"
         GameFeedbackEvent.Promotion -> "PROMOTION"
+        GameFeedbackEvent.IllegalMove -> "ILLEGAL_MOVE"
+        GameFeedbackEvent.LowTime -> "LOW_TIME"
         GameFeedbackEvent.GameStart -> "GAME_START"
         GameFeedbackEvent.GameEnd -> "GAME_END"
     }
@@ -163,6 +183,8 @@ internal object AppearanceSettingsCodec {
         "CHECK" -> GameFeedbackEvent.Check
         "CASTLE" -> GameFeedbackEvent.Castle
         "PROMOTION" -> GameFeedbackEvent.Promotion
+        "ILLEGAL_MOVE" -> GameFeedbackEvent.IllegalMove
+        "LOW_TIME" -> GameFeedbackEvent.LowTime
         "GAME_START" -> GameFeedbackEvent.GameStart
         "GAME_END" -> GameFeedbackEvent.GameEnd
         else -> null

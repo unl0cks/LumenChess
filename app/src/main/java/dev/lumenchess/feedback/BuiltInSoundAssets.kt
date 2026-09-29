@@ -57,6 +57,10 @@ object BuiltInSoundAssets {
     private val heavy = listOf(Partial(170.0, 42.0, 1.00), Partial(300.0, 60.0, 0.60), Partial(520.0, 85.0, 0.45), Partial(980.0, 140.0, 0.25), Partial(1_900.0, 220.0, 0.10))
     private val king = listOf(Partial(200.0, 52.0, 1.00), Partial(340.0, 68.0, 0.55), Partial(575.0, 92.0, 0.34), Partial(1_150.0, 150.0, 0.15))
     private val rook = listOf(Partial(260.0, 58.0, 1.00), Partial(430.0, 74.0, 0.55), Partial(720.0, 100.0, 0.34), Partial(1_420.0, 165.0, 0.15))
+    /** Heavily damped and low: a muffled knock that reads as "no" without being a buzzer. */
+    private val muffled = listOf(Partial(150.0, 95.0, 1.00), Partial(245.0, 130.0, 0.45), Partial(410.0, 170.0, 0.18))
+    /** A small, dry clock escapement tick. */
+    private val tick = listOf(Partial(820.0, 95.0, 1.00), Partial(1_340.0, 150.0, 0.45), Partial(2_050.0, 220.0, 0.16))
     private val bell = listOf(Partial(1.0, 7.0, 1.0), Partial(2.76, 11.0, 0.25), Partial(5.40, 19.0, 0.06))
     private val ping = listOf(Partial(1.0, 14.0, 1.0), Partial(2.0, 24.0, 0.16))
 
@@ -90,6 +94,17 @@ object BuiltInSoundAssets {
             chimes = listOf(
                 Chime(80, 0.30, 988.0, 1.2, bell),
                 Chime(170, 0.34, 1_319.0, 1.2, bell),
+            ),
+        ),
+        SoundEvent.ILLEGAL_MOVE to Cue(
+            150, peak = 0.52, fadeMillis = 12,
+            strikes = listOf(Strike(0, 1.0, muffled, 2.5, 0.35, 0.22, 61)),
+        ),
+        SoundEvent.LOW_TIME to Cue(
+            240, peak = 0.55, fadeMillis = 12,
+            strikes = listOf(
+                Strike(0, 1.0, tick, 1.5, 0.25, 0.30, 71),
+                Strike(120, 0.85, tick, 1.5, 0.25, 0.30, 73),
             ),
         ),
         SoundEvent.GAME_START to Cue(

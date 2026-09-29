@@ -312,6 +312,7 @@ private fun BoardFirstShell(
                     positionRevision = runtime.positionRevision.value,
                     movePresentation = movePresentation,
                 ),
+                onIllegalDrop = viewModel::onIllegalMoveAttempt,
             )
             if (premoveEnabled) {
                 BoardFirstPremoveOverlay(

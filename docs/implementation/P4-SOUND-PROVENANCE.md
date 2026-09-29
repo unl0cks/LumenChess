@@ -2,7 +2,7 @@
 
 Date: 2026-08-17
 
-LumenChess P4 uses seven built-in feedback cues for move, capture, check, castle, promotion, game start, and game end.
+LumenChess uses nine built-in feedback cues: move, capture, check, castle, promotion, illegal move, low time, game start, and game end.
 
 ## Provenance
 
@@ -23,6 +23,8 @@ Sound packs and per-event overrides (whole-pack ZIP import, user files) are unch
 | Check | 340 ms | wood hit + soft 1568 Hz ping at 60 ms |
 | Castle | 300 ms | two hits 105 ms apart: king (200 Hz body) then rook (260 Hz body) |
 | Promotion | 550 ms | wood hit + rising bell notes 988 Hz, 1319 Hz |
+| Illegal move | 150 ms | one heavily damped low knock (150 / 245 / 410 Hz); quieter and duller than a move |
+| Low time | 240 ms | two dry escapement ticks 120 ms apart (820 / 1340 / 2050 Hz modes) |
 | Game start | 600 ms | bell notes 659 Hz, 880 Hz |
 | Game end | 700 ms | bell notes 784 Hz, 587 Hz |
 
@@ -31,3 +33,5 @@ Exact partial frequencies, decays and gains live in the tables in `BuiltInSoundA
 ## Redistribution
 
 The synthesis code and resulting cues are project-owned original material and may be redistributed with LumenChess under the repository's licensing terms. Custom user-imported sounds remain user-provided app-private files and are not part of the distributed project assets.
+
+Illegal move plays only when a dragged piece is dropped on another square it cannot legally reach. Low time plays once when the player's clock falls to ten seconds or less after having been above it. Both are presentation-only. Sound packs may include `illegal` and `low_time` files; packs without them fall back to these built-in cues. Every cue is unit-tested for peak, loudness band, silent edges, and spectrum (centroid under 2 kHz, under 3% of energy above 5 kHz).

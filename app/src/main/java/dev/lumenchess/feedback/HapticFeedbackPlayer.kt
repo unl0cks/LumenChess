@@ -19,6 +19,8 @@ class HapticFeedbackPlayer(context: Context) {
             GameFeedbackEvent.Check -> 36L to 180
             GameFeedbackEvent.Castle -> 42L to 155
             GameFeedbackEvent.Promotion -> 55L to 190
+            GameFeedbackEvent.IllegalMove -> 22L to 70
+            GameFeedbackEvent.LowTime -> 40L to 120
             GameFeedbackEvent.GameStart -> 30L to 105
             GameFeedbackEvent.GameEnd -> 65L to 170
         }

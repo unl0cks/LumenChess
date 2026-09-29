@@ -87,6 +87,8 @@ fun LumenChessboard(
     arrows: List<ChessboardArrow> = emptyList(),
     palette: ChessboardPalette? = null,
     pieceSet: PieceSet? = null,
+    /** A dragged piece was dropped on another square it cannot legally reach. Presentation only. */
+    onIllegalDrop: () -> Unit = {},
 ) {
     val presentation = LocalChessboardPresentationStyle.current
     val resolvedPalette = palette ?: presentation.palette
@@ -423,6 +425,7 @@ fun LumenChessboard(
                             }
                             InputSubmission.Rejected -> {
                                 suppressNextTravel = false
+                                if (target != from && pendingPromotion.isEmpty()) onIllegalDrop()
                                 animateDragBack()
                             }
                         }

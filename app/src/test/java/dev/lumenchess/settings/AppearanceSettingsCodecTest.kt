@@ -104,4 +104,36 @@ class AppearanceSettingsCodecTest {
         assertEquals("CAPTURE,CHECK", encoded[AppearanceSettingsCodec.FEEDBACK_HAPTIC_EVENTS])
         assertEquals("night-pack", encoded[AppearanceSettingsCodec.SOUND_PACK])
     }
+
+    @Test
+    fun settingsSavedBeforeTheNewCuesExistedTurnThemOn() {
+        // Written by the previous version: seven-event lists and no schema key.
+        val legacy = mapOf(
+            AppearanceSettingsCodec.FEEDBACK_SOUND_EVENTS to "MOVE,CAPTURE,GAME_END",
+            AppearanceSettingsCodec.FEEDBACK_HAPTIC_EVENTS to "__none__",
+        )
+        val decoded = AppearanceSettingsCodec.decode(legacy)
+        assertEquals(
+            linkedSetOf(
+                GameFeedbackEvent.Move,
+                GameFeedbackEvent.Capture,
+                GameFeedbackEvent.IllegalMove,
+                GameFeedbackEvent.LowTime,
+                GameFeedbackEvent.GameEnd,
+            ),
+            decoded.feedbackSoundEvents,
+        )
+        // Someone who had switched every haptic off keeps them all off.
+        assertEquals(emptySet<GameFeedbackEvent>(), decoded.feedbackHapticEvents)
+    }
+
+    @Test
+    fun aChoiceMadeWithTheNewCuesAvailableIsKept() {
+        val chosen = AppearanceSettings(
+            feedbackSoundEvents = linkedSetOf(GameFeedbackEvent.Move, GameFeedbackEvent.Capture),
+        )
+        val decoded = AppearanceSettingsCodec.decode(AppearanceSettingsCodec.encode(chosen))
+        assertEquals(chosen.feedbackSoundEvents, decoded.feedbackSoundEvents)
+        assertEquals(GameFeedbackEvent.all, AppearanceSettings().feedbackSoundEvents)
+    }
 }

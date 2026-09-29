@@ -18,6 +18,8 @@ import dev.lumenchess.engine.host.transport.EngineHostFailure
 import dev.lumenchess.feedback.AndroidGameFeedbackOutput
 import dev.lumenchess.feedback.CommittedFeedbackObserver
 import dev.lumenchess.feedback.GameFeedbackDispatcher
+import dev.lumenchess.feedback.GameFeedbackEvent
+import dev.lumenchess.feedback.LowTimeWarning
 import dev.lumenchess.runtime.DrawOfferResponse
 import dev.lumenchess.runtime.EngineDrawPolicy
 import dev.lumenchess.runtime.RuntimeState
@@ -65,7 +67,9 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     private val clockReader = DeterministicGameClock(timeSource)
     private val mutableUiState = mutableStateOf(PlayUiState())
     private val feedbackOutput = AndroidGameFeedbackOutput(application)
-    private val feedbackObserver = CommittedFeedbackObserver(GameFeedbackDispatcher(feedbackOutput))
+    private val feedbackDispatcher = GameFeedbackDispatcher(feedbackOutput)
+    private val feedbackObserver = CommittedFeedbackObserver(feedbackDispatcher)
+    private val lowTimeWarning = LowTimeWarning()
     private val feedbackSettingsRepository = DataStoreAppearanceSettingsRepository.from(application)
 
     val uiState: State<PlayUiState> = mutableUiState
@@ -154,6 +158,16 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
         if (current.state.terminal != null) return
         current.humanMove(move)
         refreshRuntimeProjection(checkTimeout = false)
+    }
+
+    /** Presentation feedback for a drop the board rejected; the runtime never saw it. */
+    fun onIllegalMoveAttempt() {
+        dispatchFeedback(GameFeedbackEvent.IllegalMove)
+    }
+
+    private fun dispatchFeedback(event: GameFeedbackEvent) {
+        val settings = feedbackPreferences.toFeedbackSettings()
+        feedbackHandler.post { feedbackDispatcher.dispatch(listOf(event), settings) }
     }
 
     fun queuePremove(move: Move) {
@@ -276,6 +290,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     private fun startResolvedGame(setup: ResolvedPlaySetup, restored: RestoredPlayGame?) {
         stopLiveAdapters()
         drawOfferPly = null
+        lowTimeWarning.reset()
         restoreProbe?.setListener(null)
         restoreProbe?.close()
         restoreProbe = null
@@ -385,6 +400,12 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
         // Commit presentation state first. Feedback observes this committed projection afterwards.
         mutableUiState.value = mutableUiState.value.copy(runtime = state, clock = reading)
+        mutableUiState.value.resolvedSetup?.takeIf { it.clockConfig.enabled && state.terminal == null }?.let { setup ->
+            val remaining = if (setup.humanSide == Color.WHITE) reading.whiteRemainingMillis else reading.blackRemainingMillis
+            if (lowTimeWarning.update(remaining, clockRunning = reading.running && !state.paused)) {
+                dispatchFeedback(GameFeedbackEvent.LowTime)
+            }
+        }
         val feedbackState = state
         val settings = feedbackPreferences.toFeedbackSettings()
         feedbackHandler.post {
