@@ -7,16 +7,19 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,6 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.ColorFilter
@@ -52,7 +57,9 @@ import dev.lumenchess.core.chess.Piece
 import dev.lumenchess.core.chess.PieceType
 import dev.lumenchess.core.chess.Position
 import dev.lumenchess.core.chess.Square
+import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenMotion
+import dev.lumenchess.design.LumenRadii
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.floor
@@ -871,14 +878,29 @@ private fun PromotionPicker(
     modifier: Modifier = Modifier,
 ) {
     val orderedTypes = listOf(PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT)
-    Surface(modifier = modifier, shape = RoundedCornerShape(12.dp), tonalElevation = 0.dp, shadowElevation = 4.dp) {
-        Row {
+    // Each choice sits on the board square that contrasts with its piece: a near-black piece on a
+    // graphite panel (or an ivory piece on a light square) would disappear.
+    val tile = if (color == Color.WHITE) palette.darkSquare else palette.lightSquare
+    val shape = RoundedCornerShape(LumenRadii.Panel)
+    BoxWithConstraints(modifier) {
+        val choiceSize = minOf(60.dp, (maxWidth - 8.dp) / orderedTypes.size)
+        Row(
+            Modifier
+                .shadow(6.dp, shape)
+                .clip(shape)
+                .background(LumenColors.SurfaceHighest)
+                .border(1.dp, LumenColors.OutlineStrong, shape)
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
             orderedTypes.forEach { type ->
                 val move = moves.firstOrNull { it.promotion == type } ?: return@forEach
                 val label = type.name.lowercase()
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(choiceSize)
+                        .clip(RoundedCornerShape(LumenRadii.Compact))
+                        .background(tile)
                         .testTag("promotion-choice-$label")
                         .semantics { contentDescription = "Promote to ${type.displayName()}" }
                         .clickable { onChoose(move) },
@@ -887,7 +909,7 @@ private fun PromotionPicker(
                     pieceSet.Piece(
                         piece = Piece(color, type),
                         tint = if (color == Color.WHITE) palette.whitePiece else palette.blackPiece,
-                        modifier = Modifier.size(46.dp),
+                        modifier = Modifier.size(choiceSize * 0.82f),
                     )
                 }
             }

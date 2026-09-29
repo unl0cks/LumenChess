@@ -66,6 +66,8 @@ data class ArenaUiState(
     val branchOperationPending: Boolean = false,
 )
 
+private fun freshArenaSeed(): Long = kotlin.random.Random.nextLong().takeIf { it != 0L } ?: 1L
+
 /** Android presentation bridge for Arena. Canonical chess state remains inside [ArenaRuntimeCoordinator]. */
 class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -163,7 +165,13 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     fun startNewArena() {
         val config = mutableUiState.value.setup
         if (ArenaSetupValidator.validate(config) !is ArenaSetupValidation.Valid) return
-        startResolvedArena(ArenaSetupResolver.resolve(config).copy(branchOrigin = mutableUiState.value.branchDraft), restored = null)
+        // A fresh seed per engine per game (the default 0 would replay identical Humanized/Hybrid
+        // choices in every game); the resolved seeds are persisted, so restore stays exact.
+        val seeded = config.copy(
+            white = config.white.copy(strengthSeed = config.white.strengthSeed.takeIf { it != 0L } ?: freshArenaSeed()),
+            black = config.black.copy(strengthSeed = config.black.strengthSeed.takeIf { it != 0L } ?: freshArenaSeed()),
+        )
+        startResolvedArena(ArenaSetupResolver.resolve(seeded).copy(branchOrigin = mutableUiState.value.branchDraft), restored = null)
     }
 
     fun resumeLastArena() {

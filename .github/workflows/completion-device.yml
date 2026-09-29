@@ -43,7 +43,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Boot device and run the completion session
         env:
-          EMIT_IMAGES: ${{ github.event.inputs.emit_images || '03-live-start 04-engine-thinking 05-engine-replied 06-game-menu 10-result-you-lost 12-insights 13-live-low-clock 15-castle-b 17-promotion-a 21-settings' }}
+          EMIT_IMAGES: ${{ github.event.inputs.emit_images || '01-play-overview 02-new-game-setup 03-live-start 04-engine-thinking 05-engine-replied 06-game-menu 10-result-you-lost 12-insights 13-live-low-clock 15-castle-b 16-promotion-picker 17-promotion-a 22-arena-live 19-arena-setup 20-games 21-settings' }}
         run: |
           set -euo pipefail
           if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi

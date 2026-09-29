@@ -12,9 +12,17 @@ This file is the quickest way for a new ChatGPT/Codex session to resume LumenChe
 
 ## Current state
 
-- Product/design planning: substantially complete.
-- Production implementation: not started.
-- Primary next step: review the written design, then create a detailed implementation plan broken into small, independently testable milestones before coding.
+- Product/design planning: substantially complete (see the design documents below).
+- Production implementation: **substantially built** on Kotlin + Jetpack Compose + Room: Play (Standard and
+  Chess960 vs Stockfish 18 / Reckless 0.9.0 with a clocked opponent), Live board, Engine Arena with manual
+  takeover and branching, unified Games library, local Insights, Settings (Engines, Play, About), personal
+  piece sets kept out of public builds, built-in synthesized sounds and haptics.
+- Not built yet: Game Review / Analysis, Explorer, ratings, Chess.com / Lichess sync. Their Settings rows
+  were removed rather than left as dead controls.
+- Engine timing and automatic draws: see `docs/adr/0019-clocked-engine-think-time.md`.
+- Verification: JVM suites run locally; the `app` module needs the Android SDK, so it is compiled and
+  tested by CI. The `Completion pass device verification` workflow drives the real app on the API-37
+  emulator and records screenshots and measurements.
 
 ## Locked foundation
 
