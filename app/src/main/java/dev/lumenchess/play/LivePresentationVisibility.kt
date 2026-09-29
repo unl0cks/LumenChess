@@ -9,10 +9,6 @@ package dev.lumenchess.play
  * assistance customization milestone rather than P5.
  */
 internal data class LivePresentationVisibility(
-    val showEvaluation: Boolean = false,
-    val showEngineLines: Boolean = false,
-    val showMoves: Boolean = false,
-    val showInfo: Boolean = false,
     val showCapturedMaterial: Boolean = false,
     val showPauseButton: Boolean = false,
 )

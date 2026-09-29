@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
 import dev.lumenchess.MainActivity
 import dev.lumenchess.board.CHESSBOARD_TEST_TAG
+import dev.lumenchess.board.GroundedPrecisionBoardMotion
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.runtime.RuntimeTerminal
@@ -82,18 +84,59 @@ class PlayUiIntegrationTest {
         composeRule.onNodeWithTag("square-e2").performClick()
         composeRule.onNodeWithTag("square-e4").performClick()
 
-        composeRule.waitUntil(timeoutMillis = 5_000L) {
-            composeRule.onAllNodesWithTag(PLAY_PREMOVE_OVERLAY_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
-        }
-        val duringEngineThinking = boardBounds()
-        assertStableBounds(before, duringEngineThinking)
-
-        composeRule.waitUntil(timeoutMillis = 12_000L) {
+        // The engine's think time is seeded and varies by position, so a fast reply can already be on
+        // the board by the time the clicks return. Sample the bounds on every poll instead of waiting
+        // for a transient "thinking" state: whichever states occur, the board must not move.
+        var samples = 0
+        composeRule.waitUntil(timeoutMillis = 15_000L) {
+            assertStableBounds(before, boardBounds())
+            samples += 1
             val moveCount = viewModel.currentCoordinatorForTest()?.state?.gameTree?.mainline()?.size ?: beforeMoveCount
             moveCount >= beforeMoveCount + 2
         }
-        val afterEngineResult = boardBounds()
-        assertStableBounds(before, afterEngineResult)
+        assertTrue("the board was never sampled", samples > 0)
+        assertStableBounds(before, boardBounds())
+    }
+
+    /**
+     * Regression: the Live screen derived the move presentation from "revisions since the last
+     * composition", which flipped from HUMAN_TAP to ENGINE on the next recomposition. The presentation
+     * keys the board's motion effect, so any state change (the clock ticks every 100 ms) snapped a
+     * human move to its end before it could be seen.
+     */
+    @Test
+    fun humanMoveKeepsTravellingAcrossUnrelatedRecompositions() {
+        openSetup()
+        composeRule.onNodeWithText("Standard").performScrollTo().performClick()
+        composeRule.onNodeWithText("White").performScrollTo().performClick()
+        composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
+        waitForLiveScreen()
+        val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
+        val travel = GroundedPrecisionBoardMotion.humanMoveDurationMillis.toLong()
+        fun travellingPiece() = composeRule.onNodeWithTag("traveling-piece", useUnmergedTree = true)
+
+        composeRule.onNodeWithTag("square-e2").performClick()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNodeWithTag("square-e4").performClick()
+            // Pausing cancels the engine search, so no reply can legitimately supersede the move.
+            composeRule.runOnUiThread { viewModel.pause() }
+            composeRule.mainClock.advanceTimeByFrame()
+            travellingPiece().assertExists()
+
+            // An unrelated Live state change, exactly what each clock tick produces.
+            composeRule.runOnUiThread { viewModel.showNotice("recomposition") }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.mainClock.advanceTimeBy(travel / 3)
+            travellingPiece().assertExists()
+
+            composeRule.mainClock.advanceTimeBy(travel)
+            composeRule.mainClock.advanceTimeByFrame()
+            travellingPiece().assertDoesNotExist()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.onNodeWithContentDescription("e4, White pawn").assertExists()
     }
 
     @Test
@@ -105,11 +148,18 @@ class PlayUiIntegrationTest {
         val liveRoot = composeRule.onNodeWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val board = boardBounds()
         val actions = composeRule.onNodeWithTag("p5-live-action-strip").fetchSemanticsNode().boundsInRoot
+        val shell = composeRule.onNodeWithTag("p5-live-shell").fetchSemanticsNode().boundsInRoot
 
         assertTrue("default board must remain square: $board", abs(board.width - board.height) <= 1f)
         assertTrue("default board width must remain P1-stable: $board in $liveRoot", board.width / liveRoot.width in 0.92f..1f)
-        val bottomInset = composeRule.activity.resources.displayMetrics.density * 6f
-        assertTrue("essential actions must be bottom-anchored to the Live root: actions=$actions, root=$liveRoot", liveRoot.bottom - actions.bottom <= bottomInset)
+        val density = composeRule.activity.resources.displayMetrics.density
+        val shellToActions = actions.top - shell.bottom
+        val topBreathingRoom = shell.top - liveRoot.top
+        val bottomBreathingRoom = liveRoot.bottom - actions.bottom
+        // The fixed status slot (22dp) plus two 5dp gaps sits between shell and actions; the group is
+        // one composition, never a strip stranded at the bottom of the screen.
+        assertTrue("essential actions must stay attached to the gameplay shell: shell=$shell actions=$actions", shellToActions in 0f..(40f * density))
+        assertTrue("meaningful Live group should be vertically balanced: top=$topBreathingRoom bottom=$bottomBreathingRoom", abs(topBreathingRoom - bottomBreathingRoom) <= 32f * density)
 
         listOf("p5-live-lower-region", "p5-live-tabs", "p5-live-moves-rail").forEach { tag ->
             composeRule.onNodeWithTag(tag).assertDoesNotExist()
@@ -124,6 +174,12 @@ class PlayUiIntegrationTest {
 
         val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
         composeRule.onNodeWithTag("p5-live-action-resign").performClick()
+        // Resigning is destructive, so it always asks first; cancelling must leave the game running.
+        composeRule.onNodeWithTag("p5-live-resign-dialog").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-resign-cancel").performClick()
+        assertEquals(null, requireNotNull(viewModel.currentCoordinatorForTest()).state.terminal)
+        composeRule.onNodeWithTag("p5-live-action-resign").performClick()
+        composeRule.onNodeWithTag("p5-live-resign-confirm").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000L) {
             viewModel.currentCoordinatorForTest()?.state?.terminal == RuntimeTerminal.Resignation(Color.WHITE)
         }
@@ -132,6 +188,9 @@ class PlayUiIntegrationTest {
             requireNotNull(viewModel.currentCoordinatorForTest()).state.terminal,
         )
         composeRule.onNodeWithTag("p5-live-action-resign").assertDoesNotExist()
+        // A finished game presents its result and offers rematch / new game.
+        composeRule.onNodeWithTag("p5-live-result-dialog").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-result-close").performClick()
 
         composeRule.onNodeWithTag("p5-live-action-exit").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000L) {

@@ -239,10 +239,16 @@ object ArenaSnapshotCodec {
         RuntimeTerminal.DrawAgreement -> "DRAW_AGREEMENT"
         is RuntimeTerminal.Checkmate -> "CHECKMATE:${terminal.winner.name}"
         RuntimeTerminal.Stalemate -> "STALEMATE"
+        RuntimeTerminal.InsufficientMaterial -> "INSUFFICIENT_MATERIAL"
+        RuntimeTerminal.ThreefoldRepetition -> "THREEFOLD_REPETITION"
+        RuntimeTerminal.FiftyMoveRule -> "FIFTY_MOVE_RULE"
     }
     private fun decodeTerminal(value: String): RuntimeTerminal = when {
         value == "DRAW_AGREEMENT" -> RuntimeTerminal.DrawAgreement
         value == "STALEMATE" -> RuntimeTerminal.Stalemate
+        value == "INSUFFICIENT_MATERIAL" -> RuntimeTerminal.InsufficientMaterial
+        value == "THREEFOLD_REPETITION" -> RuntimeTerminal.ThreefoldRepetition
+        value == "FIFTY_MOVE_RULE" -> RuntimeTerminal.FiftyMoveRule
         value.startsWith("TIMEOUT:") -> RuntimeTerminal.Timeout(parseEnum<Color>(value.substringAfter(':'), "loser"))
         value.startsWith("RESIGNATION:") -> RuntimeTerminal.Resignation(parseEnum<Color>(value.substringAfter(':'), "loser"))
         value.startsWith("CHECKMATE:") -> RuntimeTerminal.Checkmate(parseEnum<Color>(value.substringAfter(':'), "winner"))

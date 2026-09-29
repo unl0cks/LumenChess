@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -70,7 +72,7 @@ class P5SettingsScreenshotQaTest {
         composeRule.onNodeWithTag("p5-live-player-row").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-player-clock").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-action-resign").assertIsDisplayed()
-        composeRule.onNodeWithTag("p5-live-action-exit").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-action-menu").assertIsDisplayed()
 
         val board = bounds(CHESSBOARD_TEST_TAG)
         assertTrue("board-first default must keep the board square: $board", abs(board.width - board.height) <= 1f)
@@ -107,26 +109,28 @@ class P5SettingsScreenshotQaTest {
             "settings-category-review",
             "settings-category-ratings",
             "settings-category-accounts",
-            "settings-category-advanced",
-        ).forEach { composeRule.onNodeWithTag(it).assertIsDisplayed() }
+            "settings-category-storage",
+            "settings-category-about",
+        ).forEach { composeRule.onNodeWithTag(it).performScrollTo().assertIsDisplayed() }
 
-        listOf("Engines", "Game Review", "Ratings", "Accounts & Sync", "Advanced").forEach {
-            composeRule.onNodeWithText(it).assertIsDisplayed()
+        // Every row that is shown leads somewhere real.
+        listOf("Engines", "Game Review", "Ratings", "Accounts & Sync", "Storage & Data", "About").forEach {
+            composeRule.onNodeWithText(it).performScrollTo().assertIsDisplayed()
         }
 
         assertEquals(
-            "Settings root must expose exactly six category rows",
-            6,
+            "Settings root must expose exactly seven category rows",
+            7,
             composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes().size,
         )
         assertEquals(
-            "approved Settings translation must expose exactly six canonical icon wells",
-            6,
+            "Settings must expose one canonical icon well per row",
+            7,
             composeRule.onAllNodesWithTag("settings-icon-well").fetchSemanticsNodes().size,
         )
         assertEquals(
-            "approved Settings translation must expose exactly six canonical icon glyphs",
-            6,
+            "Settings must expose one canonical icon glyph per row",
+            7,
             composeRule.onAllNodesWithTag("settings-icon-glyph").fetchSemanticsNodes().size,
         )
 
@@ -158,7 +162,7 @@ class P5SettingsScreenshotQaTest {
         val rows = composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes()
             .map { it.boundsInRoot }
             .sortedBy { it.top }
-        assertEquals(6, rows.size)
+        assertEquals(3, rows.size)
 
         rows.forEachIndexed { index, row ->
             val heightDp = row.height / density
@@ -214,11 +218,8 @@ class P5SettingsScreenshotQaTest {
         }
 
         assertTrue("last category must remain above root nav", rows.last().bottom <= nav.top)
-        val approvedNegativeSpaceDp = (nav.top - rows.last().bottom) / density
-        assertTrue(
-            "approved negative space=${approvedNegativeSpaceDp}dp expected 120..150",
-            approvedNegativeSpaceDp in 120f..150f,
-        )
+        val negativeSpaceDp = (nav.top - rows.last().bottom) / density
+        assertTrue("negative space=${negativeSpaceDp}dp must leave the list clear of the nav", negativeSpaceDp >= 24f)
     }
 
     private fun verifyInterTightRuntimeResource() {

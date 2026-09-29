@@ -1,7 +1,7 @@
 package dev.lumenchess.play
 
+import dev.lumenchess.analysis.ui.AnalysisRequest
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,11 +33,11 @@ fun ReferencePlayRoute(
     viewModel: PlayViewModel,
     onFocusedSubpageChanged: (Boolean) -> Unit = {},
     onOpenArena: () -> Unit = {},
+    onOpenAnalysis: (AnalysisRequest) -> Unit = {},
 ) {
     val ui by viewModel.uiState
     var page by rememberSaveable { mutableStateOf(ReferencePlayPage.OVERVIEW) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val slideDistance = with(LocalDensity.current) { 10.dp.roundToPx() }
     val focusedSubpageCallback by rememberUpdatedState(onFocusedSubpageChanged)
 
@@ -71,7 +71,7 @@ fun ReferencePlayRoute(
     }
 
     when (ui.mode) {
-        PlayScreenMode.LIVE -> BoardFirstReferenceLiveScreen(ui, viewModel, modifier)
+        PlayScreenMode.LIVE -> BoardFirstReferenceLiveScreen(ui, viewModel, modifier, onOpenAnalysis = onOpenAnalysis)
         PlayScreenMode.SETUP -> AnimatedContent(
             targetState = page,
             modifier = modifier,
@@ -92,7 +92,6 @@ fun ReferencePlayRoute(
                     ui = ui,
                     onPlayVsEngine = { page = ReferencePlayPage.SETUP },
                     onArenaPreview = onOpenArena,
-                    onBack = { backDispatcher?.onBackPressed() },
                     modifier = Modifier,
                 )
                 ReferencePlayPage.SETUP -> ReferenceSetupScreen(

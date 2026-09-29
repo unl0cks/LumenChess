@@ -50,6 +50,14 @@ class GamePersistenceRepository(
         }
     }
 
+    /** True when a game with this exact strong source identity is already stored. */
+    suspend fun hasExternalGame(source: GameSourceDraft): Boolean {
+        val identity = strongIdentity(source)
+        return database.withReadTransaction {
+            database.sourceDao().byStrongIdentity(identity.type, identity.accountScope, identity.externalGameId) != null
+        }
+    }
+
     /**
      * Attaches provenance that the caller has already verified belongs to this canonical game.
      * This never rewrites the canonical tree or UUID.

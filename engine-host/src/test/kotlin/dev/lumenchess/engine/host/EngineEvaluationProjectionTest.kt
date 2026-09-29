@@ -9,9 +9,9 @@ import org.junit.Test
 
 class EngineEvaluationProjectionTest {
     @Test
-    fun onlyRankOneScoredInfoCrossesTheBinderBoundary() {
-        assertNull(UciInfo(depth = 12, multiPv = 2, score = UciScore.Centipawns(40)).toRankOneSearchInfo())
-        assertNull(UciInfo(depth = 12).toRankOneSearchInfo())
+    fun everyScoredLineCrossesTheBinderBoundaryWithItsRank() {
+        assertEquals(2, UciInfo(depth = 12, multiPv = 2, score = UciScore.Centipawns(40)).toProjectedSearchInfo()?.multiPvRank)
+        assertNull(UciInfo(depth = 12).toProjectedSearchInfo())
 
         val projected = UciInfo(
             depth = 18,
@@ -20,7 +20,7 @@ class EngineEvaluationProjectionTest {
             nodes = 4_200,
             nodesPerSecond = 21_000,
             principalVariation = listOf("e2e4", "e7e5"),
-        ).toRankOneSearchInfo()
+        ).toProjectedSearchInfo()
 
         requireNotNull(projected)
         assertEquals(18, projected.depth)
@@ -30,5 +30,6 @@ class EngineEvaluationProjectionTest {
         assertEquals(4_200L, projected.nodes)
         assertEquals(21_000L, projected.nodesPerSecond)
         assertEquals("e2e4 e7e5", projected.principalVariation)
+        assertEquals(1, projected.multiPvRank)
     }
 }

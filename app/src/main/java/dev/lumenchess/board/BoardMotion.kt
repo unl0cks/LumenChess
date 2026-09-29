@@ -23,17 +23,23 @@ data class BoardDragVisuals(
     val shadowOffsetDp: Float,
 )
 
-/** Frozen Grounded Precision motion values. Geometry remains outside board measurement. */
+/**
+ * Grounded Precision motion values. Easing (CrispEase), scale, lift and shadow are unchanged from
+ * the approved P6.4 language; durations were lengthened because the original 145-165 ms slides were
+ * reported as too brief to register on a device, especially engine moves and castling, which the
+ * eye is not already tracking. Geometry remains outside board measurement.
+ */
 object GroundedPrecisionBoardMotion {
     const val pickupDurationMillis = 70
-    const val legalDropDurationMillis = 90
-    const val illegalDropDurationMillis = 120
-    const val humanMoveDurationMillis = 145
-    const val engineMoveDurationMillis = 155
-    const val premoveDurationMillis = 110
-    const val captureFadeDurationMillis = 55
-    const val castlingDurationMillis = 165
-    const val promotionDurationMillis = 80
+    const val legalDropDurationMillis = 110
+    const val illegalDropDurationMillis = 160
+    const val humanMoveDurationMillis = 190
+    const val engineMoveDurationMillis = 230
+    const val premoveDurationMillis = 140
+    /** Must not exceed [legalDropDurationMillis]: a dropped capture fades on drop progress. */
+    const val captureFadeDurationMillis = 90
+    const val castlingDurationMillis = 260
+    const val promotionDurationMillis = 120
     const val promotionInitialScale = .96f
 
     const val pickupScale = 1.04f
@@ -213,5 +219,33 @@ object BoardMovePresentationClassifier {
         revisionDelta > 1L -> BoardMovePresentation.PREMOVE
         lastMoverIsHuman -> BoardMovePresentation.HUMAN_TAP
         else -> BoardMovePresentation.ENGINE
+    }
+}
+
+/**
+ * Decides how each authoritative revision is presented, once. The answer is fixed when a revision
+ * first arrives and repeated for every later recomposition of that same revision.
+ *
+ * The screens used to derive it from "revisions since the last composition", which drops to zero on
+ * the very next recomposition (the Live clock recomposes every 100 ms). The presentation is a key of
+ * the board's motion effect, so the flip restarted the effect and snapped a human move or premove to
+ * its end after at most one clock tick.
+ */
+class BoardMovePresentationTracker(initialRevision: Long) {
+    private var presentedRevision = initialRevision
+    private var presentation = BoardMovePresentation.ENGINE
+
+    fun presentationFor(revision: Long, lastMoverIsHuman: Boolean): BoardMovePresentation {
+        if (revision != presentedRevision) {
+            val delta = revision - presentedRevision
+            // A lower revision means a different game (new game, rematch, restore): nothing to animate.
+            presentation = if (delta > 0L) {
+                BoardMovePresentationClassifier.classify(delta, lastMoverIsHuman)
+            } else {
+                BoardMovePresentation.ENGINE
+            }
+            presentedRevision = revision
+        }
+        return presentation
     }
 }

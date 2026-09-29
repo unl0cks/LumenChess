@@ -28,8 +28,12 @@ object PlaySnapshotCodec {
         put(key("strengthTarget"), encodeStrengthTarget(setup.strength.target))
         put(key("strengthSeed"), setup.strength.seed.toString())
         setup.chess960Index?.let { put(key("chess960Index"), it.toString()) }
+        if (Fen.serialize(setup.initialPosition) != Fen.serialize(if (setup.variant == dev.lumenchess.core.chess.Variant.STANDARD) dev.lumenchess.core.chess.Position.initial() else dev.lumenchess.core.chess.Chess960.startingPosition(setup.chess960Index!!))) {
+            put(key("startingFen"), Fen.serialize(setup.initialPosition))
+        }
         put(key("initialMillis"), setup.clockConfig.initialMillis.toString())
         put(key("incrementMillis"), setup.clockConfig.incrementMillis.toString())
+        if (setup.rated) put(key("rated"), "true")
 
         put(key("positionRevision"), snapshot.positionRevision.value.toString())
         put(key("clockWhite"), snapshot.clock.whiteRemainingMillis.toString())
@@ -74,6 +78,8 @@ object PlaySnapshotCodec {
             strengthTarget = strengthTarget,
             timeControl = PlayTimeControl(initialMillis, incrementMillis),
             strengthSeed = seed,
+            startingFen = metadata[key("startingFen")],
+            rated = metadata[key("rated")] == "true",
         )
         val setup = try {
             PlaySetupResolver.resolve(setupConfig)
@@ -191,11 +197,17 @@ object PlaySnapshotCodec {
         RuntimeTerminal.DrawAgreement -> "DRAW_AGREEMENT"
         is RuntimeTerminal.Checkmate -> "CHECKMATE:${terminal.winner.name}"
         RuntimeTerminal.Stalemate -> "STALEMATE"
+        RuntimeTerminal.InsufficientMaterial -> "INSUFFICIENT_MATERIAL"
+        RuntimeTerminal.ThreefoldRepetition -> "THREEFOLD_REPETITION"
+        RuntimeTerminal.FiftyMoveRule -> "FIFTY_MOVE_RULE"
     }
 
     private fun decodeTerminal(value: String): RuntimeTerminal = when {
         value == "DRAW_AGREEMENT" -> RuntimeTerminal.DrawAgreement
         value == "STALEMATE" -> RuntimeTerminal.Stalemate
+        value == "INSUFFICIENT_MATERIAL" -> RuntimeTerminal.InsufficientMaterial
+        value == "THREEFOLD_REPETITION" -> RuntimeTerminal.ThreefoldRepetition
+        value == "FIFTY_MOVE_RULE" -> RuntimeTerminal.FiftyMoveRule
         value.startsWith("TIMEOUT:") -> RuntimeTerminal.Timeout(
             parseEnum<Color>(value.substringAfter(':'), "terminal loser"),
         )

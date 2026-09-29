@@ -1,5 +1,6 @@
 package dev.lumenchess.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,6 +28,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.lumenchess.board.ChessboardPresentationStyle
 import dev.lumenchess.board.PieceSetCatalog
 import dev.lumenchess.board.ProvideChessboardPresentationStyle
+import androidx.compose.runtime.saveable.Saver
+import dev.lumenchess.analysis.ui.AnalysisRequest
+import dev.lumenchess.analysis.ui.AnalysisRoute
+import dev.lumenchess.analysis.ui.AnalysisViewModel
 import dev.lumenchess.arena.ArenaRoute
 import dev.lumenchess.arena.ArenaScreenMode
 import dev.lumenchess.arena.ArenaViewModel
@@ -36,31 +41,59 @@ import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTheme
 import dev.lumenchess.games.GameLibraryRoute
 import dev.lumenchess.games.GameLibraryViewModel
+import dev.lumenchess.insights.InsightsRoute
+import dev.lumenchess.insights.InsightsViewModel
 import dev.lumenchess.play.PlayScreenMode
 import dev.lumenchess.play.PlayViewModel
 import dev.lumenchess.play.ReferencePlayRoute
+import dev.lumenchess.settings.AboutSettingsScreen
+import dev.lumenchess.settings.AccountsSettingsScreen
+import dev.lumenchess.settings.GameReviewSettingsScreen
+import dev.lumenchess.settings.RatingsSettingsScreen
+import dev.lumenchess.settings.StorageSettingsScreen
 import dev.lumenchess.settings.AppearanceSettings
 import dev.lumenchess.settings.BoardAppearanceScreen
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
+import dev.lumenchess.settings.EnginesSettingsScreen
 import dev.lumenchess.settings.PlaySettingsScreen
 import dev.lumenchess.settings.SettingsScreen
 import dev.lumenchess.settings.SoundsHapticsScreen
 import kotlinx.coroutines.launch
 
-internal enum class MainTab(val label:String,val previewCopy:String) {
-    Play("Play","Play against Stockfish or Reckless"),
-    Arena("Arena","Set up engine battles with independent engines and openings"),
-    Games("Games","Browse your local and imported chess library"),
-    Insights("Insights","Explore performance trends and chess statistics"),
-    Settings("Settings","Tune LumenChess to your board and feedback preferences"),
+internal enum class MainTab(val label:String) {
+    Play("Play"),
+    Arena("Arena"),
+    Games("Games"),
+    Insights("Insights"),
+    Settings("Settings"),
 }
-private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS }
+private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS, ENGINES, REVIEW, RATINGS, ACCOUNTS, STORAGE, ABOUT }
+
+/** Keeps an open Analysis / Review across configuration changes and process recreation. */
+private val AnalysisRequestSaver = Saver<AnalysisRequest?, List<Any?>>(
+    save = { request ->
+        when (request) {
+            null -> listOf("none")
+            is AnalysisRequest.LibraryGame -> listOf("game", request.gameId, request.review, request.startPly)
+            is AnalysisRequest.FromPosition -> listOf("position", request.fen, request.variant.name)
+        }
+    },
+    restore = { saved ->
+        when (saved.firstOrNull()) {
+            "game" -> AnalysisRequest.LibraryGame(saved[1] as String, saved[2] as Boolean, saved[3] as Int?)
+            "position" -> AnalysisRequest.FromPosition(saved[1] as String?, dev.lumenchess.core.chess.Variant.valueOf(saved[2] as String))
+            else -> null
+        }
+    },
+)
 
 @Composable
 fun LumenChessApp() {
     var currentTab by rememberSaveable { mutableStateOf(MainTab.Play) }
     var settingsDestination by remember { mutableStateOf(SettingsDestination.ROOT) }
     var playFocusedSubpage by remember { mutableStateOf(false) }
+    var analysisRequest by rememberSaveable(stateSaver = AnalysisRequestSaver) { mutableStateOf<AnalysisRequest?>(null) }
+    val openAnalysis: (AnalysisRequest) -> Unit = { analysisRequest = it }
     val playViewModel:PlayViewModel=viewModel()
     val arenaViewModel:ArenaViewModel=viewModel()
     val playUi by playViewModel.uiState
@@ -74,6 +107,17 @@ fun LumenChessApp() {
     val liveArena=currentTab==MainTab.Arena&&arenaUi.mode==ArenaScreenMode.LIVE
     val focusedPlaySubpage=currentTab==MainTab.Play&&playFocusedSubpage
     val slideDistance=with(LocalDensity.current){10.dp.roundToPx()}
+
+    // System back walks up the hierarchy instead of leaving the app: Settings sub-pages return to their
+    // parent, any other tab returns to Play. Nested screens (Live, Arena, the Library viewer, New Game)
+    // register their own handlers later in composition and therefore take precedence.
+    BackHandler(enabled=currentTab!=MainTab.Play){currentTab=MainTab.Play}
+    BackHandler(enabled=currentTab==MainTab.Settings&&settingsDestination!=SettingsDestination.ROOT){
+        settingsDestination=when(settingsDestination){
+            SettingsDestination.BOARD_APPEARANCE,SettingsDestination.SOUNDS_HAPTICS->SettingsDestination.PLAY
+            else->SettingsDestination.ROOT
+        }
+    }
 
     LaunchedEffect(persistedAppearanceSettings){appearanceSettings=persistedAppearanceSettings}
     LaunchedEffect(currentTab){if(currentTab!=MainTab.Settings)settingsDestination=SettingsDestination.ROOT}
@@ -91,13 +135,21 @@ fun LumenChessApp() {
             Scaffold(
                 containerColor=LumenColors.Background,
                 bottomBar={
-                    if(!livePlay&&!liveArena&&!focusedPlaySubpage) {
+                    if(!livePlay&&!liveArena&&!focusedPlaySubpage&&analysisRequest==null) {
                         LumenBottomNavigation(currentTab){currentTab=it}
                     }
                 },
             ) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding)) {
-                    AnimatedContent(
+                    val openRequest = analysisRequest
+                    if (openRequest != null) {
+                        AnalysisRoute(
+                            viewModel = viewModel<AnalysisViewModel>(),
+                            request = openRequest,
+                            onClose = { analysisRequest = null },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else AnimatedContent(
                         targetState=currentTab to settingsDestination,
                         transitionSpec={
                             val tabDirection=targetState.first.ordinal.compareTo(initialState.first.ordinal)
@@ -114,6 +166,7 @@ fun LumenChessApp() {
                                 modifier=Modifier.fillMaxSize(),
                                 onFocusedSubpageChanged={playFocusedSubpage=it},
                                 onOpenArena={currentTab=MainTab.Arena},
+                                onOpenAnalysis=openAnalysis,
                             )
                             MainTab.Arena -> ArenaRoute(
                                 viewModel=arenaViewModel,
@@ -125,6 +178,7 @@ fun LumenChessApp() {
                                 reservedGameIds = setOfNotNull(playUi.gameId, playUi.restorableGame?.gameId,
                                     arenaUi.gameId, arenaUi.restorableGame?.gameId),
                                 ownershipReady = playUi.ownershipReady && arenaUi.ownershipReady,
+                                onOpenAnalysis = openAnalysis,
                             )
                             MainTab.Settings -> when(destination) {
                                 SettingsDestination.ROOT -> SettingsScreen(
@@ -134,6 +188,12 @@ fun LumenChessApp() {
                                     onOpenSoundsHaptics={settingsDestination=SettingsDestination.SOUNDS_HAPTICS},
                                     modifier=Modifier.fillMaxSize(),
                                     onOpenPlaySettings={settingsDestination=SettingsDestination.PLAY},
+                                    onOpenEngines={settingsDestination=SettingsDestination.ENGINES},
+                                    onOpenAbout={settingsDestination=SettingsDestination.ABOUT},
+                                    onOpenReview={settingsDestination=SettingsDestination.REVIEW},
+                                    onOpenRatings={settingsDestination=SettingsDestination.RATINGS},
+                                    onOpenAccounts={settingsDestination=SettingsDestination.ACCOUNTS},
+                                    onOpenStorage={settingsDestination=SettingsDestination.STORAGE},
                                 )
                                 SettingsDestination.PLAY -> PlaySettingsScreen(
                                     settings=appearanceSettings,
@@ -145,8 +205,19 @@ fun LumenChessApp() {
                                 )
                                 SettingsDestination.BOARD_APPEARANCE -> BoardAppearanceScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
                                 SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
+                                SettingsDestination.ENGINES -> EnginesSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.ABOUT -> AboutSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.REVIEW -> GameReviewSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.RATINGS -> RatingsSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.ACCOUNTS -> AccountsSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.STORAGE -> StorageSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
                             }
-                            else -> FutureSurfacePreview(tab)
+                            MainTab.Insights -> InsightsRoute(
+                                viewModel = viewModel<InsightsViewModel>(),
+                                onPlay = { currentTab = MainTab.Play },
+                                modifier = Modifier.fillMaxSize(),
+                                onOpenAnalysis = openAnalysis,
+                            )
                         }
                     }
                 }

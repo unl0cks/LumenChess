@@ -1,5 +1,9 @@
 package dev.lumenchess.play
 
+import dev.lumenchess.analysis.ui.AnalysisRequest
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -11,24 +15,23 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,6 +47,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -55,13 +59,16 @@ import androidx.compose.ui.unit.sp
 import dev.lumenchess.board.ChessboardHighlights
 import dev.lumenchess.board.ChessboardInput
 import dev.lumenchess.board.BoardMovePresentation
-import dev.lumenchess.board.BoardMovePresentationClassifier
+import dev.lumenchess.board.BoardMovePresentationTracker
 import dev.lumenchess.board.ChessboardOrientation
 import dev.lumenchess.board.LumenChessboard
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.PieceType
 import dev.lumenchess.core.chess.Square
+import dev.lumenchess.design.LumenActionGlyph
+import dev.lumenchess.design.LumenActionStrip
+import dev.lumenchess.design.LumenActionTile
 import dev.lumenchess.design.LumenClock
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenEngineBadge
@@ -76,8 +83,8 @@ import kotlin.math.floor
  * Sparse default Human-vs-Engine presentation.
  *
  * Runtime ownership is unchanged: this observes [PlayUiState] and commands [PlayViewModel].
- * Optional analysis/history surfaces remain in the richer reference implementation for the later
- * presentation-settings milestone, but are not emitted (and therefore reserve no space) by default.
+ * Analysis, move-list and information surfaces are not part of this screen at all, so they reserve
+ * no space; when the presentation settings add them they will be composed here, below the board.
  */
 @Composable
 internal fun BoardFirstReferenceLiveScreen(
@@ -85,43 +92,57 @@ internal fun BoardFirstReferenceLiveScreen(
     viewModel: PlayViewModel,
     modifier: Modifier,
     visibility: LivePresentationVisibility = DefaultLivePresentationVisibility,
+    onOpenAnalysis: (AnalysisRequest) -> Unit = {},
 ) {
     val runtime = ui.runtime ?: return
     val setup = ui.resolvedSetup ?: return
     val humanSide = setup.humanSide
-    val engineSide = humanSide.opposite
-    val orientation = if (humanSide == Color.WHITE) ChessboardOrientation.WHITE else ChessboardOrientation.BLACK
+    // Keyed on the whole resolved setup so a rematch (colours swapped) starts unflipped.
+    var boardFlipped by remember(setup) { mutableStateOf(false) }
+    var dialog by remember(setup) { mutableStateOf(LiveDialog.NONE) }
+    var resultDismissed by remember(setup) { mutableStateOf(false) }
+    val context = LocalContext.current
+    val terminal = runtime.terminal
+    val baseOrientation = if (humanSide == Color.WHITE) ChessboardOrientation.WHITE else ChessboardOrientation.BLACK
+    val orientation = if (boardFlipped) {
+        if (baseOrientation == ChessboardOrientation.WHITE) ChessboardOrientation.BLACK else ChessboardOrientation.WHITE
+    } else {
+        baseOrientation
+    }
     val humanTurn = runtime.position.sideToMove == humanSide &&
         runtime.controllers.forSide(humanSide) == RuntimeController.HUMAN
     val inputEnabled = humanTurn && !runtime.paused && runtime.terminal == null
     val premoveEnabled = !humanTurn && !runtime.paused && runtime.terminal == null
     val lastMove = runtime.gameTree.mainline().lastOrNull()?.move
     val queuedPremove = runtime.queuedPremove?.move
-    var presentedRevision by remember { mutableLongStateOf(runtime.positionRevision.value) }
-    val revisionDelta = (runtime.positionRevision.value - presentedRevision).coerceAtLeast(0L)
     val lastMover = runtime.position.sideToMove.opposite
-    val movePresentation = if (revisionDelta == 0L) {
-        BoardMovePresentation.ENGINE
-    } else {
-        BoardMovePresentationClassifier.classify(
-            revisionDelta = revisionDelta,
-            lastMoverIsHuman = runtime.controllers.forSide(lastMover) == RuntimeController.HUMAN,
-        )
-    }
-    SideEffect { presentedRevision = runtime.positionRevision.value }
+    val presentationTracker = remember { BoardMovePresentationTracker(runtime.positionRevision.value) }
+    val movePresentation = presentationTracker.presentationFor(
+        revision = runtime.positionRevision.value,
+        lastMoverIsHuman = runtime.controllers.forSide(lastMover) == RuntimeController.HUMAN,
+    )
     var pendingPremoveOrigin by remember(runtime.positionRevision) { mutableStateOf<Square?>(null) }
     LaunchedEffect(runtime.queuedPremove) {
         if (runtime.queuedPremove == null) pendingPremoveOrigin = null
     }
     val status = when {
         ui.message != null -> ui.message
-        runtime.terminal != null -> "Game over"
+        ui.notice != null -> ui.notice
+        terminal != null -> terminal.presentationLabel()
         queuedPremove != null -> "Premove ${queuedPremove.uci} queued"
         runtime.paused -> "Game paused"
         else -> null
     }
 
-    Column(
+    // System back never drops the player out of the app mid-game: it asks first, and a finished
+    // game simply returns to setup. Open dialogs are separate windows and consume back themselves.
+    BackHandler(enabled = dialog == LiveDialog.NONE) {
+        if (terminal != null) viewModel.backToSetup() else dialog = LiveDialog.LEAVE
+    }
+
+    val emphasizeStatus = terminal != null && ui.message == null && ui.notice == null
+
+    BoxWithConstraints(
         modifier.fillMaxSize()
             .background(
                 Brush.verticalGradient(
@@ -132,104 +153,234 @@ internal fun BoardFirstReferenceLiveScreen(
                     ),
                 ),
             )
-            .padding(horizontal = 7.dp, vertical = 5.dp)
             .testTag(PLAY_LIVE_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        val shellShape = RoundedCornerShape(7.dp)
+        // One deliberate composition: the board is sized from the real constraints (width-led on
+        // phones, height-led on short screens so nothing is ever clipped) and the whole group of
+        // opponent card, board, player card, status slot and actions is centred as a unit. It
+        // depends only on the viewport, never on game state, so the board cannot move.
+        val widthLimit = maxWidth - LIVE_H_PADDING * 2 - SHELL_PADDING * 2
+        val chrome = SHELL_PADDING * 2 + PARTICIPANT_ROW_HEIGHT * 2 + SHELL_GAP * 2 +
+            STATUS_SLOT_HEIGHT + ACTION_STRIP_HEIGHT + GROUP_GAP * 2
+        val heightLimit = maxHeight - LIVE_V_PADDING * 2 - chrome
+        val boardSide = minOf(widthLimit, heightLimit).coerceAtLeast(MIN_BOARD_SIDE)
         Column(
-            Modifier.fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            LumenColors.SurfaceRaised.copy(alpha = .96f),
-                            LumenColors.Surface,
-                        ),
-                    ),
-                    shellShape,
-                )
-                .border(1.dp, LumenColors.OutlineStrong.copy(alpha = .90f), shellShape)
-                .padding(4.dp)
-                .testTag("p5-live-shell"),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            Modifier.align(Alignment.Center).width(boardSide + SHELL_PADDING * 2),
+            verticalArrangement = Arrangement.spacedBy(GROUP_GAP),
         ) {
-            BoardFirstParticipantRow(
-                name = boardFirstEngineTitle(setup),
-                detail = boardFirstEngineDetail(ui.engineStatus, engineSide, runtime.position.sideToMove),
-                side = engineSide,
-                activeSide = runtime.position.sideToMove,
-                clock = ui.clock,
-                engine = true,
-                rowTag = "p5-live-opponent-row",
-                clockTag = "p5-live-opponent-clock",
-                legacyStatusTag = PLAY_ENGINE_STATUS_TEST_TAG,
+            BoardFirstShell(
+                ui, setup, runtime, viewModel, orientation, inputEnabled, premoveEnabled, lastMove,
+                queuedPremove, pendingPremoveOrigin, { pendingPremoveOrigin = it }, movePresentation,
+                Modifier.fillMaxWidth(),
             )
-            Box(
-                Modifier.fillMaxWidth().aspectRatio(1f)
-                    .border(1.dp, LumenColors.OutlineStrong.copy(alpha = .92f))
-                    .testTag(PLAY_BOARD_STAGE_TEST_TAG),
-            ) {
-                LumenChessboard(
-                    runtime.position,
-                    viewModel::onBoardMove,
-                    Modifier.fillMaxSize(),
-                    orientation,
-                    ChessboardInput(tapEnabled = inputEnabled, dragEnabled = inputEnabled),
-                    ChessboardHighlights(
-                        lastMove = lastMove,
-                        premove = queuedPremove,
-                        pendingPremoveOrigin = pendingPremoveOrigin,
-                        positionRevision = runtime.positionRevision.value,
-                        movePresentation = movePresentation,
-                    ),
-                )
-                if (premoveEnabled) {
-                    BoardFirstPremoveOverlay(
-                        runtime = runtime,
-                        humanSide = humanSide,
-                        orientation = orientation,
-                        from = pendingPremoveOrigin,
-                        onFromChange = { pendingPremoveOrigin = it },
-                        onPremove = viewModel::queuePremove,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-            }
-            BoardFirstParticipantRow(
-                name = "You",
-                detail = boardFirstHumanDetail(humanSide, runtime.position.sideToMove, runtime.paused),
-                side = humanSide,
-                activeSide = runtime.position.sideToMove,
-                clock = ui.clock,
-                engine = false,
-                rowTag = "p5-live-player-row",
-                clockTag = "p5-live-player-clock",
-            )
-        }
-
-        if (!status.isNullOrBlank()) {
-            Text(
-                status,
-                Modifier.fillMaxWidth().padding(horizontal = 3.dp),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp),
-                color = if (ui.message != null) LumenColors.Destructive else LumenColors.OnSurfaceMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        // The visibility contract controls emitted UI, not runtime state. Defaults omit every
-        // analysis/history surface completely, so no empty panel or invisible height can move the board.
-        if (visibility.showMoves || visibility.showInfo || visibility.showEvaluation || visibility.showEngineLines) {
-            ReferenceLiveScreen(ui, viewModel, Modifier.fillMaxSize())
-        } else {
-            Spacer(Modifier.weight(1f))
+            BoardFirstStatusSlot(status, ui.message != null, emphasizeStatus)
             BoardFirstEssentialActions(
                 runtime = runtime,
                 hasPremove = queuedPremove != null,
                 showPauseButton = visibility.showPauseButton,
+                onFlipBoard = { boardFlipped = !boardFlipped },
+                onResign = { dialog = LiveDialog.RESIGN },
+                onMenu = { dialog = LiveDialog.MENU },
                 viewModel = viewModel,
-                modifier = Modifier.fillMaxWidth().height(72.dp).testTag("p5-live-action-strip"),
+                modifier = Modifier.fillMaxWidth().height(ACTION_STRIP_HEIGHT).testTag("p5-live-action-strip"),
+            )
+        }
+    }
+
+    when (dialog) {
+        LiveDialog.NONE -> Unit
+        LiveDialog.RESIGN -> LiveResignDialog(
+            onCancel = { dialog = LiveDialog.NONE },
+            onConfirm = {
+                dialog = LiveDialog.NONE
+                viewModel.resign()
+            },
+        )
+        LiveDialog.LEAVE -> LiveLeaveDialog(
+            onStay = { dialog = LiveDialog.NONE },
+            onLeave = {
+                dialog = LiveDialog.NONE
+                viewModel.backToSetup()
+            },
+        )
+        LiveDialog.MENU -> LiveMenuDialog(
+            setup = setup,
+            onCopyPgn = {
+                viewModel.currentPgn()?.let { pgn ->
+                    context.getSystemService(ClipboardManager::class.java)
+                        ?.setPrimaryClip(ClipData.newPlainText("LumenChess PGN", pgn))
+                    viewModel.showNotice("PGN copied")
+                }
+                dialog = LiveDialog.NONE
+            },
+            onCopyFen = {
+                viewModel.currentFen()?.let { fen ->
+                    context.getSystemService(ClipboardManager::class.java)
+                        ?.setPrimaryClip(ClipData.newPlainText("LumenChess FEN", fen))
+                    viewModel.showNotice("FEN copied")
+                }
+                dialog = LiveDialog.NONE
+            },
+            onLeave = {
+                dialog = LiveDialog.NONE
+                viewModel.backToSetup()
+            },
+            onClose = { dialog = LiveDialog.NONE },
+            onReview = if (terminal != null) {
+                {
+                    dialog = LiveDialog.NONE
+                    viewModel.whenGamePersisted { id -> onOpenAnalysis(AnalysisRequest.LibraryGame(id, review = true)) }
+                }
+            } else null,
+        )
+    }
+
+    if (terminal != null && !resultDismissed && dialog == LiveDialog.NONE) {
+        LiveResultDialog(
+            terminal = terminal,
+            humanSide = humanSide,
+            onRematch = viewModel::rematch,
+            onNewGame = viewModel::backToSetup,
+            onViewBoard = { resultDismissed = true },
+            onReview = {
+                resultDismissed = true
+                viewModel.whenGamePersisted { id -> onOpenAnalysis(AnalysisRequest.LibraryGame(id, review = true)) }
+            },
+            onAnalyze = {
+                resultDismissed = true
+                viewModel.whenGamePersisted { id -> onOpenAnalysis(AnalysisRequest.LibraryGame(id)) }
+            },
+        )
+    }
+}
+
+private enum class LiveDialog { NONE, RESIGN, LEAVE, MENU }
+
+private val LIVE_H_PADDING = 7.dp
+private val LIVE_V_PADDING = 5.dp
+private val SHELL_PADDING = 4.dp
+private val SHELL_GAP = 2.dp
+private val GROUP_GAP = 6.dp
+private val PARTICIPANT_ROW_HEIGHT = 60.dp
+private val STATUS_SLOT_HEIGHT = 22.dp
+private val ACTION_STRIP_HEIGHT = 76.dp
+private val MIN_BOARD_SIDE = 200.dp
+
+/** Opponent card, board and player card as one raised plane. Presentation and input only. */
+@Composable
+private fun BoardFirstShell(
+    ui: PlayUiState,
+    setup: ResolvedPlaySetup,
+    runtime: RuntimeState,
+    viewModel: PlayViewModel,
+    orientation: ChessboardOrientation,
+    inputEnabled: Boolean,
+    premoveEnabled: Boolean,
+    lastMove: Move?,
+    queuedPremove: Move?,
+    pendingPremoveOrigin: Square?,
+    onPendingPremoveOrigin: (Square?) -> Unit,
+    movePresentation: BoardMovePresentation,
+    modifier: Modifier,
+) {
+    val humanSide = setup.humanSide
+    val engineSide = humanSide.opposite
+    val shellShape = RoundedCornerShape(7.dp)
+    Column(
+        modifier
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        LumenColors.SurfaceRaised.copy(alpha = .96f),
+                        LumenColors.Surface,
+                    ),
+                ),
+                shellShape,
+            )
+            .border(1.dp, LumenColors.OutlineStrong.copy(alpha = .90f), shellShape)
+            .padding(SHELL_PADDING)
+            .testTag("p5-live-shell"),
+        verticalArrangement = Arrangement.spacedBy(SHELL_GAP),
+    ) {
+        BoardFirstParticipantRow(
+            name = boardFirstEngineTitle(setup),
+            detail = boardFirstEngineDetail(ui.engineStatus, engineSide, runtime.position.sideToMove),
+            side = engineSide,
+            activeSide = runtime.position.sideToMove,
+            clock = ui.clock,
+            engine = true,
+            rowTag = "p5-live-opponent-row",
+            clockTag = "p5-live-opponent-clock",
+            legacyStatusTag = PLAY_ENGINE_STATUS_TEST_TAG,
+        )
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(1f)
+                .border(1.dp, LumenColors.OutlineStrong.copy(alpha = .92f))
+                .testTag(PLAY_BOARD_STAGE_TEST_TAG),
+        ) {
+            LumenChessboard(
+                runtime.position,
+                viewModel::onBoardMove,
+                Modifier.fillMaxSize(),
+                orientation,
+                ChessboardInput(tapEnabled = inputEnabled, dragEnabled = inputEnabled),
+                ChessboardHighlights(
+                    lastMove = lastMove,
+                    premove = queuedPremove,
+                    pendingPremoveOrigin = pendingPremoveOrigin,
+                    positionRevision = runtime.positionRevision.value,
+                    movePresentation = movePresentation,
+                ),
+                onIllegalDrop = viewModel::onIllegalMoveAttempt,
+            )
+            if (premoveEnabled) {
+                BoardFirstPremoveOverlay(
+                    runtime = runtime,
+                    humanSide = humanSide,
+                    orientation = orientation,
+                    from = pendingPremoveOrigin,
+                    onFromChange = onPendingPremoveOrigin,
+                    onPremove = viewModel::queuePremove,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        BoardFirstParticipantRow(
+            name = "You",
+            detail = boardFirstHumanDetail(humanSide, runtime.position.sideToMove, runtime.paused),
+            side = humanSide,
+            activeSide = runtime.position.sideToMove,
+            clock = ui.clock,
+            engine = false,
+            rowTag = "p5-live-player-row",
+            clockTag = "p5-live-player-clock",
+        )
+    }
+}
+
+/**
+ * Fixed-height slot: the board group is vertically centred, so a status line that appeared and
+ * disappeared would otherwise nudge the board by half its height.
+ */
+@Composable
+private fun BoardFirstStatusSlot(status: String?, isError: Boolean, emphasized: Boolean) {
+    Box(
+        Modifier.fillMaxWidth().height(STATUS_SLOT_HEIGHT).padding(horizontal = 3.dp).testTag("p5-live-status-slot"),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        if (!status.isNullOrBlank()) {
+            Text(
+                status,
+                Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+                color = when {
+                    isError -> LumenColors.Destructive
+                    emphasized -> LumenColors.OnSurface
+                    else -> LumenColors.OnSurfaceMuted
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -252,7 +403,7 @@ private fun BoardFirstParticipantRow(
     val active = side == activeSide
     val rowShape = RoundedCornerShape(5.dp)
     Row(
-        modifier.fillMaxWidth().height(56.dp)
+        modifier.fillMaxWidth().height(PARTICIPANT_ROW_HEIGHT)
             .background(
                 if (active) LumenColors.SurfaceHighest.copy(alpha = .74f)
                 else LumenColors.Surface.copy(alpha = .82f),
@@ -299,11 +450,12 @@ private fun BoardFirstParticipantRow(
             )
         }
         LumenClock(
-            boardFirstClockText(millis),
+            formatLiveClock(millis),
             active = active,
             light = !engine && active,
+            urgent = active && isLiveClockUrgent(millis),
             modifier = Modifier
-                .size(width = 94.dp, height = 44.dp)
+                .size(width = 100.dp, height = 48.dp)
                 .testTag(clockTag)
                 .semantics { contentDescription = "$name clock ${boardFirstClockAccessibility(millis)}" },
         )
@@ -383,192 +535,40 @@ private fun BoardFirstPremoveOverlay(
     )
 }
 
-private enum class BoardFirstActionGlyph { PAUSE, PLAY, FLAG, EXIT, CANCEL }
-
 @Composable
 private fun BoardFirstEssentialActions(
     runtime: RuntimeState,
     hasPremove: Boolean,
     showPauseButton: Boolean,
+    onFlipBoard: () -> Unit,
+    onResign: () -> Unit,
+    onMenu: () -> Unit,
     viewModel: PlayViewModel,
     modifier: Modifier,
 ) {
-    val stripShape = RoundedCornerShape(7.dp)
-    Row(
-        modifier
-            .background(LumenColors.SurfaceRaised.copy(alpha = .91f), stripShape)
-            .border(1.dp, LumenColors.Outline.copy(alpha = .70f), stripShape)
-            .padding(horizontal = 4.dp, vertical = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
+    val playing = runtime.terminal == null
+    LumenActionStrip(modifier) {
         if (hasPremove) {
-            BoardFirstAction(
-                label = "Cancel",
-                glyph = BoardFirstActionGlyph.CANCEL,
-                testTag = "p5-live-action-cancel",
-                onClick = viewModel::cancelPremove,
-            )
+            LumenActionTile("Cancel", LumenActionGlyph.CANCEL, "p5-live-action-cancel", viewModel::cancelPremove)
         }
-        if (showPauseButton && runtime.terminal == null) {
-            BoardFirstAction(
+        if (showPauseButton && playing) {
+            LumenActionTile(
                 label = if (runtime.paused) "Resume" else "Pause",
-                glyph = if (runtime.paused) BoardFirstActionGlyph.PLAY else BoardFirstActionGlyph.PAUSE,
+                glyph = if (runtime.paused) LumenActionGlyph.PLAY else LumenActionGlyph.PAUSE,
                 testTag = "p5-live-action-pause",
                 onClick = if (runtime.paused) viewModel::resume else viewModel::pause,
             )
         }
-        if (runtime.terminal == null) {
-            BoardFirstAction(
-                label = "Resign",
-                glyph = BoardFirstActionGlyph.FLAG,
-                destructive = true,
-                testTag = "p5-live-action-resign",
-                onClick = viewModel::resign,
-            )
+        if (playing) {
+            LumenActionTile("Resign", LumenActionGlyph.FLAG, "p5-live-action-resign", onResign, destructive = true)
+            LumenActionTile("Draw", LumenActionGlyph.DRAW, "p5-live-action-draw", viewModel::offerDraw)
+        } else {
+            // "New game" keeps the historical exit tag: it is the way out of a finished game.
+            LumenActionTile("New game", LumenActionGlyph.NEW_GAME, "p5-live-action-exit", viewModel::backToSetup)
+            LumenActionTile("Rematch", LumenActionGlyph.REMATCH, "p5-live-action-rematch", viewModel::rematch)
         }
-        BoardFirstAction(
-            label = "Exit",
-            glyph = BoardFirstActionGlyph.EXIT,
-            testTag = "p5-live-action-exit",
-            onClick = viewModel::backToSetup,
-        )
-    }
-}
-
-@Composable
-private fun RowScope.BoardFirstAction(
-    label: String,
-    glyph: BoardFirstActionGlyph,
-    destructive: Boolean = false,
-    testTag: String,
-    onClick: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) .955f else 1f,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "board-first-action-scale-$label",
-    )
-    val offset by animateDpAsState(
-        targetValue = if (pressed) 1.2.dp else 0.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "board-first-action-offset-$label",
-    )
-    val elevation by animateDpAsState(
-        targetValue = if (pressed) .2.dp else 1.8.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "board-first-action-shadow-$label",
-    )
-    val lowerEdge by animateDpAsState(
-        targetValue = if (pressed) .4.dp else 2.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "board-first-action-edge-$label",
-    )
-    val shape = RoundedCornerShape(5.dp)
-    val tint = if (destructive) LumenColors.Destructive else LumenColors.OnSurfaceMuted
-    val faceTop = if (destructive) {
-        LumenColors.DestructiveSoft.copy(alpha = if (pressed) .36f else .24f)
-    } else if (pressed) {
-        LumenColors.SurfaceHighest.copy(alpha = .82f)
-    } else {
-        LumenColors.SurfaceHighest.copy(alpha = .66f)
-    }
-    val faceBottom = if (pressed) LumenColors.Surface.copy(alpha = .98f) else LumenColors.SurfaceRaised
-    val lowerEdgeColor = if (destructive) {
-        LumenColors.Destructive.copy(alpha = .23f)
-    } else {
-        LumenColors.OutlineStrong.copy(alpha = .72f)
-    }
-
-    Box(
-        Modifier.weight(1f).fillMaxSize().testTag(testTag)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationY = offset.toPx()
-            }
-            .shadow(elevation, shape, clip = false)
-            .clip(shape)
-            .background(LumenColors.Background)
-            .drawBehind {
-                drawRect(
-                    color = lowerEdgeColor,
-                    topLeft = Offset(0f, size.height - lowerEdge.toPx()),
-                )
-            }
-            .padding(bottom = lowerEdge)
-            .clip(shape)
-            .background(Brush.verticalGradient(listOf(faceTop, faceBottom)))
-            .border(
-                1.dp,
-                if (destructive) LumenColors.Destructive.copy(alpha = .46f)
-                else LumenColors.OutlineStrong.copy(alpha = if (pressed) .92f else .76f),
-                shape,
-            )
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            BoardFirstActionGlyph(glyph, if (pressed && !destructive) LumenColors.OnSurface else tint)
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
-                fontWeight = FontWeight.Medium,
-                color = if (pressed && !destructive) LumenColors.OnSurface else tint,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BoardFirstActionGlyph(glyph: BoardFirstActionGlyph, tint: UiColor) {
-    Canvas(Modifier.size(17.dp)) {
-        val stroke = 1.35.dp.toPx()
-        when (glyph) {
-            BoardFirstActionGlyph.PAUSE -> {
-                drawLine(tint, Offset(size.width * .36f, size.height * .24f), Offset(size.width * .36f, size.height * .76f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .64f, size.height * .24f), Offset(size.width * .64f, size.height * .76f), stroke, StrokeCap.Round)
-            }
-            BoardFirstActionGlyph.PLAY -> {
-                val path = Path().apply {
-                    moveTo(size.width * .36f, size.height * .24f)
-                    lineTo(size.width * .73f, size.height * .50f)
-                    lineTo(size.width * .36f, size.height * .76f)
-                    close()
-                }
-                drawPath(path, tint)
-            }
-            BoardFirstActionGlyph.FLAG -> {
-                drawLine(tint, Offset(size.width * .31f, size.height * .18f), Offset(size.width * .31f, size.height * .82f), stroke, StrokeCap.Round)
-                val flag = Path().apply {
-                    moveTo(size.width * .32f, size.height * .22f)
-                    lineTo(size.width * .72f, size.height * .30f)
-                    lineTo(size.width * .56f, size.height * .49f)
-                    lineTo(size.width * .32f, size.height * .44f)
-                    close()
-                }
-                drawPath(flag, tint)
-            }
-            BoardFirstActionGlyph.EXIT -> {
-                drawLine(tint, Offset(size.width * .22f, size.height * .20f), Offset(size.width * .22f, size.height * .80f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .22f, size.height * .20f), Offset(size.width * .53f, size.height * .20f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .22f, size.height * .80f), Offset(size.width * .53f, size.height * .80f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .43f, size.height * .50f), Offset(size.width * .79f, size.height * .50f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .65f, size.height * .36f), Offset(size.width * .79f, size.height * .50f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .65f, size.height * .64f), Offset(size.width * .79f, size.height * .50f), stroke, StrokeCap.Round)
-            }
-            BoardFirstActionGlyph.CANCEL -> {
-                drawLine(tint, Offset(size.width * .27f, size.height * .27f), Offset(size.width * .73f, size.height * .73f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .73f, size.height * .27f), Offset(size.width * .27f, size.height * .73f), stroke, StrokeCap.Round)
-            }
-        }
+        LumenActionTile("Flip", LumenActionGlyph.FLIP, "p5-live-action-flip", onFlipBoard)
+        LumenActionTile("Menu", LumenActionGlyph.MENU, "p5-live-action-menu", onMenu)
     }
 }
 
@@ -597,12 +597,6 @@ private fun boardFirstHumanDetail(side: Color, activeSide: Color, paused: Boolea
         side == activeSide -> "$sideLabel · Your move"
         else -> "$sideLabel · Waiting"
     }
-}
-
-private fun boardFirstClockText(millis: Long?): String {
-    if (millis == null) return "--:--"
-    val safe = millis.coerceAtLeast(0L)
-    return "%d:%02d".format(safe / 60_000L, (safe % 60_000L) / 1_000L)
 }
 
 private fun boardFirstClockAccessibility(millis: Long?): String {

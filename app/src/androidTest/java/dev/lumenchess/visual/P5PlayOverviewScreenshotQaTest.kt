@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -102,7 +104,8 @@ class P5PlayOverviewScreenshotQaTest {
         composeRule.onNodeWithTag("main-tab-play").performClick()
         waitForTag("p5-play-overview")
         waitForTag("play-overview-quick-start")
-        composeRule.onNodeWithContentDescription("Navigate back").assertIsDisplayed()
+        // Play is a root tab; a back control there would only close the app.
+        composeRule.onAllNodesWithContentDescription("Navigate back").assertCountEquals(0)
     }
 
     private fun verifyInterTightRuntimeResource() {

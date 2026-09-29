@@ -12,6 +12,8 @@ enum class SoundEvent(val fileStem: String) {
     CHECK("check"),
     CASTLE("castle"),
     PROMOTION("promotion"),
+    ILLEGAL_MOVE("illegal"),
+    LOW_TIME("low_time"),
     GAME_START("game_start"),
     GAME_END("game_end");
 

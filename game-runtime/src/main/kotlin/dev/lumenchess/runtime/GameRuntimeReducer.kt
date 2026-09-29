@@ -4,7 +4,10 @@ import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.GameResult
 import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.MoveGenerator
+import dev.lumenchess.core.chess.PieceType
+import dev.lumenchess.core.chess.Position
 import dev.lumenchess.core.chess.Rules
+import dev.lumenchess.core.chess.Square
 import dev.lumenchess.core.chess.Termination
 import dev.lumenchess.engine.api.EngineMoveValidation
 import dev.lumenchess.engine.api.EngineMoveValidator
@@ -13,6 +16,9 @@ import dev.lumenchess.engine.api.PositionRevision
 import dev.lumenchess.runtime.clock.ClockSide
 import dev.lumenchess.runtime.clock.ClockTransition
 import dev.lumenchess.runtime.clock.DeterministicGameClock
+
+private const val FIFTY_MOVE_HALFMOVES = 100
+private const val MIN_HALFMOVES_FOR_THREEFOLD = 8
 
 internal object GameRuntimeReducer {
     fun reduce(
@@ -62,7 +68,7 @@ internal object GameRuntimeReducer {
         val transition = clock.settle(state.clock)
         val settled = state.copy(clock = transition.state)
         val timedOut = transition.timeoutOccurred ?: return settled
-        return terminalState(settled, RuntimeTerminal.Timeout(timedOut.toColor()))
+        return terminalState(settled, timeoutTerminal(state, timedOut.toColor()))
     }
 
     private fun start(state: RuntimeState, clock: DeterministicGameClock): RuntimeTransition {
@@ -81,7 +87,7 @@ internal object GameRuntimeReducer {
                     started = true,
                     paused = false,
                 ),
-                RuntimeTerminal.Timeout(startedClock.timeoutOccurred.toColor()),
+                timeoutTerminal(state, startedClock.timeoutOccurred.toColor()),
                 persist = true,
             )
         }
@@ -217,7 +223,7 @@ internal object GameRuntimeReducer {
         if (resumedClock.timeoutOccurred != null) {
             return terminalTransition(
                 state.copy(clock = resumedClock.state, paused = false),
-                RuntimeTerminal.Timeout(resumedClock.timeoutOccurred.toColor()),
+                timeoutTerminal(state, resumedClock.timeoutOccurred.toColor()),
                 persist = true,
             )
         }
@@ -283,7 +289,7 @@ internal object GameRuntimeReducer {
             if (started.timeoutOccurred != null) {
                 return terminalTransition(
                     next.copy(clock = started.state),
-                    RuntimeTerminal.Timeout(started.timeoutOccurred.toColor()),
+                    timeoutTerminal(state, started.timeoutOccurred.toColor()),
                     persist = true,
                 )
             }
@@ -338,7 +344,7 @@ internal object GameRuntimeReducer {
         if (switchedClock.timeoutOccurred != null) {
             return terminalTransition(
                 state.copy(clock = switchedClock.state),
-                RuntimeTerminal.Timeout(switchedClock.timeoutOccurred.toColor()),
+                timeoutTerminal(state, switchedClock.timeoutOccurred.toColor()),
                 persist = true,
             )
         }
@@ -370,7 +376,7 @@ internal object GameRuntimeReducer {
             if (unlocked.timeoutOccurred != null) {
                 return terminalTransition(
                     next.copy(clock = unlocked.state),
-                    RuntimeTerminal.Timeout(unlocked.timeoutOccurred.toColor()),
+                    timeoutTerminal(state, unlocked.timeoutOccurred.toColor()),
                     persist = true,
                 )
             }
@@ -383,6 +389,7 @@ internal object GameRuntimeReducer {
             null -> null
         }
         if (terminal != null) return terminalTransition(next, terminal, persist = true)
+        automaticDraw(next)?.let { return terminalTransition(next, it, persist = true) }
 
         if (allowPremove && state.queuedPremove != null) {
             val queued = state.queuedPremove
@@ -407,7 +414,7 @@ internal object GameRuntimeReducer {
                     if (charged.timeoutOccurred != null) {
                         return terminalTransition(
                             next,
-                            RuntimeTerminal.Timeout(charged.timeoutOccurred.toColor()),
+                            timeoutTerminal(state, charged.timeoutOccurred.toColor()),
                             persist = true,
                         )
                     }
@@ -431,7 +438,7 @@ internal object GameRuntimeReducer {
         val timedOut = transition.timeoutOccurred ?: return null
         return terminalTransition(
             state.copy(clock = transition.state),
-            RuntimeTerminal.Timeout(timedOut.toColor()),
+            timeoutTerminal(state, timedOut.toColor()),
             persist = true,
         )
     }
@@ -499,12 +506,84 @@ internal object GameRuntimeReducer {
         )
     }
 
+    /**
+     * Draws that end the game without either player's consent. Checkmate and stalemate are decided
+     * first by the caller (a mating move on the hundredth half-move is still mate). Threefold
+     * repetition and the fifty-move rule are declared automatically, as chess clients do, because
+     * the runtime has no claim gesture.
+     */
+    private fun automaticDraw(state: RuntimeState): RuntimeTerminal? {
+        val position = state.position
+        if (Rules.isInsufficientMaterial(position)) return RuntimeTerminal.InsufficientMaterial
+        if (position.halfmoveClock >= FIFTY_MOVE_HALFMOVES) return RuntimeTerminal.FiftyMoveRule
+        if (position.halfmoveClock >= MIN_HALFMOVES_FOR_THREEFOLD && repetitionCount(state) >= 3) {
+            return RuntimeTerminal.ThreefoldRepetition
+        }
+        return null
+    }
+
+    /** Occurrences of the current position along the current line; irreversible moves end the walk. */
+    private fun repetitionCount(state: RuntimeState): Int {
+        val key = state.position.repetitionKey
+        var count = 0
+        var steps = 0
+        var node = state.gameTree.node(state.currentNodeId)
+        while (true) {
+            if (node.position.repetitionKey == key) count++
+            if (steps++ >= state.position.halfmoveClock) break
+            node = state.gameTree.parentOf(node.id) ?: break
+        }
+        return count
+    }
+
+    /**
+     * A flag fall is a loss unless the opponent could never deliver mate: then it is a draw
+     * (FIDE 6.9). Deliberately conservative: only bare king, king + one minor piece, or bishops all
+     * on one colour count as unable to mate, and only when the flagged side has no pawns.
+     */
+    private fun timeoutTerminal(state: RuntimeState, loser: Color): RuntimeTerminal =
+        if (cannotMate(state.position, loser.opposite, loser)) {
+            RuntimeTerminal.InsufficientMaterial
+        } else {
+            RuntimeTerminal.Timeout(loser)
+        }
+
+    private fun cannotMate(position: Position, side: Color, opponent: Color): Boolean {
+        var minorCount = 0
+        var lightBishops = 0
+        var darkBishops = 0
+        var otherMinors = 0
+        position.board.forEachIndexed { index, piece ->
+            if (piece == null || piece.type == PieceType.KING) return@forEachIndexed
+            if (piece.color == opponent && piece.type == PieceType.PAWN) return false
+            if (piece.color != side) return@forEachIndexed
+            when (piece.type) {
+                PieceType.PAWN, PieceType.ROOK, PieceType.QUEEN -> return false
+                PieceType.BISHOP -> {
+                    minorCount++
+                    val square = Square.fromIndex(index)
+                    if ((square.file + square.rank) % 2 == 0) darkBishops++ else lightBishops++
+                }
+                PieceType.KNIGHT -> {
+                    minorCount++
+                    otherMinors++
+                }
+                PieceType.KING -> Unit
+            }
+        }
+        return minorCount <= 1 || (otherMinors == 0 && (lightBishops == 0 || darkBishops == 0))
+    }
+
     private fun RuntimeTerminal.toGameResult(): GameResult = when (this) {
         is RuntimeTerminal.Timeout -> loser.lossResult()
         is RuntimeTerminal.Resignation -> loser.lossResult()
         RuntimeTerminal.DrawAgreement -> GameResult.DRAW
         is RuntimeTerminal.Checkmate -> if (winner == Color.WHITE) GameResult.WHITE_WIN else GameResult.BLACK_WIN
-        RuntimeTerminal.Stalemate -> GameResult.DRAW
+        RuntimeTerminal.Stalemate,
+        RuntimeTerminal.InsufficientMaterial,
+        RuntimeTerminal.ThreefoldRepetition,
+        RuntimeTerminal.FiftyMoveRule,
+        -> GameResult.DRAW
     }
 
     private fun Color.lossResult(): GameResult =

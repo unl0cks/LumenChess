@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +43,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -122,6 +126,22 @@ internal fun ReferenceSetupScreen(
                 }
 
                 NewGameModeSection(ref, palette, ui.setup, viewModel::updateVariant, viewModel::updateChess960Index)
+                OutlinedTextField(
+                    value = ui.setup.startingFen.orEmpty(),
+                    onValueChange = { viewModel.updateStartingFen(it) },
+                    modifier = Modifier.fillMaxWidth().testTag("play-starting-fen"),
+                    label = { Text("Starting FEN (optional)") },
+                    placeholder = { Text("Normal start") },
+                    singleLine = false,
+                    minLines = 2,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = palette.text,
+                        unfocusedTextColor = palette.text,
+                        focusedBorderColor = palette.cyan,
+                        unfocusedBorderColor = palette.rowOutline,
+                        cursorColor = palette.cyan,
+                    ),
+                )
                 NewGameOpponentSection(
                     ref = ref,
                     palette = palette,
@@ -133,9 +153,24 @@ internal fun ReferenceSetupScreen(
                         engineExpanded = false
                     },
                 )
-                NewGameStrengthSection(ref, palette, ui.setup.strengthTarget, viewModel::updateStrengthTarget)
+                NewGameStrengthSection(
+                    ref = ref,
+                    palette = palette,
+                    target = ui.setup.strengthTarget,
+                    onStrength = viewModel::updateStrengthTarget,
+                    matchYourElo = ui.setup.matchYourElo,
+                    matchPreview = ui.matchPreview,
+                    onToggleMatch = { viewModel.updateMatchYourElo(!ui.setup.matchYourElo) },
+                )
                 NewGameStrengthModelSection(ref, palette, ui.setup.strengthModel, viewModel::updateStrengthModel)
                 NewGameSideSection(ref, palette, ui.setup.side, viewModel::updateSide)
+                NewGameRatedRow(
+                    ref = ref,
+                    palette = palette,
+                    rated = ui.setup.rated,
+                    available = ui.setup.startingFen == null,
+                    onRated = viewModel::updateRated,
+                )
                 NewGameTimeSection(
                     ref = ref,
                     palette = palette,
@@ -204,11 +239,13 @@ private data class NewGameReferenceScale(
 private enum class NewGameGlyph { BOARD, CHESS960, ENGINE, WHITE, BLACK, RANDOM, CLOCK, TARGET, INFO, CHECK }
 
 private fun Modifier.newGameBackground(palette: LumenP5IdentityPalette): Modifier = drawWithCache {
+    // Near-black floor only for the approved dark graphite; a light palette stays light.
+    val floor = if (palette.appBackground.luminance() < .5f) Color(0xFF070A0C) else palette.appBackground
     val base = Brush.verticalGradient(
         colorStops = arrayOf(
             0f to palette.appBackgroundLift,
             .28f to palette.appBackground,
-            1f to Color(0xFF070A0C),
+            1f to floor,
         ),
     )
     onDrawBehind {
@@ -419,13 +456,26 @@ private fun NewGameStrengthSection(
     palette: LumenP5IdentityPalette,
     target: EngineStrengthTarget,
     onStrength: (EngineStrengthTarget) -> Unit,
+    matchYourElo: Boolean,
+    matchPreview: MatchPreview?,
+    onToggleMatch: () -> Unit,
 ) {
     val elo = (target as? EngineStrengthTarget.Elo)?.value ?: 3000
     Column(Modifier.fillMaxWidth().height(ref.vdp(130f))) {
         NewGameSectionHeader(ref, "Strength (Elo)", info = true)
         Box(Modifier.fillMaxWidth().height(ref.vdp(19f)), contentAlignment = Alignment.CenterStart) {
             Text(
-                if (target is EngineStrengthTarget.Elo) elo.toString() else "Maximum",
+                when {
+                    matchYourElo -> matchPreview?.let { preview ->
+                        when {
+                            preview.loading && preview.base == null -> "Match My Elo · reading your rating…"
+                            preview.base != null -> "≈ ${preview.base.rating} ±${preview.range} · ${preview.base.detail}"
+                            else -> "No rating yet for this clock: starts near 1200 ±${preview.range}"
+                        }
+                    } ?: "Match My Elo"
+                    target is EngineStrengthTarget.Elo -> elo.toString()
+                    else -> "Maximum"
+                },
                 color = palette.text,
                 fontSize = ref.sp(14f),
                 lineHeight = ref.sp(17f),
@@ -448,7 +498,7 @@ private fun NewGameStrengthSection(
             Text("400", color = Color(0xFF8A959A), fontSize = ref.sp(10f), lineHeight = ref.sp(12f))
             Text("3000", color = Color(0xFF8A959A), fontSize = ref.sp(10f), lineHeight = ref.sp(12f))
         }
-        NewGameDisabledAction(ref, Modifier.fillMaxWidth().height(ref.vdp(48f)).testTag("p5-match-my-elo"))
+        NewGameMatchAction(ref, palette, matchYourElo, onToggleMatch, Modifier.fillMaxWidth().height(ref.vdp(48f)).testTag("p5-match-my-elo"))
     }
 }
 
@@ -936,12 +986,21 @@ private fun NewGameSlider(
 }
 
 @Composable
-private fun NewGameDisabledAction(ref: NewGameReferenceScale, modifier: Modifier) {
+private fun NewGameMatchAction(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
     val shape = RoundedCornerShape(ref.dp(9f))
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val tint = if (selected) palette.cyanMicro else palette.muted
     Row(
         modifier
             .graphicsLayer {
-                shadowElevation = ref.dp(3f).toPx()
+                shadowElevation = ref.dp(if (pressed) 1f else 3f).toPx()
                 ambientShadowColor = Color.Black.copy(alpha = .14f)
                 spotShadowColor = Color.Black.copy(alpha = .19f)
                 this.shape = shape
@@ -949,27 +1008,69 @@ private fun NewGameDisabledAction(ref: NewGameReferenceScale, modifier: Modifier
             }
             .drawWithCache {
                 val corner = CornerRadius(ref.dp(9f).toPx())
-                val edgeDepth = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0f to Color.White.copy(alpha = .018f),
-                        .24f to Color.Transparent,
-                        .76f to Color.Transparent,
-                        1f to Color.Black.copy(alpha = .035f),
-                    ),
-                )
+                val face = if (selected) {
+                    Brush.verticalGradient(listOf(Color(0xFF1B2D34), Color(0xFF16252B)))
+                } else {
+                    Brush.verticalGradient(listOf(Color(0xFF192024), Color(0xFF141A1D)))
+                }
                 onDrawBehind {
-                    drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF151B1E), Color(0xFF111619))), cornerRadius = corner)
-                    drawRoundRect(edgeDepth, cornerRadius = corner)
-                    drawRoundRect(Color(0xFF879FA8).copy(alpha = .08f), cornerRadius = corner, style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)))
+                    drawRoundRect(face, cornerRadius = corner)
+                    drawRoundRect(
+                        if (selected) palette.cyan.copy(alpha = .55f) else Color(0xFF879FA8).copy(alpha = .16f),
+                        cornerRadius = corner,
+                        style = Stroke(ref.dp(1f).toPx().coerceAtLeast(1f)),
+                    )
                 }
             }
-            .clickable(enabled = false, onClick = {}),
+            .toggleable(
+                value = selected,
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Switch,
+                onValueChange = { onClick() },
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        NewGameIcon(NewGameGlyph.TARGET, Color(0xFF69757A), Modifier.size(ref.dp(18f)), ref)
+        NewGameIcon(NewGameGlyph.TARGET, tint, Modifier.size(ref.dp(18f)), ref)
         Spacer(Modifier.width(ref.dp(8f)))
-        Text("Match My Elo", color = Color(0xFF69757A), fontSize = ref.sp(12f), lineHeight = ref.sp(15f), fontWeight = FontWeight.SemiBold)
+        Text(
+            if (selected) "Match My Elo · on" else "Match My Elo",
+            color = tint,
+            fontSize = ref.sp(12f),
+            lineHeight = ref.sp(15f),
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun NewGameRatedRow(
+    ref: NewGameReferenceScale,
+    palette: LumenP5IdentityPalette,
+    rated: Boolean,
+    available: Boolean,
+    onRated: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = ref.vdp(4f)).testTag("p5-setup-rated"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Rated game", color = palette.text, fontSize = ref.sp(13f), lineHeight = ref.sp(16f), fontWeight = FontWeight.SemiBold)
+            Text(
+                if (available) "Counts toward your local rating (Settings › Ratings)." else "Games from a custom position are never rated.",
+                color = Color(0xFF8D989D),
+                fontSize = ref.sp(9.7f),
+                lineHeight = ref.sp(13f),
+            )
+        }
+        dev.lumenchess.design.LumenToggle(
+            checked = rated && available,
+            onCheckedChange = onRated,
+            enabled = available,
+            contentDescription = "Rated game",
+        )
     }
 }
 
@@ -1069,7 +1170,7 @@ private fun NewGameValidationMessage(ref: NewGameReferenceScale, message: String
 @Composable
 private fun NewGameNotes(ref: NewGameReferenceScale, palette: LumenP5IdentityPalette, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(ref.vdp(7f))) {
-        NewGameNote(ref, palette, "Match My Elo is preview-only in this build.", "p5-setup-note-1")
+        NewGameNote(ref, palette, "Match My Elo picks a strength near your rating when the game starts.", "p5-setup-note-1")
         NewGameNote(ref, palette, "Your selected strength, side and clock apply when the game starts.", "p5-setup-note-2")
     }
 }

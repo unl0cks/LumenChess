@@ -45,7 +45,9 @@ class ArenaBranchingTest {
             coordinator.start()
             coordinator.onEngineHostRecovered(Color.WHITE); coordinator.onEngineHostRecovered(Color.BLACK)
             val request = white.requests.single()
-            assertEquals(1500L, request.limits.moveTimeMillis)
+            // Untimed games are still sized by the shared think-time model, never unbounded.
+            assertTrue(request.limits.moveTimeMillis!! in 60L..3_000L)
+            assertTrue(coordinator.presentationDelayMillis(Color.WHITE, EngineSearchResult(request.searchId, request.positionRevision, "e2e4")) > 0L)
             assertFalse(coordinator.state.clock.running)
             val move = MoveGenerator.legalMoves(coordinator.state.position).first()
             coordinator.onEngineResult(Color.WHITE, EngineSearchResult(request.searchId, request.positionRevision, move.uci))

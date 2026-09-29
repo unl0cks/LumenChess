@@ -56,6 +56,21 @@ class SoundPlayer(context: Context) {
         }
     }
 
+    /**
+     * Generates and loads every cue for [soundPackId] ahead of time. Without this the first move of
+     * a game would generate its file and wait for the asynchronous SoundPool load, so the opening
+     * sounds would arrive late. Playback never waits on this; it only makes the first play instant.
+     */
+    fun preload(soundPackId: String = SoundSourceResolver.BUILT_IN_PACK_ID) {
+        SoundEvent.entries.forEach { event ->
+            val file = when (val source = resolver.resolve(event, soundPackId)) {
+                is ResolvedSoundSource.BuiltIn -> runCatching { BuiltInSoundAssets.ensure(builtInRoot, source.event) }.getOrNull()
+                is ResolvedSoundSource.LocalFile -> source.file
+            }
+            if (file != null) sample(file)
+        }
+    }
+
     fun close() {
         synchronized(lock) {
             pendingSamples.clear()

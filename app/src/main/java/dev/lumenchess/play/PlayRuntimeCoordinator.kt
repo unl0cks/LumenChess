@@ -6,6 +6,8 @@ import dev.lumenchess.engine.api.EngineSearchId
 import dev.lumenchess.engine.api.EngineSearchLimits
 import dev.lumenchess.engine.api.EngineSearchRequest
 import dev.lumenchess.engine.api.EngineSearchResult
+import dev.lumenchess.runtime.EngineThinkPlan
+import dev.lumenchess.runtime.EngineThinkTimePolicy
 import dev.lumenchess.runtime.GameRuntime
 import dev.lumenchess.runtime.RuntimeController
 import dev.lumenchess.runtime.RuntimeControllers
@@ -15,7 +17,6 @@ import dev.lumenchess.runtime.RuntimeEvent
 import dev.lumenchess.runtime.RuntimeEventId
 import dev.lumenchess.runtime.RuntimeSnapshot
 import dev.lumenchess.runtime.RuntimeState
-import dev.lumenchess.runtime.clock.ClockSide
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
 
 interface PlayEngineGateway {
@@ -32,9 +33,18 @@ class PlayRuntimeCoordinator private constructor(
     private val runtime: GameRuntime,
     private val engine: PlayEngineGateway,
     private val persistence: PlayPersistenceGateway,
+    private val timeSource: MonotonicTimeSource,
     nextEventId: Long,
 ) {
     private var eventCounter = nextEventId
+    private var activeThink: ActiveThink? = null
+
+    /** The think plan of the one search the runtime currently leases to the engine. */
+    private class ActiveThink(
+        val searchId: EngineSearchId,
+        val plan: EngineThinkPlan,
+        val startedAtMillis: Long,
+    )
 
     val state: RuntimeState
         get() = runtime.state
@@ -63,35 +73,42 @@ class PlayRuntimeCoordinator private constructor(
     private fun execute(effects: List<RuntimeEffect>) {
         effects.forEach { effect ->
             when (effect) {
-                is RuntimeEffect.StartEngineSearch -> engine.startSearch(
-                    EngineSearchRequest(
-                        searchId = effect.searchId,
-                        positionRevision = effect.positionRevision,
-                        position = effect.position,
-                        limits = EngineSearchLimits(moveTimeMillis = engineMoveTimeMillis()),
+                is RuntimeEffect.StartEngineSearch -> {
+                    val plan = EngineThinkTimePolicy.plan(
+                        state = state,
                         strength = setup.strength,
-                    ),
-                )
-                is RuntimeEffect.CancelEngineSearch -> engine.cancelSearch(effect.searchId)
+                        initialClockMillis = setup.clockConfig.initialMillis,
+                        searchId = effect.searchId,
+                    )
+                    activeThink = ActiveThink(effect.searchId, plan, timeSource.nowMillis())
+                    engine.startSearch(
+                        EngineSearchRequest(
+                            searchId = effect.searchId,
+                            positionRevision = effect.positionRevision,
+                            position = effect.position,
+                            limits = EngineSearchLimits(moveTimeMillis = plan.searchMillis),
+                            strength = setup.strength,
+                        ),
+                    )
+                }
+                is RuntimeEffect.CancelEngineSearch -> {
+                    if (activeThink?.searchId == effect.searchId) activeThink = null
+                    engine.cancelSearch(effect.searchId)
+                }
                 is RuntimeEffect.PersistSnapshot -> persistence.persist(effect.snapshot, setup)
             }
         }
     }
 
     /**
-     * M19 uses a deliberately small deterministic time-management policy because the typed M11 API
-     * currently exposes move-time limits rather than full UCI clock fields. The runtime clock remains
-     * authoritative; this value only bounds external engine work and can be replaced by richer time
-     * management later without changing ownership.
+     * How much longer the finished [result] must be held before it is handed to the runtime, so the
+     * engine behaves like a clocked opponent whose own clock is running while it "thinks". The runtime
+     * remains the only owner of clocks and move application; this is presentation pacing only, and a
+     * result for a search that is not the current lease gets no delay (the runtime rejects it).
      */
-    private fun engineMoveTimeMillis(): Long {
-        val clock = state.clock
-        val remaining = when (clock.activeSide) {
-            ClockSide.WHITE -> clock.whiteRemainingMillis
-            ClockSide.BLACK -> clock.blackRemainingMillis
-        }
-        val desired = (remaining / 40L + clock.incrementMillis / 2L).coerceIn(50L, 1_500L)
-        return minOf(desired, (remaining - 10L).coerceAtLeast(1L))
+    fun presentationDelayMillis(result: EngineSearchResult): Long {
+        val think = activeThink?.takeIf { it.searchId == result.searchId } ?: return 0L
+        return think.plan.remainingPresentationMillis(timeSource.nowMillis() - think.startedAtMillis)
     }
 
     companion object {
@@ -116,6 +133,7 @@ class PlayRuntimeCoordinator private constructor(
                 ),
                 engine = engine,
                 persistence = persistence,
+                timeSource = timeSource,
                 nextEventId = 1L,
             )
         }
@@ -131,6 +149,7 @@ class PlayRuntimeCoordinator private constructor(
             runtime = GameRuntime.restore(snapshot, timeSource),
             engine = engine,
             persistence = persistence,
+            timeSource = timeSource,
             nextEventId = (snapshot.processedEventIds.maxOfOrNull { it.value } ?: 0L) + 1L,
         )
     }

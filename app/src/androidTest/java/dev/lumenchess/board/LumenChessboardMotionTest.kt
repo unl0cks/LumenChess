@@ -18,9 +18,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * Every clock offset here is derived from [GroundedPrecisionBoardMotion], so retuning the motion
+ * tokens cannot silently invalidate what these tests assert about transient frames.
+ */
 class LumenChessboardMotionTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val motion = GroundedPrecisionBoardMotion
 
     @Test
     fun legalDragSettlesContinuouslyWithoutChangingBoardBounds() {
@@ -33,7 +39,7 @@ class LumenChessboardMotionTest {
 
         drag("e2", "e4")
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(110L)
+        composeRule.mainClock.advanceTimeBy(motion.legalDropDurationMillis + SETTLE_MARGIN_MILLIS)
         transient("dragged-piece").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(Move.parseUci("e2e4"), lastMove.value) }
         composeRule.onNodeWithContentDescription("e4, White pawn").assertExists()
@@ -53,7 +59,7 @@ class LumenChessboardMotionTest {
 
         drag("e2", "e5")
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(140L)
+        composeRule.mainClock.advanceTimeBy(motion.illegalDropDurationMillis + SETTLE_MARGIN_MILLIS)
         transient("dragged-piece").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(null, emitted) }
         composeRule.onNodeWithTag("piece-e2-lumen-vector", useUnmergedTree = true).assertExists()
@@ -114,7 +120,7 @@ class LumenChessboardMotionTest {
         composeRule.onNodeWithTag("piece-f1-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
         assertEquals(initialBounds, boardBounds())
 
-        composeRule.mainClock.advanceTimeBy(180L)
+        composeRule.mainClock.advanceTimeBy(motion.castlingDurationMillis + 15L)
         composeRule.mainClock.advanceTimeByFrame()
         transient("castling-rook").assertDoesNotExist()
         transient("castling-king").assertDoesNotExist()
@@ -157,12 +163,12 @@ class LumenChessboardMotionTest {
 
         transient("traveling-piece").assertExists()
         composeRule.onNodeWithTag("piece-a8-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.mainClock.advanceTimeBy(145L)
+        composeRule.mainClock.advanceTimeBy(motion.humanMoveDurationMillis.toLong())
         composeRule.mainClock.advanceTimeByFrame()
         transient("promotion-outgoing-piece").assertExists()
         transient("promotion-promoted-piece").assertExists()
         composeRule.onNodeWithTag("piece-a8-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.mainClock.advanceTimeBy(96L)
+        composeRule.mainClock.advanceTimeBy(motion.promotionDurationMillis + 16L)
         composeRule.mainClock.advanceTimeByFrame()
         transient("promotion-outgoing-piece").assertDoesNotExist()
         transient("promotion-promoted-piece").assertDoesNotExist()
@@ -185,11 +191,13 @@ class LumenChessboardMotionTest {
 
         transient("captured-piece-fade").assertExists()
         transient("traveling-piece").assertExists()
-        composeRule.mainClock.advanceTimeBy(70L)
+        val fadeDone = motion.captureFadeDurationMillis + 15L
+        composeRule.mainClock.advanceTimeBy(fadeDone)
         transient("captured-piece-fade").assertDoesNotExist()
         transient("traveling-piece").assertExists()
 
-        composeRule.mainClock.advanceTimeBy(96L)
+        // Just into the promotion bridge: the pawn's travel is over, the bridge has not finished.
+        composeRule.mainClock.advanceTimeBy(motion.humanMoveDurationMillis - fadeDone + 20L)
         composeRule.mainClock.advanceTimeByFrame()
         transient("promotion-promoted-piece").assertExists()
         composeRule.onNodeWithTag("piece-h8-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
@@ -210,7 +218,7 @@ class LumenChessboardMotionTest {
         transient("captured-piece-fade").assertExists()
         transient("traveling-piece").assertExists()
         composeRule.onNodeWithTag("piece-d5-lumen-vector", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.mainClock.advanceTimeBy(180L)
+        composeRule.mainClock.advanceTimeBy(motion.humanMoveDurationMillis + 35L)
         composeRule.mainClock.advanceTimeByFrame()
         transient("captured-piece-fade").assertDoesNotExist()
         transient("traveling-piece").assertDoesNotExist()
@@ -258,9 +266,10 @@ class LumenChessboardMotionTest {
         composeRule.onNodeWithTag("square-e4").performClick()
         composeRule.onNodeWithTag("square-d5").performClick()
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(70L)
+        val fadeDone = motion.captureFadeDurationMillis + 15L
+        composeRule.mainClock.advanceTimeBy(fadeDone)
         transient("captured-piece-fade").assertDoesNotExist()
-        composeRule.mainClock.advanceTimeBy(110L)
+        composeRule.mainClock.advanceTimeBy(motion.humanMoveDurationMillis + 35L - fadeDone)
         transient("traveling-piece").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(Move.parseUci("e4d5"), lastMove.value) }
         composeRule.onNodeWithContentDescription("d5, White pawn").assertExists()
@@ -301,6 +310,10 @@ class LumenChessboardMotionTest {
                 durationMillis = 200L,
             )
         }
+    }
+
+    private companion object {
+        const val SETTLE_MARGIN_MILLIS = 20L
     }
 
     private fun boardBounds() = composeRule.onNodeWithTag(CHESSBOARD_TEST_TAG)

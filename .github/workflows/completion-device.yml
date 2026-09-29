@@ -1,0 +1,81 @@
+name: Completion pass device verification
+
+# Boots the canonical API-37 device, drives the real app against the real engines, checks the Live
+# contract suites, and writes screenshots + measurements. Screenshots are also embedded (downscaled,
+# base64) in the log so they can be inspected without downloading artifacts.
+on:
+  push:
+    branches: ['claude/**']
+  workflow_dispatch:
+    inputs:
+      emit_images:
+        description: Screenshot names to embed in the log
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: completion-device-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  device:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'test(device):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      EMIT_IMAGES: ${{ github.event.inputs.emit_images || '01-play-overview 02-new-game-setup 03-live-start 04-engine-thinking 05-engine-replied 06-game-menu 09-resign-confirmation 10-result-you-lost 12-insights 13-live-low-clock 14-timeout-result 15-castle-a 15-castle-b 15-castle-c 16-promotion-picker 17-promotion-a 17-promotion-b 17-promotion-c 18-capture-a 18-capture-b 22-arena-live 19-arena-setup 20-games 21-settings 30-light-settings 31-light-overview 32-light-live' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 15859902
+          packages: platform-tools emulator
+      - name: Install API-37 toolchain
+        run: |
+          sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1" "system-images;android-37.0;google_apis_ps16k;x86_64" --channel=3
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Boot device and run the completion session
+        run: |
+          set -euo pipefail
+          if [ -e /dev/kvm ]; then sudo chmod 666 /dev/kvm; fi
+          echo "no" | avdmanager create avd --force --name completion --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          cat >> "$HOME/.android/avd/completion.avd/config.ini" <<'AVD'
+          hw.lcd.width=1344
+          hw.lcd.height=2992
+          hw.lcd.density=489
+          showDeviceFrame=no
+          AVD
+          "$ANDROID_HOME/emulator/emulator" -avd completion -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 8192 > "$RUNNER_TEMP/completion-emulator.log" 2>&1 &
+          emulator_pid=$!; trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+          timeout 420 bash -c 'until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" = "1" ]; do sleep 2; done'
+          adb shell wm size; adb shell wm density
+          adb shell settings put global window_animation_scale 1
+          adb shell settings put global transition_animation_scale 1
+          adb shell settings put global animator_duration_scale 1
+          bash scripts/run-completion-device.sh
+      - name: Publish measurements and failures as annotations
+        if: always()
+        run: |
+          python3 scripts/ci-annotations.py measurements completion-device/measurements.txt
+          python3 scripts/ci-annotations.py failures
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: completion-device-${{ github.sha }}
+          path: |
+            completion-device/
+            app/build/outputs/androidTest-results/
+            app/build/reports/androidTests/
+            app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 7

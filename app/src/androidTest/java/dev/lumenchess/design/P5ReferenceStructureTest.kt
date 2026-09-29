@@ -84,7 +84,7 @@ class P5ReferenceStructureTest {
     }
 
     @Test
-    fun liveGameKeepsSparseBoardFirstFrameWithBottomAnchoredActions() {
+    fun liveGameKeepsSparseBoardFirstFrameWithAttachedAndBalancedActions() {
         openSetup()
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).performScrollTo().performClick()
         composeRule.waitUntil(timeoutMillis = 12_000L) {
@@ -97,7 +97,9 @@ class P5ReferenceStructureTest {
         composeRule.onNodeWithTag("p5-live-player-clock").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-action-strip").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-action-resign").assertIsDisplayed()
-        composeRule.onNodeWithTag("p5-live-action-exit").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-action-draw").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-action-flip").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-action-menu").assertIsDisplayed()
         listOf(
             "p5-live-lower-region",
             "p5-live-tabs",
@@ -109,10 +111,15 @@ class P5ReferenceStructureTest {
 
         val liveRoot = composeRule.onNodeWithTag(PLAY_LIVE_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val actions = composeRule.onNodeWithTag("p5-live-action-strip").fetchSemanticsNode().boundsInRoot
-        val bottomInset = composeRule.activity.resources.displayMetrics.density * 6f
+        val shell = composeRule.onNodeWithTag("p5-live-shell").fetchSemanticsNode().boundsInRoot
+        val density = composeRule.activity.resources.displayMetrics.density
         assertTrue(
-            "Essential actions must stay bottom-anchored to the sparse Live root",
-            liveRoot.bottom - actions.bottom <= bottomInset,
+            "Essential actions must stay attached to the gameplay shell, not stranded at the bottom",
+            actions.top - shell.bottom in 0f..(40f * density),
+        )
+        assertTrue(
+            "The gameplay group must be vertically balanced in the Live root",
+            kotlin.math.abs((shell.top - liveRoot.top) - (liveRoot.bottom - actions.bottom)) <= 32f * density,
         )
     }
 
@@ -131,7 +138,8 @@ class P5ReferenceStructureTest {
     fun playSettingsOwnsAppearanceBoardPiecesAndFeedbackDestinations() {
         openPlaySettings()
         composeRule.onNodeWithTag("play-settings-root").assertIsDisplayed()
-        composeRule.onNodeWithTag("play-settings-time-controls").assertIsDisplayed()
+        // Time control is chosen per game in New Game; Play settings no longer carries a dead row for it.
+        composeRule.onAllNodesWithTag("play-settings-time-controls").assertCountEquals(0)
         composeRule.onNodeWithTag("play-settings-appearance").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-board-pieces").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-sounds-haptics").assertIsDisplayed()

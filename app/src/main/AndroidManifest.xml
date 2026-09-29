@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!--
+      Network use is limited to what the player asks for: importing / syncing their own games and
+      ratings from Chess.com or Lichess, the optional Lichess sign-in, and the Lichess explorer.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -9,10 +14,18 @@
         android:theme="@style/Theme.LumenChess">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Lichess OAuth (PKCE) returns here with a one-time code. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="dev.lumenchess" android:host="oauth" android:path="/lichess" />
             </intent-filter>
         </activity>
     </application>

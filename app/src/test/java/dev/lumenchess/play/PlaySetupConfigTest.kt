@@ -112,4 +112,16 @@ class PlaySetupConfigTest {
             ),
         )
     }
+
+    @Test
+    fun customStartingFenIsValidatedAndUsedByPlayResolver() {
+        val fen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1"
+        val setup = PlaySetupConfig(startingFen = fen)
+        assertIs<PlaySetupValidation.Valid>(PlaySetupValidator.validate(setup))
+        assertEquals(fen, resolvedFen(setup))
+        assertIs<PlaySetupValidation.Invalid>(PlaySetupValidator.validate(PlaySetupConfig(startingFen = "bad")))
+    }
+
+    private fun resolvedFen(setup: PlaySetupConfig): String =
+        dev.lumenchess.core.chess.Fen.serialize(PlaySetupResolver.resolve(setup).initialPosition)
 }

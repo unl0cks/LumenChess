@@ -56,7 +56,6 @@ internal fun ApprovedPlayOverviewScreen(
     ui: PlayUiState,
     onPlayVsEngine: () -> Unit,
     onArenaPreview: () -> Unit,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val setup = ui.setup
@@ -91,9 +90,9 @@ internal fun ApprovedPlayOverviewScreen(
         val contentWidth = ref.dp(358f)
         val heroHeight = ref.dp(168f)
 
+        // Play is a root tab: a centred title, no back control (Back on a root tab leaves the app).
         ApprovedPlayTopBar(
             ref = ref,
-            onBack = onBack,
             modifier = Modifier
                 .offset(x = ref.dp(16f), y = ref.dp(34f))
                 .width(contentWidth)
@@ -191,18 +190,9 @@ private enum class ApprovedPlayArtwork(
 @Composable
 private fun ApprovedPlayTopBar(
     ref: PlayReferenceScale,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) LumenMotion.IconPressScale else 1f,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseSpring(),
-        label = "approved-play-back-scale",
-    )
     val palette = lumenP5IdentityPalette()
-
     Box(modifier, contentAlignment = Alignment.Center) {
         Text(
             "Play",
@@ -211,42 +201,6 @@ private fun ApprovedPlayTopBar(
             lineHeight = ref.sp(25f),
             fontWeight = FontWeight.SemiBold,
         )
-        Box(
-            Modifier
-                .align(Alignment.CenterStart)
-                .size(ref.dp(48f))
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = onBack,
-                )
-                .semantics { contentDescription = "Navigate back" },
-            contentAlignment = Alignment.Center,
-        ) {
-            Canvas(Modifier.size(ref.dp(23f))) {
-                val stroke = ref.dp(1.8f).toPx()
-                val tint = palette.muted.copy(alpha = .94f)
-                drawLine(
-                    tint,
-                    Offset(size.width * .64f, size.height * .18f),
-                    Offset(size.width * .35f, size.height * .50f),
-                    stroke,
-                    StrokeCap.Round,
-                )
-                drawLine(
-                    tint,
-                    Offset(size.width * .35f, size.height * .50f),
-                    Offset(size.width * .64f, size.height * .82f),
-                    stroke,
-                    StrokeCap.Round,
-                )
-            }
-        }
     }
 }
 

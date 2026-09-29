@@ -64,11 +64,11 @@ class AndroidPlayPersistenceGateway(
                 val id = runSuspendBlocking {
                     liveRepository.persist(
                         existingId = gameId?.let(::PersistentGameId),
-                        tree = snapshot.gameTree,
+                        tree = snapshot.gameTree.withHeaders(PlayGameHeaders.build(setup)),
                         metadata = GamePersistenceMetadata(
                             createdAtEpochMillis = createdAtEpochMillis,
                             playedAtEpochMillis = createdAtEpochMillis,
-                            rated = false,
+                            rated = setup.rated,
                             termination = snapshot.terminal?.toPersistedTermination(),
                             timeControl = TimeControlMetadata(
                                 baseMillis = setup.clockConfig.initialMillis,
@@ -108,7 +108,10 @@ class AndroidPlayPersistenceGateway(
     }
 
     /** Ensures all prior persistence effects have finished before a test inspects Room. */
-    internal fun flushForTest(onFlushed: () -> Unit) {
+    internal fun flushForTest(onFlushed: () -> Unit) = flush(onFlushed)
+
+    /** Runs [onFlushed] on the main thread after every snapshot accepted so far has been written. */
+    fun flush(onFlushed: () -> Unit) {
         if (closed.get()) return
         executor.execute { handler.post(onFlushed) }
     }
@@ -127,6 +130,9 @@ class AndroidPlayPersistenceGateway(
         RuntimeTerminal.DrawAgreement -> PersistedTermination.AGREEMENT
         is RuntimeTerminal.Checkmate -> PersistedTermination.CHECKMATE
         RuntimeTerminal.Stalemate -> PersistedTermination.STALEMATE
+        RuntimeTerminal.InsufficientMaterial -> PersistedTermination.INSUFFICIENT_MATERIAL
+        RuntimeTerminal.ThreefoldRepetition -> PersistedTermination.THREEFOLD_REPETITION
+        RuntimeTerminal.FiftyMoveRule -> PersistedTermination.FIFTY_MOVE_RULE
     }
 
     private fun <T> runSuspendBlocking(block: suspend () -> T): T {

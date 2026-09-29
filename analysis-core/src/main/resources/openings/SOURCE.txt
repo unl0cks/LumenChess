@@ -1,0 +1,4 @@
+Source: https://github.com/lichess-org/chess-openings
+Commit: c67912be581f0793dbaa776be5ccf111e01f88d9 (2026-09-20)
+Files: a.tsv b.tsv c.tsv d.tsv e.tsv (eco, name, pgn), unmodified.
+License: CC0 1.0 Universal (see COPYING.txt).

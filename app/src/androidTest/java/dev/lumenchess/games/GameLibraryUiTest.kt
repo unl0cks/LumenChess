@@ -118,8 +118,8 @@ class GameLibraryUiTest {
         assertEquals(bounds, compose.onNodeWithTag("library-board-stage").fetchSemanticsNode().boundsInRoot)
         compose.onNodeWithTag("library-board-stage").performTouchInput { click(center); swipe(center, topCenter) }
         assertEquals(listOf(0, 1), vm.uiState.value.nodePath)
-        compose.onNodeWithTag("library-history").performScrollToNode(hasTestTag("library-unavailable"))
-        compose.onNodeWithTag("library-unavailable").assertIsDisplayed()
+        compose.onNodeWithTag("library-history").performScrollToNode(hasTestTag("library-export-pgn"))
+        compose.onNodeWithTag("library-export-pgn").assertIsDisplayed()
         compose.onNodeWithTag("library-back").performClick()
         compose.onNodeWithTag("library-card-${id.value}").assertIsDisplayed()
         assertEquals(Pgn.serialize(original.tree), Pgn.serialize(runBlocking { repository.loadGame(id)!!.tree }))

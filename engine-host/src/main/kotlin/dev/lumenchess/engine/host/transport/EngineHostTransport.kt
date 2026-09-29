@@ -22,6 +22,7 @@ import dev.lumenchess.engine.api.UciScore
 import dev.lumenchess.engine.api.UciScoreBound
 import dev.lumenchess.engine.host.EngineSlotAService
 import dev.lumenchess.engine.host.EngineSlotBService
+import dev.lumenchess.engine.host.EngineSlotCService
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -29,6 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 enum class EngineSlot {
     A,
     B,
+    /** Analysis and Game Review: its own process, so it never competes with a live game's engine. */
+    C,
 }
 
 enum class EngineHostFailureCode(val wireValue: Int) {
@@ -136,6 +139,7 @@ class EngineHostConnection(
         val serviceClass = when (slot) {
             EngineSlot.A -> EngineSlotAService::class.java
             EngineSlot.B -> EngineSlotBService::class.java
+            EngineSlot.C -> EngineSlotCService::class.java
         }
         bound = appContext.bindService(Intent(appContext, serviceClass), serviceConnection, Context.BIND_AUTO_CREATE)
         return bound
@@ -231,6 +235,7 @@ private class RemoteEngineSession(
             nodes: Long,
             nodesPerSecond: Long,
             principalVariation: String,
+            multiPvRank: Int,
         ) {
             if (closed.get()) return
             if (callbackSessionId != sessionId.value || hostGeneration != expectedGeneration) {
@@ -273,6 +278,7 @@ private class RemoteEngineSession(
                     nodes = nodes.takeIf { it > 0L },
                     nodesPerSecond = nodesPerSecond.takeIf { it > 0L },
                     principalVariation = principalVariation.split(' ').filter(String::isNotBlank),
+                    multiPvRank = multiPvRank.coerceAtLeast(1),
                 ),
             )
         }

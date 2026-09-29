@@ -290,6 +290,8 @@ private fun feedbackEventKey(event: GameFeedbackEvent) = when(event) {
     GameFeedbackEvent.Check -> "check"
     GameFeedbackEvent.Castle -> "castle"
     GameFeedbackEvent.Promotion -> "promotion"
+    GameFeedbackEvent.IllegalMove -> "illegal-move"
+    GameFeedbackEvent.LowTime -> "low-time"
     GameFeedbackEvent.GameStart -> "game-start"
     GameFeedbackEvent.GameEnd -> "game-end"
 }
@@ -300,6 +302,8 @@ private fun feedbackEventLabel(event: GameFeedbackEvent) = when(event) {
     GameFeedbackEvent.Check -> "Check"
     GameFeedbackEvent.Castle -> "Castle"
     GameFeedbackEvent.Promotion -> "Promotion"
+    GameFeedbackEvent.IllegalMove -> "Illegal Move"
+    GameFeedbackEvent.LowTime -> "Low Time"
     GameFeedbackEvent.GameStart -> "Game Start"
     GameFeedbackEvent.GameEnd -> "Game End"
 }

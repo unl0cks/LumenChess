@@ -85,6 +85,10 @@ sealed interface RuntimeTerminal {
     data object DrawAgreement : RuntimeTerminal
     data class Checkmate(val winner: Color) : RuntimeTerminal
     data object Stalemate : RuntimeTerminal
+    /** Automatic draw: neither side can mate, or the side that could mate lost on time. */
+    data object InsufficientMaterial : RuntimeTerminal
+    data object ThreefoldRepetition : RuntimeTerminal
+    data object FiftyMoveRule : RuntimeTerminal
 }
 
 data class PendingEngineSearch(

@@ -11,5 +11,10 @@
             android:exported="false"
             android:isolatedProcess="true"
             android:process=":engine_slot_b" />
+        <service
+            android:name="dev.lumenchess.engine.host.EngineSlotCService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":engine_slot_c" />
     </application>
 </manifest>

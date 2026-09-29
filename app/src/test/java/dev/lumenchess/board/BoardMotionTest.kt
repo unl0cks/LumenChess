@@ -14,14 +14,20 @@ import org.junit.jupiter.api.Test
 
 class BoardMotionTest {
     @Test
-    fun `grounded precision tokens remain frozen`() {
+    fun `grounded precision motion tokens`() {
         assertEquals(70, GroundedPrecisionBoardMotion.pickupDurationMillis)
-        assertEquals(90, GroundedPrecisionBoardMotion.legalDropDurationMillis)
-        assertEquals(120, GroundedPrecisionBoardMotion.illegalDropDurationMillis)
-        assertEquals(145, GroundedPrecisionBoardMotion.humanMoveDurationMillis)
-        assertEquals(155, GroundedPrecisionBoardMotion.engineMoveDurationMillis)
-        assertEquals(110, GroundedPrecisionBoardMotion.premoveDurationMillis)
-        assertEquals(55, GroundedPrecisionBoardMotion.captureFadeDurationMillis)
+        assertEquals(110, GroundedPrecisionBoardMotion.legalDropDurationMillis)
+        assertEquals(160, GroundedPrecisionBoardMotion.illegalDropDurationMillis)
+        assertEquals(190, GroundedPrecisionBoardMotion.humanMoveDurationMillis)
+        assertEquals(230, GroundedPrecisionBoardMotion.engineMoveDurationMillis)
+        assertEquals(140, GroundedPrecisionBoardMotion.premoveDurationMillis)
+        assertEquals(90, GroundedPrecisionBoardMotion.captureFadeDurationMillis)
+        assertEquals(260, GroundedPrecisionBoardMotion.castlingDurationMillis)
+        assertEquals(120, GroundedPrecisionBoardMotion.promotionDurationMillis)
+        assertTrue(
+            GroundedPrecisionBoardMotion.captureFadeDurationMillis <= GroundedPrecisionBoardMotion.legalDropDurationMillis,
+            "a dropped capture fades on drop progress, so the fade may not outlast the drop",
+        )
         assertEquals(1.04f, GroundedPrecisionBoardMotion.pickupScale, 0.0001f)
         assertEquals(-2f, GroundedPrecisionBoardMotion.pickupLiftDp, 0.0001f)
         assertEquals(.20f, GroundedPrecisionBoardMotion.heldShadowAlpha, 0.0001f)
@@ -56,9 +62,9 @@ class BoardMotionTest {
         val engine = BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.ENGINE, true)
         val premove = BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.PREMOVE, true)
 
-        assertEquals(145, assertInstanceOf(BoardMotionPlan.Travel::class.java, human).durationMillis)
-        assertEquals(155, assertInstanceOf(BoardMotionPlan.Travel::class.java, engine).durationMillis)
-        assertEquals(110, assertInstanceOf(BoardMotionPlan.Travel::class.java, premove).durationMillis)
+        assertEquals(GroundedPrecisionBoardMotion.humanMoveDurationMillis, assertInstanceOf(BoardMotionPlan.Travel::class.java, human).durationMillis)
+        assertEquals(GroundedPrecisionBoardMotion.engineMoveDurationMillis, assertInstanceOf(BoardMotionPlan.Travel::class.java, engine).durationMillis)
+        assertEquals(GroundedPrecisionBoardMotion.premoveDurationMillis, assertInstanceOf(BoardMotionPlan.Travel::class.java, premove).durationMillis)
     }
 
     @Test
@@ -72,7 +78,7 @@ class BoardMotionTest {
             BoardMotionPlanner.plan(before, after, move, BoardMovePresentation.HUMAN_TAP, true),
         )
 
-        assertEquals(165, plan.durationMillis)
+        assertEquals(GroundedPrecisionBoardMotion.castlingDurationMillis, plan.durationMillis)
         assertEquals(Square.parse("e1"), plan.king.from)
         assertEquals(Square.parse("g1"), plan.king.to)
         assertEquals(Square.parse("h1"), plan.rook.from)
@@ -105,7 +111,7 @@ class BoardMotionTest {
             assertEquals(color, plan.color)
             assertFalse(plan.king.isStatic)
             assertFalse(plan.rook.isStatic)
-            assertEquals(165, plan.durationMillis)
+            assertEquals(GroundedPrecisionBoardMotion.castlingDurationMillis, plan.durationMillis)
         }
     }
 
@@ -195,10 +201,10 @@ class BoardMotionTest {
         )
 
         assertEquals(before[move.from], plan.piece)
-        assertEquals(145, plan.durationMillis)
+        assertEquals(GroundedPrecisionBoardMotion.humanMoveDurationMillis, plan.durationMillis)
         assertEquals(before[move.from], plan.promotion?.outgoingPiece)
         assertEquals(after[move.to], plan.promotion?.promotedPiece)
-        assertEquals(80, plan.promotion?.durationMillis)
+        assertEquals(GroundedPrecisionBoardMotion.promotionDurationMillis, plan.promotion?.durationMillis)
         assertEquals(.96f, plan.promotion?.initialScale)
     }
 

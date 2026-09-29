@@ -12,11 +12,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import dev.lumenchess.analysis.ui.AnalysisRequest
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.data.persistence.*
 import dev.lumenchess.design.*
@@ -29,28 +31,41 @@ fun GameLibraryRoute(
     modifier: Modifier = Modifier,
     reservedGameIds: Set<String> = emptySet(),
     ownershipReady: Boolean = true,
+    onOpenAnalysis: (AnalysisRequest) -> Unit = {},
 ) {
     val ui by viewModel.uiState
     SideEffect { viewModel.setOwnership(reservedGameIds, ownershipReady) }
     LaunchedEffect(viewModel) { viewModel.refresh() }
     BackHandler(enabled = ui.selectedGameId != null, onBack = viewModel::backToList)
     if (ui.selectedGameId != null) {
-        GameLibraryViewer(ui, viewModel, modifier)
+        GameLibraryViewer(ui, viewModel, modifier, onOpenAnalysis)
     } else {
-        GameLibraryScreen(ui, viewModel, modifier)
+        GameLibraryScreen(ui, viewModel, modifier, onOpenAnalysis)
     }
 }
 
 @Composable
-private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, modifier: Modifier) {
+private fun GameLibraryScreen(
+    ui: GameLibraryUiState,
+    vm: GameLibraryViewModel,
+    modifier: Modifier,
+    onOpenAnalysis: (AnalysisRequest) -> Unit,
+) {
     val filterState = rememberLazyListState(ui.query.filter.ordinal)
+    var importOpen by rememberSaveable { mutableStateOf(false) }
+    if (importOpen) {
+        LibraryImportDialog(ui, vm, onDismiss = { importOpen = false; vm.clearImportStatus() })
+    }
     LumenDerivativePage(modifier, testTag = "library-list", verticalPadding = 12, spacing = 10) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text("Games", style = MaterialTheme.typography.headlineMedium, color = LumenColors.OnSurface)
                 Text("Your chess library", style = MaterialTheme.typography.bodyMedium, color = LumenColors.OnSurfaceMuted)
             }
-            LumenDerivativeAction("Refresh", vm::refresh, enabled = !ui.loading, testTag = "library-refresh")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LumenDerivativeAction("Import", { importOpen = true }, testTag = "library-import")
+                LumenDerivativeAction("Refresh", vm::refresh, enabled = !ui.loading, testTag = "library-refresh")
+            }
         }
         OutlinedTextField(
             value = ui.query.search, onValueChange = vm::setSearch,
@@ -131,12 +146,23 @@ private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, 
             LumenDerivativeSurface(DerivativeSurfaceRole.PREVIEW_PANEL) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(entry.playerNames(), style = MaterialTheme.typography.titleMedium, color = LumenColors.OnSurface)
+                    // A game Play or Arena still owns may change; once it has a result it is final.
+                    val reviewable = entry.id.value !in ui.reservedGameIds || entry.result != null
+                    LumenDerivativeAction(
+                        if (entry.latestReviewState == ReviewState.COMPLETE) "Open Game Review" else "Game Review",
+                        { vm.dismissActions(); onOpenAnalysis(AnalysisRequest.LibraryGame(entry.id.value, review = true)) },
+                        Modifier.fillMaxWidth(), enabled = reviewable, testTag = "library-review",
+                    )
+                    LumenDerivativeAction(
+                        "Analyze",
+                        { vm.dismissActions(); onOpenAnalysis(AnalysisRequest.LibraryGame(entry.id.value)) },
+                        Modifier.fillMaxWidth(), enabled = reviewable, testTag = "library-analyze",
+                    )
                     LumenDerivativeAction(if (entry.isFavorite) "Remove favorite" else "Favorite", { vm.toggleFavorite(entry) }, Modifier.fillMaxWidth(), enabled = !ui.actionPending, testTag = "library-favorite")
                     LumenDerivativeAction(if (entry.isProtected) "Remove protection" else "Protect", { vm.toggleProtected(entry) }, Modifier.fillMaxWidth(), enabled = !ui.actionPending, testTag = "library-protect")
                     val deletionBlocked = !ui.ownershipReady || entry.id.value in ui.reservedGameIds
                     LumenDerivativeAction("Delete", { vm.requestDelete(entry.id) }, Modifier.fillMaxWidth(), enabled = !deletionBlocked && !ui.actionPending, testTag = "library-delete")
                     if (deletionBlocked) LibraryNote("Owned by, or still being checked by, the current Play or Arena session. Deletion is unavailable while this game can still be saved or resumed.")
-                    LibraryUnavailableActions()
                     LumenDerivativeAction("Close", vm::dismissActions, Modifier.fillMaxWidth(), testTag = "library-actions-close")
                 }
             }
@@ -164,10 +190,6 @@ private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, 
 
 @Composable internal fun LibraryNote(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier, style = MaterialTheme.typography.bodyMedium, color = LumenColors.OnSurfaceMuted)
-}
-
-@Composable internal fun LibraryUnavailableActions() {
-    LibraryNote("Review, Analyze, Export, and the Library branch editor are not available in this build. Branching from an Arena session remains available in Arena.", Modifier.testTag("library-unavailable"))
 }
 
 internal val LibraryFilter.label: String get() = when (this) {
@@ -211,10 +233,19 @@ internal fun GameSourceType.libraryLabel(): String = when (this) {
     GameSourceType.PGN_IMPORT -> "Imported"; GameSourceType.BRANCH -> "Branch"; GameSourceType.OTHER -> "Other"
 }
 
+/**
+ * "10+0" style time control. The recorded base and increment are authoritative when present; the
+ * stored raw string is whatever the writer recorded (Play and Arena record milliseconds, imported
+ * PGN records the tag as written), so it is only shown when there is nothing better.
+ */
 internal fun libraryTimeControl(metadata: GamePersistenceMetadata, headers: Map<String, String>): String? {
     val control = metadata.timeControl
-    return control?.raw ?: headers["TimeControl"] ?: control?.baseMillis?.let { base ->
-        val increment = control.incrementMillis
-        "${base / 1000}s" + (increment?.let { " + ${it / 1000}s" } ?: "")
+    val base = control?.baseMillis
+    if (base != null) {
+        if (base <= 0L) return "Untimed"
+        val increment = (control.incrementMillis ?: 0L) / 1_000L
+        val start = if (base % 60_000L == 0L) "${base / 60_000L}" else "${base / 1_000L}s"
+        return "$start+$increment"
     }
+    return control?.raw ?: headers["TimeControl"]
 }

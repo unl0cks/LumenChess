@@ -22,6 +22,8 @@ data class HeavyAnalysisRetentionPolicy(
     }
 }
 
+data class HeavyAnalysisUsage(val entries: Int, val payloadBytes: Long)
+
 class PersistenceRetention internal constructor(
     private val database: LumenDatabase,
     private val afterDeleteForTesting: suspend () -> Unit = {},
@@ -44,7 +46,15 @@ class PersistenceRetention internal constructor(
         deleted
     }
 
+    /** Current size of the disposable analysis cache. */
+    suspend fun heavyUsage(): HeavyAnalysisUsage = HeavyAnalysisUsage(
+        entries = database.reviewDao().countHeavy(),
+        payloadBytes = database.reviewDao().heavyPayloadBytes(),
+    )
+
     companion object {
+        fun forDatabase(database: LumenDatabase): PersistenceRetention = PersistenceRetention(database)
+
         private val classes = mapOf(
             "participants" to RetentionClass.CANONICAL_DURABLE,
             "participant_external_identities" to RetentionClass.CANONICAL_DURABLE,

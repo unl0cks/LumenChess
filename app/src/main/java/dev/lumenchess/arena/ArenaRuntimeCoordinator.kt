@@ -9,6 +9,8 @@ import dev.lumenchess.engine.api.EngineSearchRequest
 import dev.lumenchess.engine.api.EngineSearchResult
 import dev.lumenchess.engine.api.UciScore
 import dev.lumenchess.play.PlayEngineGateway
+import dev.lumenchess.runtime.EngineThinkPlan
+import dev.lumenchess.runtime.EngineThinkTimePolicy
 import dev.lumenchess.runtime.GameRuntime
 import dev.lumenchess.runtime.RuntimeController
 import dev.lumenchess.runtime.RuntimeControllers
@@ -41,12 +43,16 @@ class ArenaRuntimeCoordinator private constructor(
     private val blackEngine: PlayEngineGateway,
     private val persistence: ArenaPersistenceGateway,
     private val onEvaluation: (ArenaEvaluation) -> Unit,
+    private val timeSource: MonotonicTimeSource,
     nextEventId: Long,
 ) {
     private val coordinatorLock = Any()
     private var eventCounter = nextEventId
     private val readyHosts = mutableSetOf<Color>()
     private val searchOwners = mutableMapOf<EngineSearchId, Color>()
+    private val thinkPlans = mutableMapOf<EngineSearchId, ActiveThink>()
+
+    private class ActiveThink(val plan: EngineThinkPlan, val startedAtMillis: Long)
 
     val state: RuntimeState get() = runtime.state
 
@@ -76,6 +82,7 @@ class ArenaRuntimeCoordinator private constructor(
             // Remove ownership before invoking a gateway. A host may synchronously deliver a final
             // callback while cancellation is in flight; that callback must already be stale.
             searchOwners.clear()
+            thinkPlans.clear()
             cancellations.forEach { (searchId, owner) -> engine(owner).cancelSearch(searchId) }
             if (state.engineHostAvailable) dispatch { RuntimeEvent.EngineHostDied(it) }
         }
@@ -85,6 +92,7 @@ class ArenaRuntimeCoordinator private constructor(
         synchronized(coordinatorLock) {
             if (searchOwners[result.searchId] != side) return null
             searchOwners.remove(result.searchId)
+            thinkPlans.remove(result.searchId)
             return dispatch { RuntimeEvent.EngineCompleted(it, result) }
         }
     }
@@ -140,17 +148,25 @@ class ArenaRuntimeCoordinator private constructor(
                     val side = effect.position.sideToMove
                     val configured = if (side == Color.WHITE) setup.white else setup.black
                     searchOwners[effect.searchId] = side
+                    val plan = EngineThinkTimePolicy.plan(
+                        state = state,
+                        strength = configured.strength,
+                        initialClockMillis = setup.clockConfig.initialMillis,
+                        searchId = effect.searchId,
+                    )
+                    thinkPlans[effect.searchId] = ActiveThink(plan, timeSource.nowMillis())
                     engine(side).startSearch(
                         EngineSearchRequest(
                             searchId = effect.searchId,
                             positionRevision = effect.positionRevision,
                             position = effect.position,
-                            limits = EngineSearchLimits(moveTimeMillis = engineMoveTimeMillis(side)),
+                            limits = EngineSearchLimits(moveTimeMillis = plan.searchMillis),
                             strength = configured.strength,
                         ),
                     )
                 }
                 is RuntimeEffect.CancelEngineSearch -> {
+                    thinkPlans.remove(effect.searchId)
                     searchOwners.remove(effect.searchId)?.let { owner ->
                         engine(owner).cancelSearch(effect.searchId)
                     }
@@ -163,16 +179,18 @@ class ArenaRuntimeCoordinator private constructor(
     private fun engine(side: Color): PlayEngineGateway =
         if (side == Color.WHITE) whiteEngine else blackEngine
 
-    private fun engineMoveTimeMillis(side: Color): Long {
-        val clock = state.clock
-        // Untimed does not mean unbounded engine work. Keep the existing maximum search budget.
-        if (!clock.enabled) return 1_500L
-        val remaining = when (side) {
-            Color.WHITE -> clock.whiteRemainingMillis
-            Color.BLACK -> clock.blackRemainingMillis
+    /**
+     * How much longer a finished engine move must be held so each engine plays on its own clock at a
+     * believable pace. Presentation pacing only: the runtime keeps charging that engine's clock and is
+     * still the sole authority that validates and applies the move. Unknown or stale searches get no
+     * delay (the runtime rejects them).
+     */
+    fun presentationDelayMillis(side: Color, result: EngineSearchResult): Long {
+        synchronized(coordinatorLock) {
+            if (searchOwners[result.searchId] != side) return 0L
+            val think = thinkPlans[result.searchId] ?: return 0L
+            return think.plan.remainingPresentationMillis(timeSource.nowMillis() - think.startedAtMillis)
         }
-        val desired = (remaining / 40L + clock.incrementMillis / 2L).coerceIn(50L, 1_500L)
-        return minOf(desired, (remaining - 10L).coerceAtLeast(1L))
     }
 
     companion object {
@@ -200,6 +218,7 @@ class ArenaRuntimeCoordinator private constructor(
             blackEngine = blackEngine,
             persistence = persistence,
             onEvaluation = onEvaluation,
+            timeSource = timeSource,
             nextEventId = 1L,
         )
 
@@ -218,6 +237,7 @@ class ArenaRuntimeCoordinator private constructor(
             blackEngine = blackEngine,
             persistence = persistence,
             onEvaluation = onEvaluation,
+            timeSource = timeSource,
             nextEventId = (snapshot.processedEventIds.maxOfOrNull { it.value } ?: 0L) + 1L,
         )
     }

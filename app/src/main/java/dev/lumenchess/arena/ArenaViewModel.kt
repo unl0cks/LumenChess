@@ -7,6 +7,7 @@ import android.os.SystemClock
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import dev.lumenchess.board.ChessboardOrientation
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Move
@@ -19,6 +20,9 @@ import dev.lumenchess.engine.api.EngineStrengthModel
 import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.engine.host.transport.EngineHostFailure
 import dev.lumenchess.engine.host.transport.EngineSlot
+import dev.lumenchess.feedback.AndroidGameFeedbackOutput
+import dev.lumenchess.feedback.CommittedFeedbackObserver
+import dev.lumenchess.feedback.GameFeedbackDispatcher
 import dev.lumenchess.play.AndroidPlayEngineGateway
 import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.play.PlayTimeControl
@@ -30,6 +34,10 @@ import dev.lumenchess.runtime.RuntimeManualControl
 import dev.lumenchess.runtime.clock.ClockReading
 import dev.lumenchess.runtime.clock.DeterministicGameClock
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
+import dev.lumenchess.settings.AppearanceSettings
+import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 private const val ARENA_CLOCK_REFRESH_MILLIS = 100L
@@ -58,12 +66,22 @@ data class ArenaUiState(
     val branchOperationPending: Boolean = false,
 )
 
+private fun freshArenaSeed(): Long = kotlin.random.Random.nextLong().takeIf { it != 0L } ?: 1L
+
 /** Android presentation bridge for Arena. Canonical chess state remains inside [ArenaRuntimeCoordinator]. */
 class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val timeSource = MonotonicTimeSource { SystemClock.elapsedRealtime() }
     private val clockReader = DeterministicGameClock(timeSource)
     private val mutableUiState = mutableStateOf(ArenaUiState())
+
+    // Arena shares Play's committed-state feedback path: sounds and haptics observe the projection
+    // after the runtime has committed it and can never influence game state.
+    private val feedbackHandler = Handler(Looper.getMainLooper())
+    private val feedbackOutput = AndroidGameFeedbackOutput(application)
+    private val feedbackObserver = CommittedFeedbackObserver(GameFeedbackDispatcher(feedbackOutput))
+    private val feedbackSettingsRepository = DataStoreAppearanceSettingsRepository.from(application)
+    private var feedbackPreferences = AppearanceSettings()
 
     val uiState: State<ArenaUiState> = mutableUiState
 
@@ -77,6 +95,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private var sessionGeneration = 0L
     private var pendingBranchCapture: Any? = null
     private var pendingOriginalReturn: AndroidArenaPersistenceGateway? = null
+    private var delayedEngineResult: Runnable? = null
 
     private val clockTicker = object : Runnable {
         override fun run() {
@@ -88,6 +107,13 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        viewModelScope.launch {
+            feedbackSettingsRepository.settings.collectLatest { settings ->
+                feedbackPreferences = settings
+                feedbackOutput.updateSoundPackId(settings.soundPackId)
+                feedbackOutput.warmUp()
+            }
+        }
         loadRestorableArena()
     }
 
@@ -139,7 +165,13 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     fun startNewArena() {
         val config = mutableUiState.value.setup
         if (ArenaSetupValidator.validate(config) !is ArenaSetupValidation.Valid) return
-        startResolvedArena(ArenaSetupResolver.resolve(config).copy(branchOrigin = mutableUiState.value.branchDraft), restored = null)
+        // A fresh seed per engine per game (the default 0 would replay identical Humanized/Hybrid
+        // choices in every game); the resolved seeds are persisted, so restore stays exact.
+        val seeded = config.copy(
+            white = config.white.copy(strengthSeed = config.white.strengthSeed.takeIf { it != 0L } ?: freshArenaSeed()),
+            black = config.black.copy(strengthSeed = config.black.strengthSeed.takeIf { it != 0L } ?: freshArenaSeed()),
+        )
+        startResolvedArena(ArenaSetupResolver.resolve(seeded).copy(branchOrigin = mutableUiState.value.branchDraft), restored = null)
     }
 
     fun resumeLastArena() {
@@ -387,6 +419,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         restoreProbe?.setListener(null)
         restoreProbe?.close()
         restoreProbe = null
+        feedbackOutput.close()
         super.onCleared()
     }
 
@@ -422,6 +455,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             ArenaRuntimeCoordinator.restore(setup, restored.snapshot, timeSource, white, black, persistence, ::onEvaluation)
         }
 
+        feedbackObserver.resetBaseline(runtimeCoordinator.state)
         coordinator = runtimeCoordinator
         whiteGateway = white
         blackGateway = black
@@ -478,6 +512,21 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         refreshRuntimeProjection(checkTimeout = false)
     }
 
+    private fun deliverEngineResult(generation: Long, side: Color, result: EngineSearchResult) {
+        if (generation != sessionGeneration || coordinator == null) return
+        val previousRevision = coordinator?.state?.positionRevision
+        val dispatchResult = coordinator?.onEngineResult(side, result)
+        if (dispatchResult != null && dispatchResult.state.positionRevision != previousRevision) {
+            mutableUiState.value = mutableUiState.value.copy(lastMoveWasHuman = false)
+        }
+        refreshRuntimeProjection(checkTimeout = false)
+    }
+
+    private fun clearDelayedEngineResult() {
+        delayedEngineResult?.let(mainHandler::removeCallbacks)
+        delayedEngineResult = null
+    }
+
     private fun engineListener(side: Color, engine: PlayEngine, generation: Long) = object : AndroidPlayEngineGateway.Listener {
         override fun onEngineHostRecovered() {
             if (generation != sessionGeneration || coordinator == null) return
@@ -495,12 +544,19 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
 
         override fun onEngineResult(result: EngineSearchResult) {
             if (generation != sessionGeneration || coordinator == null) return
-            val previousRevision = coordinator?.state?.positionRevision
-            val dispatchResult = coordinator?.onEngineResult(side, result)
-            if (dispatchResult != null && dispatchResult.state.positionRevision != previousRevision) {
-                mutableUiState.value = mutableUiState.value.copy(lastMoveWasHuman = false)
+            val delay = coordinator?.presentationDelayMillis(side, result) ?: 0L
+            if (delay <= 0L) {
+                deliverEngineResult(generation, side, result)
+                return
             }
-            refreshRuntimeProjection(checkTimeout = false)
+            // Only one search is ever active, so at most one release is pending.
+            clearDelayedEngineResult()
+            val release = Runnable {
+                delayedEngineResult = null
+                deliverEngineResult(generation, side, result)
+            }
+            delayedEngineResult = release
+            mainHandler.postDelayed(release, delay)
         }
 
         override fun onEngineInfo(info: EngineSearchInfo) {
@@ -537,6 +593,9 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             reading = clockReader.read(state.clock)
         }
         mutableUiState.value = mutableUiState.value.copy(runtime = state, clock = reading)
+        val feedbackState = state
+        val settings = feedbackPreferences.toFeedbackSettings()
+        feedbackHandler.post { feedbackObserver.onCommitted(feedbackState, settings) }
     }
 
     private fun updateEngineConfig(side: Color, transform: ArenaEngineConfig.() -> ArenaEngineConfig) = updateSetup {
@@ -592,6 +651,9 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private fun stopLiveAdapters() {
         cancelBranchNavigation()
         mainHandler.removeCallbacks(clockTicker)
+        clearDelayedEngineResult()
+        feedbackHandler.removeCallbacksAndMessages(null)
+        feedbackObserver.resetBaseline(null)
         whiteGateway?.setListener(null)
         blackGateway?.setListener(null)
         persistenceGateway?.setListener(null)

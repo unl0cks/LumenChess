@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -58,6 +59,12 @@ fun SettingsScreen(
     onOpenSoundsHaptics: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenPlaySettings: () -> Unit = onOpenBoardAppearance,
+    onOpenEngines: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
+    onOpenReview: () -> Unit = {},
+    onOpenRatings: () -> Unit = {},
+    onOpenAccounts: () -> Unit = {},
+    onOpenStorage: () -> Unit = {},
 ) {
     // Root Settings remains category-only. These retained parameters are still owned by the deeper
     // Settings routes and intentionally remain part of the public screen contract.
@@ -100,14 +107,15 @@ fun SettingsScreen(
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.ENGINE,
                 title = "Engines",
-                subtitle = "Manage installed engines",
+                subtitle = "Stockfish 18 and Reckless 0.9.0",
                 uniqueTag = "settings-category-engines",
                 palette = palette,
+                onClick = onOpenEngines,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.PLAY,
                 title = "Play",
-                subtitle = "Time controls, themes, sounds, board",
+                subtitle = "Themes, sounds, board",
                 uniqueTag = "settings-category-play",
                 legacyTag = "settings-play",
                 palette = palette,
@@ -116,16 +124,18 @@ fun SettingsScreen(
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.REVIEW,
                 title = "Game Review",
-                subtitle = "Analysis settings, move classification",
+                subtitle = "Depth, automatic reviews",
                 uniqueTag = "settings-category-review",
                 palette = palette,
+                onClick = onOpenReview,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.RATING,
                 title = "Ratings",
-                subtitle = "Rating mode, system, match options",
+                subtitle = "Rating system, Match My Elo",
                 uniqueTag = "settings-category-ratings",
                 palette = palette,
+                onClick = onOpenRatings,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.ACCOUNT,
@@ -133,24 +143,37 @@ fun SettingsScreen(
                 subtitle = "Chess.com, Lichess",
                 uniqueTag = "settings-category-accounts",
                 palette = palette,
+                onClick = onOpenAccounts,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.ADVANCED,
-                title = "Advanced",
-                subtitle = "Developer & advanced",
-                uniqueTag = "settings-category-advanced",
+                title = "Storage & Data",
+                subtitle = "Cache cleanup, export",
+                uniqueTag = "settings-category-storage",
                 palette = palette,
+                onClick = onOpenStorage,
+            )
+            SettingsCategoryRow(
+                kind = SettingsGlyphKind.ADVANCED,
+                title = "About",
+                subtitle = "Version, licenses, device",
+                uniqueTag = "settings-category-about",
+                palette = palette,
+                onClick = onOpenAbout,
             )
         }
     }
 }
 
 private fun Modifier.approvedSettingsBackground(palette: LumenP5IdentityPalette): Modifier = drawWithCache {
+    // The approved dark graphite falls away to a near-black floor; a light palette stays light, as
+    // on the Play overview, instead of fading to black.
+    val floor = if (palette.appBackground.luminance() < .5f) Color(0xFF070A0C) else palette.appBackground
     val base = Brush.verticalGradient(
         colorStops = arrayOf(
             0f to palette.appBackgroundLift,
             .28f to palette.appBackground,
-            1f to Color(0xFF070A0C),
+            1f to floor,
         ),
     )
     val ambient = Brush.radialGradient(
