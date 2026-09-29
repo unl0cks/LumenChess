@@ -82,6 +82,13 @@ data class AnalysisUiState(
     val explorer: ExplorerIndex? = null,
     val explorerLoading: Boolean = false,
     val explorerError: String? = null,
+    /** Lichess online explorer ("lichess" or "masters") for the current position, when asked for. */
+    val onlineDatabase: String = "lichess",
+    val onlineEnabled: Boolean = false,
+    val online: dev.lumenchess.player.lichess.LichessExplorer? = null,
+    val onlineFen: String? = null,
+    val onlineLoading: Boolean = false,
+    val onlineError: String? = null,
 ) {
     val node: GameNode get() = tree.node(nodeId)
     val position: Position get() = node.position
@@ -149,7 +156,8 @@ class AnalysisViewModel(application: Application) : AndroidViewModel(application
         stopEngine()
         loadJob?.cancel()
         ui = AnalysisUiState(request = request, loading = true, engineEnabled = ui.engineEnabled, multiPv = ui.multiPv,
-            reviewPreset = ui.reviewPreset, flipped = false, explorer = ui.explorer)
+            reviewPreset = ui.reviewPreset, flipped = false, explorer = ui.explorer,
+            onlineDatabase = ui.onlineDatabase, onlineEnabled = ui.onlineEnabled)
         loadJob = viewModelScope.launch {
             try {
                 when (request) {
@@ -210,6 +218,7 @@ class AnalysisViewModel(application: Application) : AndroidViewModel(application
         if (nodeId !in ui.tree.nodes) return
         ui = ui.copy(nodeId = nodeId)
         refreshEngine()
+        refreshOnline()
     }
 
     fun toStart() = select(ui.tree.rootId)
@@ -246,6 +255,7 @@ class AnalysisViewModel(application: Application) : AndroidViewModel(application
         val created = tree !== ui.tree
         ui = ui.copy(tree = tree, nodeId = id, edited = ui.edited || created, saveMessage = null)
         refreshEngine()
+        refreshOnline()
     }
 
     /** Goes back to before mainline move [ply] and plays the engine's choice there instead. */
@@ -328,6 +338,40 @@ class AnalysisViewModel(application: Application) : AndroidViewModel(application
     fun setPane(pane: AnalysisPane) {
         ui = ui.copy(pane = pane)
         if (pane == AnalysisPane.EXPLORER && ui.explorer == null) loadExplorer()
+        refreshOnline()
+    }
+
+    private var onlineJob: Job? = null
+
+    /** Turns the Lichess explorer on or off (it is off until asked for: it is a network request). */
+    fun setOnline(enabled: Boolean, database: String = ui.onlineDatabase) {
+        ui = ui.copy(onlineEnabled = enabled, onlineDatabase = database, online = null, onlineFen = null, onlineError = null)
+        refreshOnline()
+    }
+
+    private fun refreshOnline() {
+        if (!ui.onlineEnabled || ui.pane != AnalysisPane.EXPLORER) return
+        val position = ui.position
+        if (position.variant != Variant.STANDARD) {
+            ui = ui.copy(online = null, onlineError = "The Lichess explorer covers standard chess only.", onlineLoading = false)
+            return
+        }
+        val fen = Fen.serialize(position)
+        if (ui.onlineFen == fen && (ui.online != null || ui.onlineLoading)) return
+        onlineJob?.cancel()
+        ui = ui.copy(onlineFen = fen, onlineLoading = true, onlineError = null)
+        val database = ui.onlineDatabase
+        onlineJob = viewModelScope.launch {
+            val result = runCatching { dev.lumenchess.player.lichess.LichessClient.explorer(getApplication<Application>(), fen, database) }
+            if (ui.onlineFen != fen) return@launch
+            ui = result.fold(
+                onSuccess = { ui.copy(online = it, onlineLoading = false) },
+                onFailure = { error ->
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    ui.copy(online = null, onlineLoading = false, onlineError = error.message ?: "Lichess explorer unavailable.")
+                },
+            )
+        }
     }
 
     /** Builds the offline "your games" move statistics from the library (mainlines, 40 plies). */

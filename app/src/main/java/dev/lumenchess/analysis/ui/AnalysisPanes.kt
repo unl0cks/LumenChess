@@ -470,6 +470,36 @@ internal fun ExplorerPane(ui: AnalysisUiState, vm: AnalysisViewModel) {
                 ExplorerRow(San.generate(position, move), opening.name, null) { vm.play(move) }
             }
         }
+        Text("Lichess", color = LumenColors.OnSurfaceMuted, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+        if (!ui.onlineEnabled) {
+            AnalysisNote("Move statistics from millions of Lichess games. Sends this position (FEN) to Lichess.")
+            LumenDerivativeAction("Show Lichess statistics", { vm.setOnline(true) }, Modifier.fillMaxWidth(), testTag = "explorer-online-on")
+        } else {
+            Row(Modifier.fillMaxWidth().height(48.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LumenDerivativeSegment("Lichess players", ui.onlineDatabase == "lichess", { vm.setOnline(true, "lichess") }, testTag = "explorer-online-lichess")
+                LumenDerivativeSegment("Masters", ui.onlineDatabase == "masters", { vm.setOnline(true, "masters") }, testTag = "explorer-online-masters")
+                LumenDerivativeSegment("Off", false, { vm.setOnline(false) }, testTag = "explorer-online-off")
+            }
+            val online = ui.online
+            when {
+                ui.onlineLoading -> AnalysisNote("Asking Lichess…")
+                ui.onlineError != null -> AnalysisNote(ui.onlineError)
+                online != null && online.moves.isEmpty() -> AnalysisNote("No ${if (online.database == "masters") "master" else "Lichess"} games from this position.")
+                online != null -> {
+                    online.moves.take(10).forEach { move ->
+                        val total = move.games.coerceAtLeast(1).toDouble()
+                        ExplorerRow(
+                            move.san,
+                            "${compactCount(move.games)} games" + (move.averageRating?.let { " · avg $it" } ?: ""),
+                            Triple(move.white / total, move.draws / total, move.black / total),
+                        ) {
+                            MoveGenerator.legalMoves(position).firstOrNull { it.uci == move.uci }?.let(vm::play)
+                        }
+                    }
+                    AnalysisNote(if (online.database == "masters") "Lichess masters database (OTB, 2200+)." else "Lichess rated blitz, rapid and classical, 1600+.")
+                }
+            }
+        }
         Text("Your games", color = LumenColors.OnSurfaceMuted, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
         val index = ui.explorer
         when {
@@ -496,6 +526,12 @@ internal fun ExplorerPane(ui: AnalysisUiState, vm: AnalysisViewModel) {
             }
         }
     }
+}
+
+private fun compactCount(value: Long): String = when {
+    value >= 1_000_000 -> String.format(Locale.US, "%.1fM", value / 1_000_000.0)
+    value >= 10_000 -> "${value / 1_000}k"
+    else -> value.toString()
 }
 
 @Composable

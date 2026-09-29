@@ -138,12 +138,17 @@ dependencies {
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.datastore.preferences)
+    implementation(libs.work.runtime)
+    // Analysis, Review, Insights and storage read counts straight from the shared database.
+    implementation(libs.room3.runtime)
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
 
     testImplementation(kotlin("test-junit5"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
+    // Real org.json for JVM tests (the Android stub throws).
+    testImplementation("org.json:json:20240303")
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)

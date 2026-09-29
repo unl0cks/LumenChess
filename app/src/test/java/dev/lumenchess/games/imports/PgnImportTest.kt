@@ -178,3 +178,34 @@ class OnlineGameSourcesTest {
         assertEquals(listOf("g1", "g2", "g3"), events)
     }
 }
+
+class IncrementalSyncTest {
+    private val game = { n: Int -> "[Event \"g$n\"]\n[Site \"Chess.com\"]\n[Result \"*\"]\n\n1. e4 *" }
+
+    @Test fun chessComSkipsMonthsBeforeTheLastSync() {
+        val requested = ArrayList<String>()
+        val http = HttpGet { url, _ ->
+            requested += url
+            when {
+                url.endsWith("/archives") -> HttpResult.Ok(
+                    """{"archives":["https://api.chess.com/pub/player/timelord/games/2024/01",""" +
+                        """"https://api.chess.com/pub/player/timelord/games/2024/02",""" +
+                        """"https://api.chess.com/pub/player/timelord/games/2024/03"]}""",
+                )
+                url.endsWith("/pgn") -> HttpResult.Ok(game(1))
+                else -> error("unexpected $url")
+            }
+        }
+        // 2024-02-15T00:00:00Z
+        OnlineGameSources.fetchRecentPgn(OnlineSite.CHESS_COM, "timelord", http, sinceEpochMillis = 1_707_955_200_000L)
+        assertTrue(requested.any { it.endsWith("2024/03/pgn") } && requested.any { it.endsWith("2024/02/pgn") })
+        assertTrue(requested.none { it.endsWith("2024/01/pgn") }, "a month wholly before the last sync is not downloaded")
+    }
+
+    @Test fun lichessAsksOnlyForGamesSinceTheLastSync() {
+        var seen = ""
+        val http = HttpGet { url, _ -> seen = url; HttpResult.Ok(game(1)) }
+        OnlineGameSources.fetchRecentPgn(OnlineSite.LICHESS, "someone", http, sinceEpochMillis = 1_700_000_000_000L)
+        assertTrue(seen.endsWith("&since=1700000000000"), seen)
+    }
+}

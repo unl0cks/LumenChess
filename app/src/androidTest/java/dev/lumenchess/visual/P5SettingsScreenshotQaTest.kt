@@ -106,31 +106,31 @@ class P5SettingsScreenshotQaTest {
         listOf(
             "settings-category-engines",
             "settings-category-play",
+            "settings-category-review",
+            "settings-category-ratings",
+            "settings-category-accounts",
+            "settings-category-storage",
             "settings-category-about",
-        ).forEach { composeRule.onNodeWithTag(it).assertIsDisplayed() }
+        ).forEach { composeRule.onNodeWithTag(it).performScrollTo().assertIsDisplayed() }
 
-        listOf("Engines", "About").forEach {
-            composeRule.onNodeWithText(it).assertIsDisplayed()
-        }
-        // Rows for features that do not exist yet (Game Review, Ratings, Accounts & Sync) are not
-        // shown: every row that is shown leads somewhere real.
-        listOf("Game Review", "Ratings", "Accounts & Sync").forEach {
-            composeRule.onAllNodesWithText(it).assertCountEquals(0)
+        // Every row that is shown leads somewhere real.
+        listOf("Engines", "Game Review", "Ratings", "Accounts & Sync", "Storage & Data", "About").forEach {
+            composeRule.onNodeWithText(it).performScrollTo().assertIsDisplayed()
         }
 
         assertEquals(
-            "Settings root must expose exactly three category rows",
-            3,
+            "Settings root must expose exactly seven category rows",
+            7,
             composeRule.onAllNodesWithTag("settings-category-row").fetchSemanticsNodes().size,
         )
         assertEquals(
             "Settings must expose one canonical icon well per row",
-            3,
+            7,
             composeRule.onAllNodesWithTag("settings-icon-well").fetchSemanticsNodes().size,
         )
         assertEquals(
             "Settings must expose one canonical icon glyph per row",
-            3,
+            7,
             composeRule.onAllNodesWithTag("settings-icon-glyph").fetchSemanticsNodes().size,
         )
 

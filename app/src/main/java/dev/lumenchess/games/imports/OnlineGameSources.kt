@@ -37,19 +37,36 @@ object OnlineGameSources {
         return name.takeIf(pattern::matches)
     }
 
-    /** PGN of up to [maxGames] of the player's most recent games, oldest first. */
-    fun fetchRecentPgn(site: OnlineSite, username: String, http: HttpGet, maxGames: Int = MAX_GAMES): String {
+    /**
+     * PGN of up to [maxGames] of the player's most recent games, oldest first. With
+     * [sinceEpochMillis] only games from then on are requested (incremental account sync; the
+     * library still skips any game it already has).
+     */
+    fun fetchRecentPgn(
+        site: OnlineSite,
+        username: String,
+        http: HttpGet,
+        maxGames: Int = MAX_GAMES,
+        sinceEpochMillis: Long? = null,
+    ): String {
         val name = normalizedUsername(site, username)
             ?: throw OnlineImportException("\"${username.trim()}\" is not a valid ${site.label} username")
         return when (site) {
-            OnlineSite.CHESS_COM -> chessCom(name.lowercase(), http, maxGames)
-            OnlineSite.LICHESS -> lichess(name, http, maxGames)
+            OnlineSite.CHESS_COM -> chessCom(name.lowercase(), http, maxGames, sinceEpochMillis)
+            OnlineSite.LICHESS -> lichess(name, http, maxGames, sinceEpochMillis)
         }
     }
 
-    private fun chessCom(name: String, http: HttpGet, maxGames: Int): String {
+    private fun chessCom(name: String, http: HttpGet, maxGames: Int, sinceEpochMillis: Long?): String {
         val index = body(OnlineSite.CHESS_COM, name, http.get("https://api.chess.com/pub/player/$name/games/archives", "application/json"))
-        val months = CHESS_COM_ARCHIVE.findAll(index).map { it.value }.distinct().toList()
+        // Archive URLs end in /YYYY/MM; months before the last sync cannot hold new games.
+        val sinceMonth = sinceEpochMillis?.let { millis ->
+            val calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply { timeInMillis = millis }
+            calendar.get(java.util.Calendar.YEAR) * 100 + calendar.get(java.util.Calendar.MONTH) + 1
+        }
+        val months = CHESS_COM_ARCHIVE.findAll(index).map { it.value }.distinct().toList().filter { url ->
+            sinceMonth == null || url.takeLast(7).replace("/", "").toIntOrNull()?.let { it >= sinceMonth } != false
+        }
         val newestGamesFirst = ArrayList<String>()
         for (month in months.asReversed().take(MAX_CHESS_COM_MONTHS)) {
             val pgn = body(OnlineSite.CHESS_COM, name, http.get("$month/pgn", PGN))
@@ -59,9 +76,10 @@ object OnlineGameSources {
         return newestGamesFirst.take(maxGames).asReversed().joinToString("\n\n")
     }
 
-    private fun lichess(name: String, http: HttpGet, maxGames: Int): String {
+    private fun lichess(name: String, http: HttpGet, maxGames: Int, sinceEpochMillis: Long?): String {
         val url = "https://lichess.org/api/games/user/$name?max=$maxGames&moves=true&tags=true" +
-            "&clocks=false&evals=false&opening=false&literate=false"
+            "&clocks=false&evals=false&opening=false&literate=false" +
+            (sinceEpochMillis?.let { "&since=$it" } ?: "")
         return PgnImport.split(body(OnlineSite.LICHESS, name, http.get(url, PGN))).asReversed().joinToString("\n\n")
     }
 

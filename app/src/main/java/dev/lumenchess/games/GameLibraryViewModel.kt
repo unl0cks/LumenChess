@@ -50,27 +50,7 @@ internal class RoomLibraryStore(private val database: LumenDatabase, private val
     override suspend fun favorite(id: PersistentGameId, value: Boolean) = library.setFavorite(id, value)
     override suspend fun protect(id: PersistentGameId, value: Boolean) = library.setProtected(id, value)
     override suspend fun delete(id: PersistentGameId) = library.delete(id)
-    override suspend fun importGame(candidate: ImportCandidate): ImportResult {
-        // Site games are identified by the site's game id; plain PGN by its content, so the same
-        // file imported twice (or a site game pasted after an account import) is not duplicated.
-        val source = GameSourceDraft(
-            type = candidate.sourceType,
-            externalGameId = candidate.externalGameId ?: GameContentFingerprint.compute(candidate.tree),
-            externalUrl = candidate.externalUrl,
-            importedAtEpochMillis = candidate.metadata.importedAtEpochMillis,
-        )
-        if (games.hasExternalGame(source)) return ImportResult.ALREADY_IN_LIBRARY
-        games.persistExternalGame(
-            PersistGameRequest(
-                tree = candidate.tree,
-                metadata = candidate.metadata,
-                whiteParticipant = candidate.whiteName?.let { ParticipantDraft(ParticipantKind.EXTERNAL, displayName = it) },
-                blackParticipant = candidate.blackName?.let { ParticipantDraft(ParticipantKind.EXTERNAL, displayName = it) },
-            ),
-            source,
-        )
-        return ImportResult.ADDED
-    }
+    override suspend fun importGame(candidate: ImportCandidate): ImportResult = GameImporter.import(games, candidate)
     override fun close() { if (ownsDatabase) LumenDatabaseFactory.close(database) }
 }
 

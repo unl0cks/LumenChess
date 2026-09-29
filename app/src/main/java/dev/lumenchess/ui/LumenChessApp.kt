@@ -47,6 +47,10 @@ import dev.lumenchess.play.PlayScreenMode
 import dev.lumenchess.play.PlayViewModel
 import dev.lumenchess.play.ReferencePlayRoute
 import dev.lumenchess.settings.AboutSettingsScreen
+import dev.lumenchess.settings.AccountsSettingsScreen
+import dev.lumenchess.settings.GameReviewSettingsScreen
+import dev.lumenchess.settings.RatingsSettingsScreen
+import dev.lumenchess.settings.StorageSettingsScreen
 import dev.lumenchess.settings.AppearanceSettings
 import dev.lumenchess.settings.BoardAppearanceScreen
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
@@ -63,7 +67,7 @@ internal enum class MainTab(val label:String) {
     Insights("Insights"),
     Settings("Settings"),
 }
-private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS, ENGINES, ABOUT }
+private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS, ENGINES, REVIEW, RATINGS, ACCOUNTS, STORAGE, ABOUT }
 
 /** Keeps an open Analysis / Review across configuration changes and process recreation. */
 private val AnalysisRequestSaver = Saver<AnalysisRequest?, List<Any?>>(
@@ -186,6 +190,10 @@ fun LumenChessApp() {
                                     onOpenPlaySettings={settingsDestination=SettingsDestination.PLAY},
                                     onOpenEngines={settingsDestination=SettingsDestination.ENGINES},
                                     onOpenAbout={settingsDestination=SettingsDestination.ABOUT},
+                                    onOpenReview={settingsDestination=SettingsDestination.REVIEW},
+                                    onOpenRatings={settingsDestination=SettingsDestination.RATINGS},
+                                    onOpenAccounts={settingsDestination=SettingsDestination.ACCOUNTS},
+                                    onOpenStorage={settingsDestination=SettingsDestination.STORAGE},
                                 )
                                 SettingsDestination.PLAY -> PlaySettingsScreen(
                                     settings=appearanceSettings,
@@ -199,11 +207,16 @@ fun LumenChessApp() {
                                 SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
                                 SettingsDestination.ENGINES -> EnginesSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
                                 SettingsDestination.ABOUT -> AboutSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.REVIEW -> GameReviewSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.RATINGS -> RatingsSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.ACCOUNTS -> AccountsSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.STORAGE -> StorageSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
                             }
                             MainTab.Insights -> InsightsRoute(
                                 viewModel = viewModel<InsightsViewModel>(),
                                 onPlay = { currentTab = MainTab.Play },
                                 modifier = Modifier.fillMaxSize(),
+                                onOpenAnalysis = openAnalysis,
                             )
                         }
                     }

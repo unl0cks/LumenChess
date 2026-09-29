@@ -61,6 +61,10 @@ fun SettingsScreen(
     onOpenPlaySettings: () -> Unit = onOpenBoardAppearance,
     onOpenEngines: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenReview: () -> Unit = {},
+    onOpenRatings: () -> Unit = {},
+    onOpenAccounts: () -> Unit = {},
+    onOpenStorage: () -> Unit = {},
 ) {
     // Root Settings remains category-only. These retained parameters are still owned by the deeper
     // Settings routes and intentionally remain part of the public screen contract.
@@ -116,6 +120,38 @@ fun SettingsScreen(
                 legacyTag = "settings-play",
                 palette = palette,
                 onClick = onOpenPlaySettings,
+            )
+            SettingsCategoryRow(
+                kind = SettingsGlyphKind.REVIEW,
+                title = "Game Review",
+                subtitle = "Depth, automatic reviews",
+                uniqueTag = "settings-category-review",
+                palette = palette,
+                onClick = onOpenReview,
+            )
+            SettingsCategoryRow(
+                kind = SettingsGlyphKind.RATING,
+                title = "Ratings",
+                subtitle = "Rating system, Match My Elo",
+                uniqueTag = "settings-category-ratings",
+                palette = palette,
+                onClick = onOpenRatings,
+            )
+            SettingsCategoryRow(
+                kind = SettingsGlyphKind.ACCOUNT,
+                title = "Accounts & Sync",
+                subtitle = "Chess.com, Lichess",
+                uniqueTag = "settings-category-accounts",
+                palette = palette,
+                onClick = onOpenAccounts,
+            )
+            SettingsCategoryRow(
+                kind = SettingsGlyphKind.ADVANCED,
+                title = "Storage & Data",
+                subtitle = "Cache cleanup, export",
+                uniqueTag = "settings-category-storage",
+                palette = palette,
+                onClick = onOpenStorage,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.ADVANCED,
