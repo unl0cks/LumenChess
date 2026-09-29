@@ -1,5 +1,8 @@
 package dev.lumenchess.play
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
@@ -14,7 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,6 +46,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -90,7 +93,12 @@ internal fun BoardFirstReferenceLiveScreen(
     val setup = ui.resolvedSetup ?: return
     val humanSide = setup.humanSide
     val engineSide = humanSide.opposite
-    var boardFlipped by remember(setup.variant, setup.chess960Index) { mutableStateOf(false) }
+    // Keyed on the whole resolved setup so a rematch (colours swapped) starts unflipped.
+    var boardFlipped by remember(setup) { mutableStateOf(false) }
+    var dialog by remember(setup) { mutableStateOf(LiveDialog.NONE) }
+    var resultDismissed by remember(setup) { mutableStateOf(false) }
+    val context = LocalContext.current
+    val terminal = runtime.terminal
     val baseOrientation = if (humanSide == Color.WHITE) ChessboardOrientation.WHITE else ChessboardOrientation.BLACK
     val orientation = if (boardFlipped) {
         if (baseOrientation == ChessboardOrientation.WHITE) ChessboardOrientation.BLACK else ChessboardOrientation.WHITE
@@ -121,10 +129,17 @@ internal fun BoardFirstReferenceLiveScreen(
     }
     val status = when {
         ui.message != null -> ui.message
-        runtime.terminal != null -> runtime.terminal?.presentationLabel() ?: "Game over"
+        ui.notice != null -> ui.notice
+        terminal != null -> terminal.presentationLabel()
         queuedPremove != null -> "Premove ${queuedPremove.uci} queued"
         runtime.paused -> "Game paused"
         else -> null
+    }
+
+    // System back never drops the player out of the app mid-game: it asks first, and a finished
+    // game simply returns to setup. Open dialogs are separate windows and consume back themselves.
+    BackHandler(enabled = dialog == LiveDialog.NONE) {
+        if (terminal != null) viewModel.backToSetup() else dialog = LiveDialog.LEAVE
     }
 
     Column(
@@ -213,15 +228,27 @@ internal fun BoardFirstReferenceLiveScreen(
             )
         }
 
-        if (!status.isNullOrBlank()) {
-            Text(
-                status,
-                Modifier.fillMaxWidth().padding(horizontal = 3.dp),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp),
-                color = if (ui.message != null) LumenColors.Destructive else LumenColors.OnSurfaceMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        // Fixed-height slot: the board group is vertically centred, so a status line that
+        // appeared and disappeared would otherwise nudge the board by half its height.
+        Box(
+            Modifier.fillMaxWidth().height(STATUS_SLOT_HEIGHT).padding(horizontal = 3.dp).testTag("p5-live-status-slot"),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (!status.isNullOrBlank()) {
+                Text(
+                    status,
+                    Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                    fontWeight = if (terminal != null && ui.message == null && ui.notice == null) FontWeight.SemiBold else FontWeight.Normal,
+                    color = when {
+                        ui.message != null -> LumenColors.Destructive
+                        terminal != null && ui.notice == null -> LumenColors.OnSurface
+                        else -> LumenColors.OnSurfaceMuted
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         // The visibility contract controls emitted UI, not runtime state. Defaults omit every
@@ -233,19 +260,75 @@ internal fun BoardFirstReferenceLiveScreen(
             // made the sparse Live surface look like the board had ended early, leaving a
             // large device-dependent dead zone before the actions. The board stage remains
             // width-driven and fixed; this gap is presentation-only and cannot remeasure it.
-            Spacer(Modifier.height(8.dp))
             BoardFirstEssentialActions(
                 runtime = runtime,
                 hasPremove = queuedPremove != null,
                 showPauseButton = visibility.showPauseButton,
-                boardFlipped = boardFlipped,
                 onFlipBoard = { boardFlipped = !boardFlipped },
+                onResign = { dialog = LiveDialog.RESIGN },
+                onMenu = { dialog = LiveDialog.MENU },
                 viewModel = viewModel,
                 modifier = Modifier.fillMaxWidth().height(72.dp).testTag("p5-live-action-strip"),
             )
         }
     }
+
+    when (dialog) {
+        LiveDialog.NONE -> Unit
+        LiveDialog.RESIGN -> LiveResignDialog(
+            onCancel = { dialog = LiveDialog.NONE },
+            onConfirm = {
+                dialog = LiveDialog.NONE
+                viewModel.resign()
+            },
+        )
+        LiveDialog.LEAVE -> LiveLeaveDialog(
+            onStay = { dialog = LiveDialog.NONE },
+            onLeave = {
+                dialog = LiveDialog.NONE
+                viewModel.backToSetup()
+            },
+        )
+        LiveDialog.MENU -> LiveMenuDialog(
+            setup = setup,
+            onCopyPgn = {
+                viewModel.currentPgn()?.let { pgn ->
+                    context.getSystemService(ClipboardManager::class.java)
+                        ?.setPrimaryClip(ClipData.newPlainText("LumenChess PGN", pgn))
+                    viewModel.showNotice("PGN copied")
+                }
+                dialog = LiveDialog.NONE
+            },
+            onCopyFen = {
+                viewModel.currentFen()?.let { fen ->
+                    context.getSystemService(ClipboardManager::class.java)
+                        ?.setPrimaryClip(ClipData.newPlainText("LumenChess FEN", fen))
+                    viewModel.showNotice("FEN copied")
+                }
+                dialog = LiveDialog.NONE
+            },
+            onLeave = {
+                dialog = LiveDialog.NONE
+                viewModel.backToSetup()
+            },
+            onClose = { dialog = LiveDialog.NONE },
+        )
+    }
+
+    if (terminal != null && !resultDismissed && dialog == LiveDialog.NONE) {
+        LiveResultDialog(
+            terminal = terminal,
+            humanSide = humanSide,
+            onRematch = viewModel::rematch,
+            onNewGame = viewModel::backToSetup,
+            onViewBoard = { resultDismissed = true },
+        )
+    }
 }
+
+private enum class LiveDialog { NONE, RESIGN, LEAVE, MENU }
+
+private val STATUS_SLOT_HEIGHT = 22.dp
 
 @Composable
 private fun BoardFirstParticipantRow(
@@ -395,19 +478,21 @@ private fun BoardFirstPremoveOverlay(
     )
 }
 
-private enum class BoardFirstActionGlyph { PAUSE, PLAY, FLAG, EXIT, CANCEL, FLIP }
+private enum class BoardFirstActionGlyph { PAUSE, PLAY, FLAG, CANCEL, FLIP, DRAW, MENU, NEW_GAME, REMATCH }
 
 @Composable
 private fun BoardFirstEssentialActions(
     runtime: RuntimeState,
     hasPremove: Boolean,
     showPauseButton: Boolean,
-    boardFlipped: Boolean,
     onFlipBoard: () -> Unit,
+    onResign: () -> Unit,
+    onMenu: () -> Unit,
     viewModel: PlayViewModel,
     modifier: Modifier,
 ) {
     val stripShape = RoundedCornerShape(7.dp)
+    val playing = runtime.terminal == null
     Row(
         modifier
             .background(LumenColors.SurfaceRaised.copy(alpha = .91f), stripShape)
@@ -423,7 +508,7 @@ private fun BoardFirstEssentialActions(
                 onClick = viewModel::cancelPremove,
             )
         }
-        if (showPauseButton && runtime.terminal == null) {
+        if (showPauseButton && playing) {
             BoardFirstAction(
                 label = if (runtime.paused) "Resume" else "Pause",
                 glyph = if (runtime.paused) BoardFirstActionGlyph.PLAY else BoardFirstActionGlyph.PAUSE,
@@ -431,26 +516,46 @@ private fun BoardFirstEssentialActions(
                 onClick = if (runtime.paused) viewModel::resume else viewModel::pause,
             )
         }
-        if (runtime.terminal == null) {
+        if (playing) {
             BoardFirstAction(
                 label = "Resign",
                 glyph = BoardFirstActionGlyph.FLAG,
                 destructive = true,
                 testTag = "p5-live-action-resign",
-                onClick = viewModel::resign,
+                onClick = onResign,
+            )
+            BoardFirstAction(
+                label = "Draw",
+                glyph = BoardFirstActionGlyph.DRAW,
+                testTag = "p5-live-action-draw",
+                onClick = viewModel::offerDraw,
+            )
+        } else {
+            // "New game" keeps the historical exit tag: it is the way out of a finished game.
+            BoardFirstAction(
+                label = "New game",
+                glyph = BoardFirstActionGlyph.NEW_GAME,
+                testTag = "p5-live-action-exit",
+                onClick = viewModel::backToSetup,
+            )
+            BoardFirstAction(
+                label = "Rematch",
+                glyph = BoardFirstActionGlyph.REMATCH,
+                testTag = "p5-live-action-rematch",
+                onClick = viewModel::rematch,
             )
         }
         BoardFirstAction(
-            label = if (boardFlipped) "White" else "Black",
+            label = "Flip",
             glyph = BoardFirstActionGlyph.FLIP,
             testTag = "p5-live-action-flip",
             onClick = onFlipBoard,
         )
         BoardFirstAction(
-            label = if (runtime.terminal == null) "Exit" else "New game",
-            glyph = BoardFirstActionGlyph.EXIT,
-            testTag = "p5-live-action-exit",
-            onClick = viewModel::backToSetup,
+            label = "Menu",
+            glyph = BoardFirstActionGlyph.MENU,
+            testTag = "p5-live-action-menu",
+            onClick = onMenu,
         )
     }
 }
@@ -576,41 +681,42 @@ private fun BoardFirstActionGlyph(glyph: BoardFirstActionGlyph, tint: UiColor) {
                 }
                 drawPath(flag, tint)
             }
-            BoardFirstActionGlyph.EXIT -> {
-                drawLine(tint, Offset(size.width * .22f, size.height * .20f), Offset(size.width * .22f, size.height * .80f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .22f, size.height * .20f), Offset(size.width * .53f, size.height * .20f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .22f, size.height * .80f), Offset(size.width * .53f, size.height * .80f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .43f, size.height * .50f), Offset(size.width * .79f, size.height * .50f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .65f, size.height * .36f), Offset(size.width * .79f, size.height * .50f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .65f, size.height * .64f), Offset(size.width * .79f, size.height * .50f), stroke, StrokeCap.Round)
-            }
             BoardFirstActionGlyph.CANCEL -> {
                 drawLine(tint, Offset(size.width * .27f, size.height * .27f), Offset(size.width * .73f, size.height * .73f), stroke, StrokeCap.Round)
                 drawLine(tint, Offset(size.width * .73f, size.height * .27f), Offset(size.width * .27f, size.height * .73f), stroke, StrokeCap.Round)
             }
             BoardFirstActionGlyph.FLIP -> {
-                drawArc(
-                    color = tint,
-                    startAngle = 205f,
-                    sweepAngle = 220f,
-                    useCenter = false,
-                    topLeft = Offset(size.width * .17f, size.height * .19f),
-                    size = androidx.compose.ui.geometry.Size(size.width * .66f, size.height * .62f),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = StrokeCap.Round),
-                )
-                drawLine(tint, Offset(size.width * .20f, size.height * .38f), Offset(size.width * .18f, size.height * .20f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .20f, size.height * .38f), Offset(size.width * .37f, size.height * .34f), stroke, StrokeCap.Round)
-                drawArc(
-                    color = tint,
-                    startAngle = 25f,
-                    sweepAngle = 220f,
-                    useCenter = false,
-                    topLeft = Offset(size.width * .17f, size.height * .19f),
-                    size = androidx.compose.ui.geometry.Size(size.width * .66f, size.height * .62f),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = StrokeCap.Round),
-                )
-                drawLine(tint, Offset(size.width * .80f, size.height * .62f), Offset(size.width * .82f, size.height * .80f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .80f, size.height * .62f), Offset(size.width * .63f, size.height * .66f), stroke, StrokeCap.Round)
+                // Two opposed vertical arrows: the board turns over.
+                drawLine(tint, Offset(size.width * .32f, size.height * .78f), Offset(size.width * .32f, size.height * .22f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .32f, size.height * .22f), Offset(size.width * .20f, size.height * .36f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .32f, size.height * .22f), Offset(size.width * .44f, size.height * .36f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .68f, size.height * .22f), Offset(size.width * .68f, size.height * .78f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .68f, size.height * .78f), Offset(size.width * .56f, size.height * .64f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .68f, size.height * .78f), Offset(size.width * .80f, size.height * .64f), stroke, StrokeCap.Round)
+            }
+            BoardFirstActionGlyph.DRAW -> {
+                // "=": the result of a drawn game.
+                drawLine(tint, Offset(size.width * .24f, size.height * .38f), Offset(size.width * .76f, size.height * .38f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .24f, size.height * .62f), Offset(size.width * .76f, size.height * .62f), stroke, StrokeCap.Round)
+            }
+            BoardFirstActionGlyph.MENU -> {
+                val radius = stroke * .85f
+                listOf(.25f, .5f, .75f).forEach { x ->
+                    drawCircle(tint, radius = radius, center = Offset(size.width * x, size.height * .5f))
+                }
+            }
+            BoardFirstActionGlyph.NEW_GAME -> {
+                drawLine(tint, Offset(size.width * .24f, size.height * .5f), Offset(size.width * .76f, size.height * .5f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .5f, size.height * .24f), Offset(size.width * .5f, size.height * .76f), stroke, StrokeCap.Round)
+            }
+            BoardFirstActionGlyph.REMATCH -> {
+                // Opposed horizontal arrows: same opponent, colours swapped.
+                drawLine(tint, Offset(size.width * .22f, size.height * .36f), Offset(size.width * .78f, size.height * .36f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .78f, size.height * .36f), Offset(size.width * .62f, size.height * .24f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .78f, size.height * .36f), Offset(size.width * .62f, size.height * .48f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .78f, size.height * .64f), Offset(size.width * .22f, size.height * .64f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .22f, size.height * .64f), Offset(size.width * .38f, size.height * .52f), stroke, StrokeCap.Round)
+                drawLine(tint, Offset(size.width * .22f, size.height * .64f), Offset(size.width * .38f, size.height * .76f), stroke, StrokeCap.Round)
             }
         }
     }

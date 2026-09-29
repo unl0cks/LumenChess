@@ -7,6 +7,7 @@ import android.os.SystemClock
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import dev.lumenchess.board.ChessboardOrientation
 import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Move
@@ -19,6 +20,9 @@ import dev.lumenchess.engine.api.EngineStrengthModel
 import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.engine.host.transport.EngineHostFailure
 import dev.lumenchess.engine.host.transport.EngineSlot
+import dev.lumenchess.feedback.AndroidGameFeedbackOutput
+import dev.lumenchess.feedback.CommittedFeedbackObserver
+import dev.lumenchess.feedback.GameFeedbackDispatcher
 import dev.lumenchess.play.AndroidPlayEngineGateway
 import dev.lumenchess.play.PlayEngine
 import dev.lumenchess.play.PlayTimeControl
@@ -30,6 +34,10 @@ import dev.lumenchess.runtime.RuntimeManualControl
 import dev.lumenchess.runtime.clock.ClockReading
 import dev.lumenchess.runtime.clock.DeterministicGameClock
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
+import dev.lumenchess.settings.AppearanceSettings
+import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 private const val ARENA_CLOCK_REFRESH_MILLIS = 100L
@@ -65,6 +73,14 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private val clockReader = DeterministicGameClock(timeSource)
     private val mutableUiState = mutableStateOf(ArenaUiState())
 
+    // Arena shares Play's committed-state feedback path: sounds and haptics observe the projection
+    // after the runtime has committed it and can never influence game state.
+    private val feedbackHandler = Handler(Looper.getMainLooper())
+    private val feedbackOutput = AndroidGameFeedbackOutput(application)
+    private val feedbackObserver = CommittedFeedbackObserver(GameFeedbackDispatcher(feedbackOutput))
+    private val feedbackSettingsRepository = DataStoreAppearanceSettingsRepository.from(application)
+    private var feedbackPreferences = AppearanceSettings()
+
     val uiState: State<ArenaUiState> = mutableUiState
 
     private var coordinator: ArenaRuntimeCoordinator? = null
@@ -88,6 +104,13 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        viewModelScope.launch {
+            feedbackSettingsRepository.settings.collectLatest { settings ->
+                feedbackPreferences = settings
+                feedbackOutput.updateSoundPackId(settings.soundPackId)
+                feedbackOutput.warmUp()
+            }
+        }
         loadRestorableArena()
     }
 
@@ -387,6 +410,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         restoreProbe?.setListener(null)
         restoreProbe?.close()
         restoreProbe = null
+        feedbackOutput.close()
         super.onCleared()
     }
 
@@ -422,6 +446,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             ArenaRuntimeCoordinator.restore(setup, restored.snapshot, timeSource, white, black, persistence, ::onEvaluation)
         }
 
+        feedbackObserver.resetBaseline(runtimeCoordinator.state)
         coordinator = runtimeCoordinator
         whiteGateway = white
         blackGateway = black
@@ -537,6 +562,9 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
             reading = clockReader.read(state.clock)
         }
         mutableUiState.value = mutableUiState.value.copy(runtime = state, clock = reading)
+        val feedbackState = state
+        val settings = feedbackPreferences.toFeedbackSettings()
+        feedbackHandler.post { feedbackObserver.onCommitted(feedbackState, settings) }
     }
 
     private fun updateEngineConfig(side: Color, transform: ArenaEngineConfig.() -> ArenaEngineConfig) = updateSetup {
@@ -592,6 +620,8 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private fun stopLiveAdapters() {
         cancelBranchNavigation()
         mainHandler.removeCallbacks(clockTicker)
+        feedbackHandler.removeCallbacksAndMessages(null)
+        feedbackObserver.resetBaseline(null)
         whiteGateway?.setListener(null)
         blackGateway?.setListener(null)
         persistenceGateway?.setListener(null)

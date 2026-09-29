@@ -18,6 +18,8 @@ import dev.lumenchess.engine.host.transport.EngineHostFailure
 import dev.lumenchess.feedback.AndroidGameFeedbackOutput
 import dev.lumenchess.feedback.CommittedFeedbackObserver
 import dev.lumenchess.feedback.GameFeedbackDispatcher
+import dev.lumenchess.runtime.DrawOfferResponse
+import dev.lumenchess.runtime.EngineDrawPolicy
 import dev.lumenchess.runtime.RuntimeState
 import dev.lumenchess.runtime.RuntimeTerminal
 import dev.lumenchess.runtime.clock.ClockReading
@@ -30,6 +32,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 private const val CLOCK_REFRESH_MILLIS = 100L
+private const val NOTICE_MILLIS = 3_500L
+
+private fun freshStrengthSeed(): Long = kotlin.random.Random.nextLong().takeIf { it != 0L } ?: 1L
 
 enum class PlayScreenMode { SETUP, LIVE }
 
@@ -45,6 +50,8 @@ data class PlayUiState(
     val gameId: String? = null,
     val ownershipReady: Boolean = false,
     val message: String? = null,
+    /** Short-lived, non-error feedback (draw declined, PGN copied). Cleared automatically. */
+    val notice: String? = null,
 )
 
 /**
@@ -69,6 +76,10 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     private var persistenceGateway: AndroidPlayPersistenceGateway? = null
     private var restoreProbe: AndroidPlayPersistenceGateway? = null
     private var screenStarted = false
+    private var drawOfferPly: Int? = null
+    private val noticeClearer = Runnable {
+        mutableUiState.value = mutableUiState.value.copy(notice = null)
+    }
     private var delayedEngineResultRunnable: Runnable? = null
 
     private val clockTicker = object : Runnable {
@@ -85,6 +96,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             feedbackSettingsRepository.settings.collectLatest { settings ->
                 feedbackPreferences = settings
                 feedbackOutput.updateSoundPackId(settings.soundPackId)
+                feedbackOutput.warmUp()
             }
         }
         loadRestorableGame()
@@ -110,11 +122,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
         if (PlaySetupValidator.validate(config) !is PlaySetupValidation.Valid) return
         // A fresh seed per game keeps Humanized/Hybrid choices from replaying identically every
         // time; the resolved seed is persisted with the game, so restore and replay stay exact.
-        val seeded = if (config.strengthSeed != 0L) {
-            config
-        } else {
-            config.copy(strengthSeed = kotlin.random.Random.nextLong().takeIf { it != 0L } ?: 1L)
-        }
+        val seeded = if (config.strengthSeed != 0L) config else config.copy(strengthSeed = freshStrengthSeed())
         startResolvedGame(PlaySetupResolver.resolve(seeded), restored = null)
     }
 
@@ -125,6 +133,8 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
     fun backToSetup() {
         stopLiveAdapters()
+        drawOfferPly = null
+        mainHandler.removeCallbacks(noticeClearer)
         mutableUiState.value = mutableUiState.value.copy(
             mode = PlayScreenMode.SETUP,
             resolvedSetup = null,
@@ -134,6 +144,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             gameId = null,
             ownershipReady = false,
             message = null,
+            notice = null,
         )
         loadRestorableGame()
     }
@@ -175,6 +186,50 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
         refreshRuntimeProjection(checkTimeout = false)
     }
 
+    /**
+     * The human offers a draw. The engine answers through [EngineDrawPolicy]; only an accepted offer
+     * reaches the runtime (as the ordinary agreed-draw event), so the runtime stays the sole owner of
+     * the result.
+     */
+    fun offerDraw() {
+        val current = coordinator ?: return
+        val setup = mutableUiState.value.resolvedSetup ?: return
+        val state = current.state
+        if (state.terminal != null || state.paused) return
+        val plies = state.gameTree.mainline().size
+        if (EngineDrawPolicy.inCooldown(drawOfferPly, plies)) {
+            showNotice("You can offer another draw in a few moves")
+            return
+        }
+        drawOfferPly = plies
+        when (val response = EngineDrawPolicy.respond(state, setup.humanSide.opposite, setup.strength)) {
+            DrawOfferResponse.Accepted -> agreeDraw()
+            is DrawOfferResponse.Declined -> showNotice(response.reason)
+        }
+    }
+
+    /** Same opponent and time control, opposite colours, fresh strength seed. */
+    fun rematch() {
+        val setup = mutableUiState.value.resolvedSetup ?: return
+        startResolvedGame(
+            setup.copy(
+                humanSide = setup.humanSide.opposite,
+                strength = setup.strength.copy(seed = freshStrengthSeed()),
+            ),
+            restored = null,
+        )
+    }
+
+    fun currentPgn(): String? = coordinator?.state?.gameTree?.let { dev.lumenchess.core.chess.Pgn.serialize(it) }
+
+    fun currentFen(): String? = coordinator?.state?.position?.let { dev.lumenchess.core.chess.Fen.serialize(it) }
+
+    fun showNotice(text: String) {
+        mainHandler.removeCallbacks(noticeClearer)
+        mutableUiState.value = mutableUiState.value.copy(notice = text)
+        mainHandler.postDelayed(noticeClearer, NOTICE_MILLIS)
+    }
+
     fun onScreenStarted() {
         if (screenStarted) return
         screenStarted = true
@@ -204,6 +259,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         mainHandler.removeCallbacks(clockTicker)
+        mainHandler.removeCallbacks(noticeClearer)
         feedbackHandler.removeCallbacksAndMessages(null)
         stopLiveAdapters()
         restoreProbe?.setListener(null)
@@ -215,6 +271,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startResolvedGame(setup: ResolvedPlaySetup, restored: RestoredPlayGame?) {
         stopLiveAdapters()
+        drawOfferPly = null
         restoreProbe?.setListener(null)
         restoreProbe?.close()
         restoreProbe = null

@@ -70,7 +70,7 @@ class P5SettingsScreenshotQaTest {
         composeRule.onNodeWithTag("p5-live-player-row").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-player-clock").assertIsDisplayed()
         composeRule.onNodeWithTag("p5-live-action-resign").assertIsDisplayed()
-        composeRule.onNodeWithTag("p5-live-action-exit").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-action-menu").assertIsDisplayed()
 
         val board = bounds(CHESSBOARD_TEST_TAG)
         assertTrue("board-first default must keep the board square: $board", abs(board.width - board.height) <= 1f)

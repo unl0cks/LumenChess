@@ -14,6 +14,12 @@ class AndroidGameFeedbackOutput(context: Context) : GameFeedbackOutput {
         soundPackId = id
     }
 
+    /** Off the main thread: file synthesis is cheap but SoundPool loading is not free. */
+    fun warmUp() {
+        val pack = soundPackId
+        Thread({ runCatching { soundPlayer.preload(pack) } }, "lumen-sound-warmup").start()
+    }
+
     override fun playSound(event: GameFeedbackEvent) {
         soundPlayer.play(event.toSoundEvent(), soundPackId)
     }

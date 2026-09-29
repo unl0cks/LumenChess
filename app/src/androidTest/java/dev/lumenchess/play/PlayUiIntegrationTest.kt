@@ -113,7 +113,9 @@ class PlayUiIntegrationTest {
         val shellToActions = actions.top - shell.bottom
         val topBreathingRoom = shell.top - liveRoot.top
         val bottomBreathingRoom = liveRoot.bottom - actions.bottom
-        assertTrue("essential actions must stay attached to the gameplay shell: shell=$shell actions=$actions", shellToActions in 0f..(16f * density))
+        // The fixed status slot (22dp) plus two 5dp gaps sits between shell and actions; the group is
+        // one composition, never a strip stranded at the bottom of the screen.
+        assertTrue("essential actions must stay attached to the gameplay shell: shell=$shell actions=$actions", shellToActions in 0f..(40f * density))
         assertTrue("meaningful Live group should be vertically balanced: top=$topBreathingRoom bottom=$bottomBreathingRoom", abs(topBreathingRoom - bottomBreathingRoom) <= 32f * density)
 
         listOf("p5-live-lower-region", "p5-live-tabs", "p5-live-moves-rail").forEach { tag ->
@@ -129,6 +131,12 @@ class PlayUiIntegrationTest {
 
         val viewModel = ViewModelProvider(composeRule.activity)[PlayViewModel::class.java]
         composeRule.onNodeWithTag("p5-live-action-resign").performClick()
+        // Resigning is destructive, so it always asks first; cancelling must leave the game running.
+        composeRule.onNodeWithTag("p5-live-resign-dialog").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-resign-cancel").performClick()
+        assertEquals(null, requireNotNull(viewModel.currentCoordinatorForTest()).state.terminal)
+        composeRule.onNodeWithTag("p5-live-action-resign").performClick()
+        composeRule.onNodeWithTag("p5-live-resign-confirm").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000L) {
             viewModel.currentCoordinatorForTest()?.state?.terminal == RuntimeTerminal.Resignation(Color.WHITE)
         }
@@ -137,6 +145,9 @@ class PlayUiIntegrationTest {
             requireNotNull(viewModel.currentCoordinatorForTest()).state.terminal,
         )
         composeRule.onNodeWithTag("p5-live-action-resign").assertDoesNotExist()
+        // A finished game presents its result and offers rematch / new game.
+        composeRule.onNodeWithTag("p5-live-result-dialog").assertIsDisplayed()
+        composeRule.onNodeWithTag("p5-live-result-close").performClick()
 
         composeRule.onNodeWithTag("p5-live-action-exit").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000L) {

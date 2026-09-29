@@ -206,7 +206,7 @@ class P5LiveScreenshotQaTest {
             "p5-live-player-clock",
             "p5-live-action-strip",
             "p5-live-action-resign",
-            "p5-live-action-exit",
+            "p5-live-action-menu",
         ).forEach(::waitForTag)
 
         val liveRoot = bounds(PLAY_LIVE_TEST_TAG)
@@ -216,9 +216,14 @@ class P5LiveScreenshotQaTest {
         assertTrue("board must remain square: $board", abs(board.width - board.height) <= 1f)
         assertTrue("board width must retain P1-safe bounds: $board in $liveRoot", board.width / liveRoot.width in 0.92f..1f)
         assertTrue("essential action strip must retain its 72dp geometry: $actionStrip", actionStrip.height / density in 64f..84f)
+        val shell = bounds("p5-live-shell")
         assertTrue(
-            "essential action strip must be bottom-anchored to the Live root: actions=$actionStrip, root=$liveRoot",
-            liveRoot.bottom - actionStrip.bottom <= 6f * density,
+            "essential action strip must stay attached to the gameplay shell: shell=$shell actions=$actionStrip",
+            actionStrip.top - shell.bottom in 0f..(40f * density),
+        )
+        assertTrue(
+            "gameplay group must be vertically balanced in the Live root: shell=$shell actions=$actionStrip root=$liveRoot",
+            abs((shell.top - liveRoot.top) - (liveRoot.bottom - actionStrip.bottom)) <= 32f * density,
         )
     }
 

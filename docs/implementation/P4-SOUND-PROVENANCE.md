@@ -8,21 +8,25 @@ LumenChess P4 uses seven built-in feedback cues for move, capture, check, castle
 
 The built-in cues are original LumenChess audio. They are synthesized deterministically by `BuiltInSoundAssets` at runtime from code in this repository. No third-party recordings, samples, downloaded sound effects, or audio from Chess.com or any other chess product are embedded, copied, or fetched.
 
-The synthesis recipe uses short layered sine partials with event-specific frequencies and weights, a fast attack, exponential damping, and a short end fade. Output is mono 44.1 kHz, 16-bit PCM WAV. Peak synthesis amplitude is capped below full scale.
+**Recipe v2 (product completion pass).** The original P4 cues were short sine blips and did not read as pieces on a board. Piece cues are now modal "struck wood" hits: a handful of exponentially damped sinusoids (the body modes of a small wooden block) plus a few-millisecond, low-passed noise click from a fixed-seed xorshift generator. Check adds a soft harmonic ping; promotion and the two game cues use bell partials (ratios 1 : 2.76 : 5.40). Every cue is peak-normalised so loudness (RMS) stays in one band across events. Output is mono 44.1 kHz, 16-bit PCM WAV.
 
-The longer semantic cues (promotion, game start, and game end) are 150 ms. Other cues are intentionally short (90–165 ms) to keep feedback immediate and to avoid adding a material APK-size payload.
+Generated files are cached on disk by name and carry the recipe version (`move.v2.wav`); unversioned files from older recipes are deleted on first use so an update cannot keep playing the old cues. The Kotlin implementation was verified sample-for-sample against an independent reference implementation of the same math.
 
-## Built-in cue definitions
+Sound packs and per-event overrides (whole-pack ZIP import, user files) are unchanged and still take precedence over the built-in cues.
 
-| Event | Duration | Frequencies (Hz) | Weights | Decay |
-| --- | ---: | --- | --- | ---: |
-| Move | 90 ms | 430, 690 | 0.72, 0.28 | 24 |
-| Capture | 125 ms | 330, 515, 825 | 0.55, 0.30, 0.15 | 18 |
-| Check | 150 ms | 610, 915 | 0.65, 0.35 | 15 |
-| Castle | 165 ms | 285, 430, 570 | 0.48, 0.34, 0.18 | 13 |
-| Promotion | 150 ms | 520, 780, 1040 | 0.48, 0.32, 0.20 | 11 |
-| Game start | 150 ms | 392, 523.25, 659.25 | 0.38, 0.34, 0.28 | 10 |
-| Game end | 150 ms | 523.25, 392, 293.66 | 0.34, 0.35, 0.31 | 9 |
+## Built-in cue definitions (v2)
+
+| Event | Duration | Structure |
+| --- | ---: | --- |
+| Move | 160 ms | one wood hit (220 / 365 / 610 / 1250 Hz modes) |
+| Capture | 220 ms | heavy hit (170 Hz body) + a second lighter hit 30 ms later (the captured piece) |
+| Check | 340 ms | wood hit + soft 1568 Hz ping at 60 ms |
+| Castle | 300 ms | two hits 105 ms apart: king (200 Hz body) then rook (260 Hz body) |
+| Promotion | 550 ms | wood hit + rising bell notes 988 Hz, 1319 Hz |
+| Game start | 600 ms | bell notes 659 Hz, 880 Hz |
+| Game end | 700 ms | bell notes 784 Hz, 587 Hz |
+
+Exact partial frequencies, decays and gains live in the tables in `BuiltInSoundAssets.kt`, which is the only place to tune them.
 
 ## Redistribution
 
