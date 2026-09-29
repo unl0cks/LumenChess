@@ -12,6 +12,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -44,13 +45,20 @@ fun GameLibraryRoute(
 @Composable
 private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, modifier: Modifier) {
     val filterState = rememberLazyListState(ui.query.filter.ordinal)
+    var importOpen by rememberSaveable { mutableStateOf(false) }
+    if (importOpen) {
+        LibraryImportDialog(ui, vm, onDismiss = { importOpen = false; vm.clearImportStatus() })
+    }
     LumenDerivativePage(modifier, testTag = "library-list", verticalPadding = 12, spacing = 10) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text("Games", style = MaterialTheme.typography.headlineMedium, color = LumenColors.OnSurface)
                 Text("Your chess library", style = MaterialTheme.typography.bodyMedium, color = LumenColors.OnSurfaceMuted)
             }
-            LumenDerivativeAction("Refresh", vm::refresh, enabled = !ui.loading, testTag = "library-refresh")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LumenDerivativeAction("Import", { importOpen = true }, testTag = "library-import")
+                LumenDerivativeAction("Refresh", vm::refresh, enabled = !ui.loading, testTag = "library-refresh")
+            }
         }
         OutlinedTextField(
             value = ui.query.search, onValueChange = vm::setSearch,

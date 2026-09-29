@@ -13,9 +13,22 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.lumenchess.core.chess.GameNode
 import dev.lumenchess.core.chess.GameTree
 import dev.lumenchess.data.persistence.*
+import dev.lumenchess.BuildConfig
+import dev.lumenchess.games.imports.HttpGet
+import dev.lumenchess.games.imports.ImportCandidate
+import dev.lumenchess.games.imports.OnlineGameSources
+import dev.lumenchess.games.imports.OnlineImportException
+import dev.lumenchess.games.imports.OnlineSite
+import dev.lumenchess.games.imports.PgnImport
+import dev.lumenchess.games.imports.PgnImportBatch
+import dev.lumenchess.games.imports.UrlConnectionHttpGet
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+internal enum class ImportResult { ADDED, ALREADY_IN_LIBRARY, UNSUPPORTED }
 
 /** Storage boundary keeps database ownership and cancellable reads separate from presentation. */
 internal interface LibraryStore {
@@ -24,6 +37,8 @@ internal interface LibraryStore {
     suspend fun favorite(id: PersistentGameId, value: Boolean): Boolean
     suspend fun protect(id: PersistentGameId, value: Boolean): Boolean
     suspend fun delete(id: PersistentGameId): Boolean
+    /** Stores one imported game unless the same source game is already in the library. */
+    suspend fun importGame(candidate: ImportCandidate): ImportResult = ImportResult.UNSUPPORTED
     fun close()
 }
 
@@ -35,6 +50,27 @@ internal class RoomLibraryStore(private val database: LumenDatabase, private val
     override suspend fun favorite(id: PersistentGameId, value: Boolean) = library.setFavorite(id, value)
     override suspend fun protect(id: PersistentGameId, value: Boolean) = library.setProtected(id, value)
     override suspend fun delete(id: PersistentGameId) = library.delete(id)
+    override suspend fun importGame(candidate: ImportCandidate): ImportResult {
+        // Site games are identified by the site's game id; plain PGN by its content, so the same
+        // file imported twice (or a site game pasted after an account import) is not duplicated.
+        val source = GameSourceDraft(
+            type = candidate.sourceType,
+            externalGameId = candidate.externalGameId ?: GameContentFingerprint.compute(candidate.tree),
+            externalUrl = candidate.externalUrl,
+            importedAtEpochMillis = candidate.metadata.importedAtEpochMillis,
+        )
+        if (games.hasExternalGame(source)) return ImportResult.ALREADY_IN_LIBRARY
+        games.persistExternalGame(
+            PersistGameRequest(
+                tree = candidate.tree,
+                metadata = candidate.metadata,
+                whiteParticipant = candidate.whiteName?.let { ParticipantDraft(ParticipantKind.EXTERNAL, displayName = it) },
+                blackParticipant = candidate.blackName?.let { ParticipantDraft(ParticipantKind.EXTERNAL, displayName = it) },
+            ),
+            source,
+        )
+        return ImportResult.ADDED
+    }
     override fun close() { if (ownsDatabase) LumenDatabaseFactory.close(database) }
 }
 
@@ -59,6 +95,8 @@ data class GameLibraryUiState(
     val actionPending: Boolean = false,
     val actionError: String? = null,
     val canRetryAction: Boolean = false,
+    val importing: Boolean = false,
+    val importStatus: String? = null,
 ) {
     val selectedNode: GameNode? get() = game?.let { libraryNodeAtPath(it.tree, nodePath) }
 }
@@ -85,6 +123,8 @@ class GameLibraryViewModel internal constructor(
     private var pageGeneration = 0L
     private var openGeneration = 0L
     private var retryAction: (() -> Unit)? = null
+    private var importJob: Job? = null
+    internal var httpGet: HttpGet = UrlConnectionHttpGet("LumenChess/${BuildConfig.VERSION_NAME} (Android; game import)")
     private var failedPageAppend = false
 
     companion object {
@@ -96,6 +136,46 @@ class GameLibraryViewModel internal constructor(
     init {
         refresh()
         saved.get<String>("gameId")?.let { open(PersistentGameId(it), restorePath = true) }
+    }
+
+    /** Imports every readable game in pasted or opened PGN text. */
+    fun importPgnText(text: String) = importPgnSource { text }
+
+    /** [read] runs off the main thread, so it may open and read a file. */
+    fun importPgnSource(read: () -> String) = runImport("Reading PGN…") { PgnImport.parse(read(), System.currentTimeMillis()) }
+
+    /** Downloads and imports the player's most recent games from Chess.com or Lichess. */
+    fun importFromSite(site: OnlineSite, username: String) = runImport("Downloading from ${site.label}…") {
+        PgnImport.parse(OnlineGameSources.fetchRecentPgn(site, username, httpGet), System.currentTimeMillis())
+    }
+
+    fun clearImportStatus() {
+        if (!uiState.value.importing) mutableUi.value = uiState.value.copy(importStatus = null)
+    }
+
+    private fun runImport(progress: String, read: () -> PgnImportBatch) {
+        if (importJob?.isActive == true) return
+        mutableUi.value = uiState.value.copy(importing = true, importStatus = progress)
+        importJob = viewModelScope.launch {
+            val status = try {
+                val batch = withContext(Dispatchers.IO) { read() }
+                var added = 0
+                var existing = 0
+                var failed = batch.unreadable
+                for (candidate in batch.candidates) {
+                    when (runCatching { store.importGame(candidate) }.getOrNull()) {
+                        ImportResult.ADDED -> added += 1
+                        ImportResult.ALREADY_IN_LIBRARY -> existing += 1
+                        ImportResult.UNSUPPORTED, null -> failed += 1
+                    }
+                }
+                importSummary(added, existing, failed)
+            } catch (cancelled: CancellationException) { throw cancelled
+            } catch (error: OnlineImportException) { error.message
+            } catch (_: Exception) { "Import failed. Nothing was changed." }
+            mutableUi.value = uiState.value.copy(importing = false, importStatus = status)
+            refresh()
+        }
     }
 
     fun setSearch(value: String) = changeQuery(uiState.value.query.copy(search = value))
@@ -289,3 +369,14 @@ internal fun libraryNodeAtPath(tree: GameTree, path: List<Int>): GameNode {
 }
 
 internal fun libraryMainlineEndPath(tree: GameTree): List<Int> = List(tree.mainline().size) { 0 }
+
+/** "Imported 12 games · 3 already in your library · 1 could not be read" */
+internal fun importSummary(added: Int, existing: Int, failed: Int): String {
+    if (added == 0 && existing == 0 && failed == 0) return "No games found"
+    fun games(count: Int) = if (count == 1) "1 game" else "$count games"
+    return buildList {
+        add("Imported ${games(added)}")
+        if (existing > 0) add("$existing already in your library")
+        if (failed > 0) add("$failed could not be read")
+    }.joinToString(" · ")
+}
