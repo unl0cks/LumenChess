@@ -113,7 +113,7 @@ class ReviewRepository(
             reviews.associate { review ->
                 val order = mainlineInternal(review.gameId.value).withIndex().associate { (index, id) -> id to index }
                 review.id to rows[review.id.value].orEmpty()
-                    .mapNotNull { row -> order[row.nodeId]?.let { ply -> row.toRecord(ply, emptyMap()) } }
+                    .mapNotNull { row -> order[row.nodeId]?.let { ply -> row.toRecord(ply, emptyList()) } }
                     .sortedBy { it.ply }
             }
         }

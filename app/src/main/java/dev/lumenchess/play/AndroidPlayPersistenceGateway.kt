@@ -68,7 +68,7 @@ class AndroidPlayPersistenceGateway(
                         metadata = GamePersistenceMetadata(
                             createdAtEpochMillis = createdAtEpochMillis,
                             playedAtEpochMillis = createdAtEpochMillis,
-                            rated = false,
+                            rated = setup.rated,
                             termination = snapshot.terminal?.toPersistedTermination(),
                             timeControl = TimeControlMetadata(
                                 baseMillis = setup.clockConfig.initialMillis,

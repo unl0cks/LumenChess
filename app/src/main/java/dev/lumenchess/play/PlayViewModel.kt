@@ -30,10 +30,17 @@ import dev.lumenchess.runtime.clock.MonotonicTimeSource
 import dev.lumenchess.settings.AppearanceSettings
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
 import dev.lumenchess.settings.toFeedbackSettings
+import dev.lumenchess.analysis.rating.TimeClass
+import dev.lumenchess.player.MatchBase
+import dev.lumenchess.player.PlayerData
+import dev.lumenchess.player.PlayerSettingsRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 private const val CLOCK_REFRESH_MILLIS = 100L
+/** Match Your Elo with no rating yet: a beginner-friendly start, still varied by the range. */
+private const val MATCH_FALLBACK_ELO = 1200
 private const val NOTICE_MILLIS = 3_500L
 
 private fun freshStrengthSeed(): Long = kotlin.random.Random.nextLong().takeIf { it != 0L } ?: 1L
@@ -54,7 +61,11 @@ data class PlayUiState(
     val message: String? = null,
     /** Short-lived, non-error feedback (draw declined, PGN copied). Cleared automatically. */
     val notice: String? = null,
+    /** Match Your Elo: the rating the target is drawn around, for the selected mode and clock. */
+    val matchPreview: MatchPreview? = null,
 )
+
+data class MatchPreview(val base: MatchBase?, val range: Int, val loading: Boolean = false)
 
 /**
  * Android lifecycle/presentation bridge. The ViewModel owns adapters and presentation state, not the
@@ -96,6 +107,14 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        // The last setup a game was started with (without its one-off starting position).
+        PlaySetupMemory.recall(application)?.let { remembered ->
+            mutableUiState.value = mutableUiState.value.copy(
+                setup = remembered,
+                setupValidation = PlaySetupValidator.validate(remembered),
+            )
+            if (remembered.matchYourElo) refreshMatchPreview()
+        }
         viewModelScope.launch {
             feedbackSettingsRepository.settings.collectLatest { settings ->
                 feedbackPreferences = settings
@@ -120,10 +139,49 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     fun updateStrengthModel(model: EngineStrengthModel) = updateSetup { copy(strengthModel = model) }
     fun updateStrengthTarget(target: EngineStrengthTarget) = updateSetup { copy(strengthTarget = target) }
     fun updateTimeControl(control: PlayTimeControl) = updateSetup { copy(timeControl = control) }
+    fun updateRated(rated: Boolean) = updateSetup { copy(rated = rated) }
+    fun updateMatchYourElo(enabled: Boolean) = updateSetup { copy(matchYourElo = enabled) }
+
+    private var matchJob: Job? = null
+
+    /** Re-reads the rating Match Your Elo aims at (pool follows the selected mode and clock). */
+    fun refreshMatchPreview() {
+        val setup = mutableUiState.value.setup
+        matchJob?.cancel()
+        if (!setup.matchYourElo) {
+            mutableUiState.value = mutableUiState.value.copy(matchPreview = null)
+            return
+        }
+        mutableUiState.value = mutableUiState.value.copy(
+            matchPreview = (mutableUiState.value.matchPreview ?: MatchPreview(null, 100)).copy(loading = true),
+        )
+        matchJob = viewModelScope.launch {
+            val preview = try {
+                val settings = PlayerSettingsRepository.from(getApplication()).current()
+                val games = PlayerData.games(getApplication(), settings)
+                val timeClass = TimeClass.of(setup.timeControl.initialMillis, setup.timeControl.incrementMillis)
+                MatchPreview(PlayerData.matchBase(settings, games, setup.variant, timeClass), settings.matchRange)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                MatchPreview(null, 100)
+            }
+            mutableUiState.value = mutableUiState.value.copy(matchPreview = preview)
+        }
+    }
 
     fun startNewGame() {
-        val config = mutableUiState.value.setup
-        if (PlaySetupValidator.validate(config) !is PlaySetupValidation.Valid) return
+        val chosen = mutableUiState.value.setup
+        if (PlaySetupValidator.validate(chosen) !is PlaySetupValidation.Valid) return
+        // Match Your Elo draws the target once, now; it never changes during the game.
+        val config = if (chosen.matchYourElo) {
+            val preview = mutableUiState.value.matchPreview
+            val base = preview?.base
+            val target = if (base != null) PlayerData.matchTarget(base, preview.range) else
+                dev.lumenchess.analysis.insights.MatchYourElo.target(MATCH_FALLBACK_ELO, preview?.range ?: 100)
+            chosen.copy(strengthTarget = EngineStrengthTarget.Elo(target))
+        } else chosen
+        PlaySetupMemory.remember(getApplication(), chosen)
         // A fresh seed per game keeps Humanized/Hybrid choices from replaying identically every
         // time; the resolved seed is persisted with the game, so restore and replay stay exact.
         val seeded = if (config.strengthSeed != 0L) config else config.copy(strengthSeed = freshStrengthSeed())
@@ -461,12 +519,15 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun updateSetup(transform: PlaySetupConfig.() -> PlaySetupConfig) {
         if (mutableUiState.value.mode != PlayScreenMode.SETUP) return
-        val updated = mutableUiState.value.setup.transform()
+        val previous = mutableUiState.value.setup
+        val updated = previous.transform()
         mutableUiState.value = mutableUiState.value.copy(
             setup = updated,
             setupValidation = PlaySetupValidator.validate(updated),
             message = null,
         )
+        val poolChanged = previous.variant != updated.variant || previous.timeControl != updated.timeControl
+        if (previous.matchYourElo != updated.matchYourElo || (updated.matchYourElo && poolChanged)) refreshMatchPreview()
     }
 
     private fun loadRestorableGame() {

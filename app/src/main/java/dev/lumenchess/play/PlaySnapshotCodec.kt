@@ -33,6 +33,7 @@ object PlaySnapshotCodec {
         }
         put(key("initialMillis"), setup.clockConfig.initialMillis.toString())
         put(key("incrementMillis"), setup.clockConfig.incrementMillis.toString())
+        if (setup.rated) put(key("rated"), "true")
 
         put(key("positionRevision"), snapshot.positionRevision.value.toString())
         put(key("clockWhite"), snapshot.clock.whiteRemainingMillis.toString())
@@ -78,6 +79,7 @@ object PlaySnapshotCodec {
             timeControl = PlayTimeControl(initialMillis, incrementMillis),
             strengthSeed = seed,
             startingFen = metadata[key("startingFen")],
+            rated = metadata[key("rated")] == "true",
         )
         val setup = try {
             PlaySetupResolver.resolve(setupConfig)

@@ -92,12 +92,12 @@ class P5SetupScreenshotQaTest {
         ).forEach(::waitForTag)
 
         composeRule.onNodeWithTag("main-tab-play").assertDoesNotExist()
-        composeRule.onNodeWithTag("p5-match-my-elo").assertIsNotEnabled()
+        composeRule.onNodeWithTag("p5-match-my-elo").assertIsEnabled()
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).assertIsEnabled()
         listOf("1600", "Stockfish 18", "Hybrid", "White", "Rapid", "0 sec", "Start Game").forEach {
             composeRule.onNodeWithText(it).assertIsDisplayed()
         }
-        composeRule.onNodeWithText("Match My Elo is preview-only in this build.").assertIsDisplayed()
+        composeRule.onNodeWithText("Match My Elo picks a strength near your rating when the game starts.").assertIsDisplayed()
         composeRule.onNodeWithText("Your selected strength, side and clock apply when the game starts.").assertIsDisplayed()
 
         assertApprovedGeometry()
@@ -155,7 +155,7 @@ class P5SetupScreenshotQaTest {
         composeRule.waitForIdle()
         assertEquals(5_000L, viewModel.uiState.value.setup.timeControl.incrementMillis)
 
-        composeRule.onNodeWithTag("p5-match-my-elo").assertIsNotEnabled()
+        composeRule.onNodeWithTag("p5-match-my-elo").assertIsEnabled()
         composeRule.onNodeWithTag(PLAY_START_TEST_TAG).assertIsEnabled()
     }
 

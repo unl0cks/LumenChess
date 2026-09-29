@@ -42,6 +42,10 @@ data class PlaySetupConfig(
     val strengthSeed: Long = 0L,
     /** Optional validated custom starting position; null means the normal variant start. */
     val startingFen: String? = null,
+    /** Counts toward the local rated rating (Rated Results). Custom positions are never rated. */
+    val rated: Boolean = false,
+    /** Match Your Elo: the target is drawn near the user's rating when the game starts. */
+    val matchYourElo: Boolean = false,
 )
 
 data class ResolvedPlaySetup(
@@ -52,6 +56,7 @@ data class ResolvedPlaySetup(
     val strength: EngineStrengthSettings,
     val clockConfig: ClockConfig,
     val initialPosition: Position,
+    val rated: Boolean = false,
 )
 
 sealed interface PlaySetupValidation {
@@ -112,6 +117,7 @@ object PlaySetupResolver {
             clockConfig = ClockConfig(setup.timeControl.initialMillis, setup.timeControl.incrementMillis),
             initialPosition = setup.startingFen?.let { Fen.parse(it, setup.variant) }
                 ?: if (setup.variant == Variant.STANDARD) Position.initial() else Chess960.startingPosition(index!!),
+            rated = setup.rated && setup.startingFen == null,
         )
     }
 }
