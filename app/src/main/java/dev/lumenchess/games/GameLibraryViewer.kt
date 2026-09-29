@@ -116,7 +116,6 @@ internal fun GameLibraryViewer(ui: GameLibraryUiState, vm: GameLibraryViewModel,
                                 ClipData.newPlainText("LumenChess FEN", Fen.serialize(node.position)),
                             )
                         }, Modifier.fillMaxWidth(), testTag = "library-copy-fen")
-                        LibraryNote("Review, Analyze, and the Library branch editor remain unavailable in this build.")
                     }
                 }
             }

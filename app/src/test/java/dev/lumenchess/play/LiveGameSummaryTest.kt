@@ -86,4 +86,26 @@ class LiveGameSummaryTest {
         val setup = PlaySetupResolver.resolve(PlaySetupConfig(strengthTarget = EngineStrengthTarget.FullStrength))
         assertEquals("Full strength", liveStrengthLabel(setup))
     }
+
+    @Test
+    fun clockShowsTenthsUnderTenSecondsAndHoursForLongControls() {
+        assertEquals("--:--", formatLiveClock(null))
+        assertEquals("10:00", formatLiveClock(600_000L))
+        assertEquals("1:05", formatLiveClock(65_000L))
+        assertEquals("0:10", formatLiveClock(10_000L))
+        assertEquals("0:09.9", formatLiveClock(9_999L))
+        assertEquals("0:07.4", formatLiveClock(7_450L))
+        assertEquals("0:00.0", formatLiveClock(0L))
+        assertEquals("0:00.0", formatLiveClock(-25L))
+        assertEquals("1:00:00", formatLiveClock(3_600_000L))
+        assertEquals("1:30:05", formatLiveClock(5_405_000L))
+    }
+
+    @Test
+    fun onlyTheLastTenSecondsAreUrgent() {
+        assertEquals(false, isLiveClockUrgent(null))
+        assertEquals(false, isLiveClockUrgent(10_000L))
+        assertEquals(true, isLiveClockUrgent(9_999L))
+        assertEquals(true, isLiveClockUrgent(0L))
+    }
 }

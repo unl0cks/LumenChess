@@ -136,7 +136,6 @@ private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, 
                     val deletionBlocked = !ui.ownershipReady || entry.id.value in ui.reservedGameIds
                     LumenDerivativeAction("Delete", { vm.requestDelete(entry.id) }, Modifier.fillMaxWidth(), enabled = !deletionBlocked && !ui.actionPending, testTag = "library-delete")
                     if (deletionBlocked) LibraryNote("Owned by, or still being checked by, the current Play or Arena session. Deletion is unavailable while this game can still be saved or resumed.")
-                    LibraryUnavailableActions()
                     LumenDerivativeAction("Close", vm::dismissActions, Modifier.fillMaxWidth(), testTag = "library-actions-close")
                 }
             }
@@ -164,10 +163,6 @@ private fun GameLibraryScreen(ui: GameLibraryUiState, vm: GameLibraryViewModel, 
 
 @Composable internal fun LibraryNote(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier, style = MaterialTheme.typography.bodyMedium, color = LumenColors.OnSurfaceMuted)
-}
-
-@Composable internal fun LibraryUnavailableActions() {
-    LibraryNote("Review, Analyze, Export, and the Library branch editor are not available in this build. Branching from an Arena session remains available in Arena.", Modifier.testTag("library-unavailable"))
 }
 
 internal val LibraryFilter.label: String get() = when (this) {

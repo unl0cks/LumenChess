@@ -11,7 +11,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,11 +44,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.lumenchess.design.LumenColors
-import dev.lumenchess.design.DerivativeSurfaceRole
-import dev.lumenchess.design.LumenDerivativePage
-import dev.lumenchess.design.LumenDerivativeSurface
 import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenP5IdentityPalette
 import dev.lumenchess.design.LumenP5SettingsGeometry
@@ -354,125 +348,6 @@ private fun LumenNavGlyph(tab: MainTab, tint: Color, modifier: Modifier = Modifi
                 line(16.85f, 16.85f, 18.25f, 18.25f)
                 line(18.25f, 5.75f, 16.85f, 7.15f)
                 line(7.15f, 16.85f, 5.75f, 18.25f)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun FutureSurfacePreview(tab: MainTab) {
-    val palette = lumenP5IdentityPalette()
-    LumenDerivativePage(
-        modifier = Modifier.fillMaxSize(),
-        testTag = "derivative-future-preview",
-        horizontalPadding = 18,
-        verticalPadding = 22,
-        spacing = 18,
-    ) {
-        Text(
-            text = tab.label,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontSize = 24.sp,
-                lineHeight = 29.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
-            color = palette.text,
-        )
-        LumenDerivativeSurface(
-            role = DerivativeSurfaceRole.PREVIEW_PANEL,
-            modifier = Modifier.fillMaxWidth().height(96.dp),
-            testTag = "derivative-preview-panel",
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
-        ) {
-            Row(
-                Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(13.dp),
-            ) {
-                LumenDerivativeSurface(
-                    role = DerivativeSurfaceRole.SELECTED_FACE,
-                    modifier = Modifier.size(48.dp),
-                    contentPadding = PaddingValues(10.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    LegacyPreviewTabIcon(tab, palette.cyanMicro, Modifier.fillMaxSize())
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        text = tab.label,
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold),
-                        color = palette.text,
-                    )
-                    Text(
-                        text = tab.previewCopy,
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 17.sp),
-                        color = palette.muted,
-                        maxLines = 2,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** Existing placeholder-surface iconography stays untouched by the root-navigation translation. */
-@Composable
-private fun LegacyPreviewTabIcon(tab: MainTab,color: Color,modifier: Modifier=Modifier.size(18.dp)) {
-    Canvas(modifier) {
-        val w=size.width
-        val h=size.height
-        val s=size.minDimension*.076f
-        when(tab) {
-            MainTab.Play -> {
-                val knight = Path().apply {
-                    moveTo(w*.18f,h*.80f)
-                    lineTo(w*.80f,h*.80f)
-                    lineTo(w*.74f,h*.68f)
-                    cubicTo(w*.82f,h*.56f,w*.77f,h*.41f,w*.62f,h*.31f)
-                    lineTo(w*.79f,h*.17f)
-                    lineTo(w*.61f,h*.08f)
-                    lineTo(w*.45f,h*.16f)
-                    lineTo(w*.34f,h*.30f)
-                    lineTo(w*.17f,h*.51f)
-                    lineTo(w*.43f,h*.47f)
-                    lineTo(w*.23f,h*.65f)
-                }
-                drawPath(knight,color,style=Stroke(width=s,cap=StrokeCap.Round,join=StrokeJoin.Round))
-                drawLine(color,Offset(w*.14f,h*.88f),Offset(w*.84f,h*.88f),s,StrokeCap.Round)
-                drawCircle(color,s*.62f,Offset(w*.50f,h*.25f))
-                val play = Path().apply {
-                    moveTo(w*.56f,h*.48f)
-                    lineTo(w*.75f,h*.58f)
-                    lineTo(w*.56f,h*.68f)
-                    close()
-                }
-                drawPath(play,color.copy(alpha=.92f))
-            }
-            MainTab.Arena -> {
-                drawLine(color,Offset(w*.24f,h*.22f),Offset(w*.76f,h*.78f),s,StrokeCap.Round)
-                drawLine(color,Offset(w*.76f,h*.22f),Offset(w*.24f,h*.78f),s,StrokeCap.Round)
-                drawCircle(color,s*1.15f,Offset(w*.23f,h*.21f))
-                drawCircle(color,s*1.15f,Offset(w*.77f,h*.21f))
-            }
-            MainTab.Games -> {
-                drawRoundRect(color,Offset(w*.2f,h*.18f),Size(w*.6f,h*.64f),CornerRadius(w*.08f),style=Stroke(s))
-                repeat(3) { i ->
-                    val y=h*(.34f+i*.16f)
-                    drawLine(color,Offset(w*.32f,y),Offset(w*.68f,y),s*.74f,StrokeCap.Round)
-                }
-            }
-            MainTab.Insights -> {
-                drawLine(color,Offset(w*.22f,h*.76f),Offset(w*.22f,h*.52f),s*1.24f,StrokeCap.Round)
-                drawLine(color,Offset(w*.5f,h*.76f),Offset(w*.5f,h*.34f),s*1.24f,StrokeCap.Round)
-                drawLine(color,Offset(w*.78f,h*.76f),Offset(w*.78f,h*.2f),s*1.24f,StrokeCap.Round)
-            }
-            MainTab.Settings -> {
-                drawCircle(color,w*.29f,Offset(w*.5f,h*.5f),style=Stroke(s))
-                drawCircle(color,w*.09f,Offset(w*.5f,h*.5f),style=Stroke(s))
-                drawLine(color,Offset(w*.08f,h*.5f),Offset(w*.2f,h*.5f),s,StrokeCap.Round)
-                drawLine(color,Offset(w*.8f,h*.5f),Offset(w*.92f,h*.5f),s,StrokeCap.Round)
-                drawLine(color,Offset(w*.5f,h*.08f),Offset(w*.5f,h*.2f),s,StrokeCap.Round)
-                drawLine(color,Offset(w*.5f,h*.8f),Offset(w*.5f,h*.92f),s,StrokeCap.Round)
             }
         }
     }

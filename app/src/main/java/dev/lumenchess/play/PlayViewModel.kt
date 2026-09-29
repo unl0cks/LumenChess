@@ -220,7 +220,11 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun currentPgn(): String? = coordinator?.state?.gameTree?.let { dev.lumenchess.core.chess.Pgn.serialize(it) }
+    fun currentPgn(): String? {
+        val tree = coordinator?.state?.gameTree ?: return null
+        val setup = mutableUiState.value.resolvedSetup ?: return dev.lumenchess.core.chess.Pgn.serialize(tree)
+        return dev.lumenchess.core.chess.Pgn.serialize(tree.withHeaders(PlayGameHeaders.build(setup)))
+    }
 
     fun currentFen(): String? = coordinator?.state?.position?.let { dev.lumenchess.core.chess.Fen.serialize(it) }
 

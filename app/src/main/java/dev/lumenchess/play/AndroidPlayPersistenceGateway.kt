@@ -64,7 +64,7 @@ class AndroidPlayPersistenceGateway(
                 val id = runSuspendBlocking {
                     liveRepository.persist(
                         existingId = gameId?.let(::PersistentGameId),
-                        tree = snapshot.gameTree,
+                        tree = snapshot.gameTree.withHeaders(PlayGameHeaders.build(setup)),
                         metadata = GamePersistenceMetadata(
                             createdAtEpochMillis = createdAtEpochMillis,
                             playedAtEpochMillis = createdAtEpochMillis,

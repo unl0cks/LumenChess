@@ -36,6 +36,8 @@ import dev.lumenchess.design.LumenMotion
 import dev.lumenchess.design.LumenTheme
 import dev.lumenchess.games.GameLibraryRoute
 import dev.lumenchess.games.GameLibraryViewModel
+import dev.lumenchess.insights.InsightsRoute
+import dev.lumenchess.insights.InsightsViewModel
 import dev.lumenchess.play.PlayScreenMode
 import dev.lumenchess.play.PlayViewModel
 import dev.lumenchess.play.ReferencePlayRoute
@@ -47,12 +49,12 @@ import dev.lumenchess.settings.SettingsScreen
 import dev.lumenchess.settings.SoundsHapticsScreen
 import kotlinx.coroutines.launch
 
-internal enum class MainTab(val label:String,val previewCopy:String) {
-    Play("Play","Play against Stockfish or Reckless"),
-    Arena("Arena","Set up engine battles with independent engines and openings"),
-    Games("Games","Browse your local and imported chess library"),
-    Insights("Insights","Explore performance trends and chess statistics"),
-    Settings("Settings","Tune LumenChess to your board and feedback preferences"),
+internal enum class MainTab(val label:String) {
+    Play("Play"),
+    Arena("Arena"),
+    Games("Games"),
+    Insights("Insights"),
+    Settings("Settings"),
 }
 private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS }
 
@@ -146,7 +148,11 @@ fun LumenChessApp() {
                                 SettingsDestination.BOARD_APPEARANCE -> BoardAppearanceScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
                                 SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
                             }
-                            else -> FutureSurfacePreview(tab)
+                            MainTab.Insights -> InsightsRoute(
+                                viewModel = viewModel<InsightsViewModel>(),
+                                onPlay = { currentTab = MainTab.Play },
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         }
                     }
                 }

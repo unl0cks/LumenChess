@@ -261,14 +261,30 @@ fun LumenEngineBadge(label: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun LumenClock(text: String, modifier: Modifier = Modifier, active: Boolean = false, light: Boolean = false) {
+fun LumenClock(
+    text: String,
+    modifier: Modifier = Modifier,
+    active: Boolean = false,
+    light: Boolean = false,
+    /** Time trouble: the running clock turns warning-red so it reads at a glance. */
+    urgent: Boolean = false,
+) {
     val animatedBorder by animateColorAsState(
-        if (active) LumenColors.AccentBlue.copy(alpha=.72f) else LumenColors.Outline,
+        when {
+            urgent -> LumenColors.Destructive.copy(alpha = .78f)
+            active -> LumenColors.AccentBlue.copy(alpha = .72f)
+            else -> LumenColors.Outline
+        },
         LumenMotion.fastTween(), label = "lumen-clock-border",
     )
     val bg = if (light) Color(0xFFF0EFE8) else if (active) LumenColors.SurfaceHighest else LumenColors.Background
-    val border = if (light) Color(0xFFCAC8BE) else animatedBorder
-    val textColor = if (light) Color(0xFF16191A) else LumenColors.OnSurface
+    val border = if (light) (if (urgent) Color(0xFFB23A3F) else Color(0xFFCAC8BE)) else animatedBorder
+    val textColor = when {
+        urgent && light -> Color(0xFFA4272C)
+        urgent -> LumenColors.Destructive
+        light -> Color(0xFF16191A)
+        else -> LumenColors.OnSurface
+    }
     Box(
         modifier.defaultMinSize(minWidth=84.dp,minHeight=40.dp).clip(RoundedCornerShape(6.dp))
             .background(bg).border(1.dp,border,RoundedCornerShape(6.dp)).padding(horizontal=10.dp,vertical=5.dp),

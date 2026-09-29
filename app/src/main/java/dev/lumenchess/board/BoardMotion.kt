@@ -23,17 +23,23 @@ data class BoardDragVisuals(
     val shadowOffsetDp: Float,
 )
 
-/** Frozen Grounded Precision motion values. Geometry remains outside board measurement. */
+/**
+ * Grounded Precision motion values. Easing (CrispEase), scale, lift and shadow are unchanged from
+ * the approved P6.4 language; durations were lengthened after physical-device review found the
+ * original 145-165 ms slides too brief to register, especially engine moves and castling, which the
+ * eye is not already tracking. Geometry remains outside board measurement.
+ */
 object GroundedPrecisionBoardMotion {
     const val pickupDurationMillis = 70
-    const val legalDropDurationMillis = 90
-    const val illegalDropDurationMillis = 120
-    const val humanMoveDurationMillis = 145
-    const val engineMoveDurationMillis = 155
-    const val premoveDurationMillis = 110
-    const val captureFadeDurationMillis = 55
-    const val castlingDurationMillis = 165
-    const val promotionDurationMillis = 80
+    const val legalDropDurationMillis = 110
+    const val illegalDropDurationMillis = 160
+    const val humanMoveDurationMillis = 190
+    const val engineMoveDurationMillis = 230
+    const val premoveDurationMillis = 140
+    /** Must not exceed [legalDropDurationMillis]: a dropped capture fades on drop progress. */
+    const val captureFadeDurationMillis = 90
+    const val castlingDurationMillis = 260
+    const val promotionDurationMillis = 120
     const val promotionInitialScale = .96f
 
     const val pickupScale = 1.04f

@@ -189,3 +189,21 @@ internal fun formatLiveTimeControl(clock: ClockConfig): String {
 }
 
 private fun Color.label(): String = name.lowercase().replaceFirstChar { it.uppercase() }
+
+/** Under ten seconds the clock shows tenths, like a real chess clock; long controls show hours. */
+internal fun formatLiveClock(millis: Long?): String {
+    if (millis == null) return "--:--"
+    val safe = millis.coerceAtLeast(0L)
+    return when {
+        safe < URGENT_CLOCK_MILLIS ->
+            String.format(java.util.Locale.ROOT, "0:%02d.%d", safe / 1_000L, (safe % 1_000L) / 100L)
+        safe >= 3_600_000L -> String.format(
+            java.util.Locale.ROOT, "%d:%02d:%02d", safe / 3_600_000L, (safe % 3_600_000L) / 60_000L, (safe % 60_000L) / 1_000L,
+        )
+        else -> String.format(java.util.Locale.ROOT, "%d:%02d", safe / 60_000L, (safe % 60_000L) / 1_000L)
+    }
+}
+
+internal fun isLiveClockUrgent(millis: Long?): Boolean = millis != null && millis < URGENT_CLOCK_MILLIS
+
+private const val URGENT_CLOCK_MILLIS = 10_000L
