@@ -69,9 +69,6 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     private var persistenceGateway: AndroidPlayPersistenceGateway? = null
     private var restoreProbe: AndroidPlayPersistenceGateway? = null
     private var screenStarted = false
-    private var trackedEngineSearchId: Long? = null
-    private var engineSearchStartedAtMillis: Long? = null
-    private var delayedEngineResult: EngineSearchResult? = null
     private var delayedEngineResultRunnable: Runnable? = null
 
     private val clockTicker = object : Runnable {
@@ -111,7 +108,14 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
     fun startNewGame() {
         val config = mutableUiState.value.setup
         if (PlaySetupValidator.validate(config) !is PlaySetupValidation.Valid) return
-        startResolvedGame(PlaySetupResolver.resolve(config), restored = null)
+        // A fresh seed per game keeps Humanized/Hybrid choices from replaying identically every
+        // time; the resolved seed is persisted with the game, so restore and replay stay exact.
+        val seeded = if (config.strengthSeed != 0L) {
+            config
+        } else {
+            config.copy(strengthSeed = kotlin.random.Random.nextLong().takeIf { it != 0L } ?: 1L)
+        }
+        startResolvedGame(PlaySetupResolver.resolve(seeded), restored = null)
     }
 
     fun resumeLastGame() {
@@ -318,8 +322,6 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
             reading = clockReader.read(state.clock)
         }
 
-        trackEngineSearch(state)
-
         // Commit presentation state first. Feedback observes this committed projection afterwards.
         mutableUiState.value = mutableUiState.value.copy(runtime = state, clock = reading)
         val feedbackState = state
@@ -329,47 +331,41 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun trackEngineSearch(state: RuntimeState) {
-        val searchId = state.pendingEngineSearch?.searchId?.value
-        if (searchId == trackedEngineSearchId) return
-        trackedEngineSearchId = searchId
-        engineSearchStartedAtMillis = if (searchId == null) null else SystemClock.elapsedRealtime()
-    }
-
+    /**
+     * Holds a finished engine move for the remainder of its planned think time. The runtime clock
+     * keeps running for the engine side meanwhile (and can flag it), while the runtime stays the
+     * only authority that validates and applies the move: a result that is stale by the time it is
+     * released is simply rejected there.
+     */
     private fun scheduleEngineResult(result: EngineSearchResult) {
         val current = coordinator ?: return
-        val pending = current.state.pendingEngineSearch
-        if (pending == null || pending.searchId.value != result.searchId.value ||
-            pending.positionRevision != result.positionRevision
-        ) {
-            // Runtime remains the final stale-result gate. Do not retain a presentation callback
-            // for a search that is no longer the active lease.
+        val delay = current.presentationDelayMillis(result)
+        if (delay <= 0L) {
+            // Due now, or not the active lease (a late result from a cancelled search): hand it to
+            // the runtime, which rejects stale ones. It must never cancel a valid pending release.
+            deliverEngineResult(result)
             return
         }
-
-        delayedEngineResultRunnable?.let(mainHandler::removeCallbacks)
-        delayedEngineResult = result
-        val elapsed = engineSearchStartedAtMillis?.let { SystemClock.elapsedRealtime() - it } ?: 0L
-        val delay = EngineResponseTimingPolicy.remainingMillis(current.setup.strength, elapsed)
-        if (delay == 0L) {
-            applyDelayedEngineResult()
-            return
+        // Only the active lease gets a delay, and only one lease exists, so this replaces at most
+        // an older release for the same search.
+        clearDelayedEngineResult()
+        val runnable = Runnable {
+            delayedEngineResultRunnable = null
+            deliverEngineResult(result)
         }
-
-        val runnable = Runnable { applyDelayedEngineResult() }
         delayedEngineResultRunnable = runnable
         mainHandler.postDelayed(runnable, delay)
     }
 
-    private fun applyDelayedEngineResult() {
-        val result = delayedEngineResult ?: return
-        delayedEngineResult = null
-        delayedEngineResultRunnable = null
+    private fun deliverEngineResult(result: EngineSearchResult) {
         val current = coordinator ?: return
-        val pending = current.state.pendingEngineSearch ?: return
-        if (pending.searchId.value != result.searchId.value || pending.positionRevision != result.positionRevision) return
         current.onEngineResult(result)
         refreshRuntimeProjection(checkTimeout = false)
+    }
+
+    private fun clearDelayedEngineResult() {
+        delayedEngineResultRunnable?.let(mainHandler::removeCallbacks)
+        delayedEngineResultRunnable = null
     }
 
     private fun updateSetup(transform: PlaySetupConfig.() -> PlaySetupConfig) {
@@ -407,11 +403,7 @@ class PlayViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun stopLiveAdapters() {
         mainHandler.removeCallbacks(clockTicker)
-        delayedEngineResultRunnable?.let(mainHandler::removeCallbacks)
-        delayedEngineResultRunnable = null
-        delayedEngineResult = null
-        trackedEngineSearchId = null
-        engineSearchStartedAtMillis = null
+        clearDelayedEngineResult()
         feedbackHandler.removeCallbacksAndMessages(null)
         feedbackObserver.resetBaseline(null)
         engineGateway?.setListener(null)
@@ -438,4 +430,7 @@ fun RuntimeTerminal.presentationLabel(): String = when (this) {
     RuntimeTerminal.DrawAgreement -> "Draw by agreement"
     is RuntimeTerminal.Checkmate -> "Checkmate · ${winner.name.lowercase().replaceFirstChar { it.uppercase() }} wins"
     RuntimeTerminal.Stalemate -> "Draw by stalemate"
+    RuntimeTerminal.InsufficientMaterial -> "Draw · insufficient material"
+    RuntimeTerminal.ThreefoldRepetition -> "Draw by threefold repetition"
+    RuntimeTerminal.FiftyMoveRule -> "Draw by fifty-move rule"
 }

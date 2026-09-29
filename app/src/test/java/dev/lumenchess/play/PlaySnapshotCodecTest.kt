@@ -15,6 +15,7 @@ import dev.lumenchess.engine.api.EngineSearchRequest
 import dev.lumenchess.engine.api.EngineStrengthModel
 import dev.lumenchess.engine.api.EngineStrengthTarget
 import dev.lumenchess.runtime.RuntimeSnapshot
+import dev.lumenchess.runtime.RuntimeTerminal
 import dev.lumenchess.runtime.clock.MonotonicTimeSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -74,6 +75,29 @@ class PlaySnapshotCodecTest {
         assertEquals(snapshot.gameTree.mainline().map { it.move }, decoded.snapshot.gameTree.mainline().map { it.move })
         assertTrue(decoded.snapshot.paused)
         assertTrue(!decoded.snapshot.clock.running)
+    }
+
+    @Test
+    fun everyTerminalKindSurvivesTheVersionedRoundTrip() {
+        val setup = PlaySetupResolver.resolve(PlaySetupConfig())
+        val coordinator = PlayRuntimeCoordinator.create(setup, FakeTime(), NoopEngine, NoopPersistence)
+        coordinator.start()
+        val snapshot = coordinator.snapshotForRestore()
+
+        listOf(
+            RuntimeTerminal.Timeout(Color.BLACK),
+            RuntimeTerminal.Resignation(Color.WHITE),
+            RuntimeTerminal.DrawAgreement,
+            RuntimeTerminal.Checkmate(Color.WHITE),
+            RuntimeTerminal.Stalemate,
+            RuntimeTerminal.InsufficientMaterial,
+            RuntimeTerminal.ThreefoldRepetition,
+            RuntimeTerminal.FiftyMoveRule,
+        ).forEach { terminal ->
+            val ended = snapshot.copy(terminal = terminal)
+            val decoded = PlaySnapshotCodec.decode(loadedGame(ended, PlaySnapshotCodec.encode(ended, setup)))
+            assertEquals(terminal, decoded.snapshot.terminal, "terminal $terminal must round-trip")
+        }
     }
 
     @Test

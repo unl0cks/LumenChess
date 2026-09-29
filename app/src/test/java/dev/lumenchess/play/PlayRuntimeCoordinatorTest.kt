@@ -44,6 +44,7 @@ class PlayRuntimeCoordinatorTest {
         engine: PlayEngine = PlayEngine.STOCKFISH_18,
         variant: Variant = Variant.STANDARD,
         timeControl: PlayTimeControl = PlayTimeControl(60_000L, 1_000L),
+        target: EngineStrengthTarget = EngineStrengthTarget.Elo(1400),
     ) = PlaySetupResolver.resolve(
         PlaySetupConfig(
             variant = variant,
@@ -51,7 +52,7 @@ class PlayRuntimeCoordinatorTest {
             engine = engine,
             side = side,
             strengthModel = EngineStrengthModel.HYBRID,
-            strengthTarget = EngineStrengthTarget.Elo(1400),
+            strengthTarget = target,
             timeControl = timeControl,
             strengthSeed = 77L,
         ),
@@ -76,7 +77,7 @@ class PlayRuntimeCoordinatorTest {
         assertEquals(EngineStrengthTarget.Elo(1400), request.strength.target)
         assertEquals(77L, request.strength.seed)
         assertNotNull(request.limits.moveTimeMillis)
-        assertTrue(request.limits.moveTimeMillis!! in 1L..1_500L)
+        assertTrue(request.limits.moveTimeMillis!! in 1L..3_000L)
         assertEquals(1L, coordinator.state.positionRevision.value)
     }
 
@@ -117,6 +118,107 @@ class PlayRuntimeCoordinatorTest {
         val replacement = engine.started.last()
         assertTrue(replacement.searchId != old.searchId)
         assertEquals(old.positionRevision, replacement.positionRevision)
+    }
+
+    @Test
+    fun eloLimitedEngineReplyIsHeldForItsPlannedThinkTimeAndThenReleased() {
+        val time = FakeTime()
+        val engine = FakeEngine()
+        val coordinator = PlayRuntimeCoordinator.create(
+            setup(timeControl = PlayTimeControl(600_000L, 0L)),
+            time,
+            engine,
+            FakePersistence(),
+        )
+        coordinator.start()
+        coordinator.onEngineHostRecovered()
+        coordinator.humanMove(Move.parseUci("e2e4"))
+        val search = engine.started.single()
+        val result = EngineSearchResult(search.searchId, search.positionRevision, "e7e5")
+
+        val delay = coordinator.presentationDelayMillis(result)
+        assertTrue(delay >= 380L, "an Elo-limited reply must be held like a considered move, was $delay ms")
+
+        time.advanceBy(delay - 1L)
+        assertEquals(1L, coordinator.presentationDelayMillis(result))
+        time.advanceBy(1L)
+        assertEquals(0L, coordinator.presentationDelayMillis(result))
+    }
+
+    @Test
+    fun engineThinksOnItsOwnClockWhileTheReplyIsHeld() {
+        val time = FakeTime()
+        val engine = FakeEngine()
+        val coordinator = PlayRuntimeCoordinator.create(
+            setup(timeControl = PlayTimeControl(600_000L, 0L)),
+            time,
+            engine,
+            FakePersistence(),
+        )
+        coordinator.start()
+        coordinator.onEngineHostRecovered()
+        coordinator.humanMove(Move.parseUci("e2e4"))
+        val search = engine.started.single()
+        val delay = coordinator.presentationDelayMillis(
+            EngineSearchResult(search.searchId, search.positionRevision, "e7e5"),
+        )
+
+        time.advanceBy(delay)
+        coordinator.onEngineResult(EngineSearchResult(search.searchId, search.positionRevision, "e7e5"))
+
+        val clockAfter = coordinator.state.clock
+        assertEquals(600_000L, clockAfter.whiteRemainingMillis)
+        assertEquals(600_000L - delay, clockAfter.blackRemainingMillis)
+    }
+
+    @Test
+    fun staleOrCancelledSearchesGetNoPresentationDelay() {
+        val time = FakeTime()
+        val engine = FakeEngine()
+        val coordinator = PlayRuntimeCoordinator.create(
+            setup(timeControl = PlayTimeControl(600_000L, 0L)),
+            time,
+            engine,
+            FakePersistence(),
+        )
+        coordinator.start()
+        coordinator.onEngineHostRecovered()
+        coordinator.humanMove(Move.parseUci("e2e4"))
+        val search = engine.started.single()
+        val stale = EngineSearchResult(EngineSearchId(search.searchId.value + 50L), search.positionRevision, "e7e5")
+        val current = EngineSearchResult(search.searchId, search.positionRevision, "e7e5")
+
+        assertEquals(0L, coordinator.presentationDelayMillis(stale))
+        assertTrue(coordinator.presentationDelayMillis(current) > 0L)
+
+        coordinator.pause()
+
+        assertEquals(0L, coordinator.presentationDelayMillis(current))
+    }
+
+    @Test
+    fun fullStrengthEngineIsNotPaddedBeyondItsRealSearch() {
+        val engine = FakeEngine()
+        val coordinator = PlayRuntimeCoordinator.create(
+            setup(
+                timeControl = PlayTimeControl(600_000L, 0L),
+                target = EngineStrengthTarget.FullStrength,
+            ),
+            FakeTime(),
+            engine,
+            FakePersistence(),
+        )
+        coordinator.start()
+        coordinator.onEngineHostRecovered()
+        coordinator.humanMove(Move.parseUci("e2e4"))
+        val search = engine.started.single()
+
+        assertTrue(search.limits.moveTimeMillis!! >= 60L)
+        assertTrue(
+            coordinator.presentationDelayMillis(
+                EngineSearchResult(search.searchId, search.positionRevision, "e7e5"),
+            ) <= 400L,
+        )
     }
 
     @Test

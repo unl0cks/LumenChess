@@ -149,6 +149,9 @@ class AndroidArenaPersistenceGateway(
         RuntimeTerminal.DrawAgreement -> PersistedTermination.AGREEMENT
         is RuntimeTerminal.Checkmate -> PersistedTermination.CHECKMATE
         RuntimeTerminal.Stalemate -> PersistedTermination.STALEMATE
+        RuntimeTerminal.InsufficientMaterial -> PersistedTermination.INSUFFICIENT_MATERIAL
+        RuntimeTerminal.ThreefoldRepetition -> PersistedTermination.THREEFOLD_REPETITION
+        RuntimeTerminal.FiftyMoveRule -> PersistedTermination.FIFTY_MOVE_RULE
     }
 
     private fun <T> runSuspendBlocking(block: suspend () -> T): T {
