@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -49,6 +50,9 @@ import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Variant
 import dev.lumenchess.design.DerivativeSurfaceRole
 import dev.lumenchess.design.LumenClock
+import dev.lumenchess.design.LumenActionGlyph
+import dev.lumenchess.design.LumenActionStrip
+import dev.lumenchess.design.LumenActionTile
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenDerivativePage
 import dev.lumenchess.design.LumenDerivativeSurface
@@ -432,15 +436,23 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
     // is centred between two equal slots, so the board never moves. Everything that varies with mode
     // (messages, result, history browsing, sandbox controls) lives in the lower slot, under the
     // actions, and grows downward without touching the board.
-    Column(
+    BoxWithConstraints(
         modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .padding(horizontal = 7.dp, vertical = 5.dp)
             .testTag("arena-live"),
     ) {
+    // Width-led on phones, height-led on short screens: the board shrinks before the lower slot
+    // (history and sandbox controls) or the actions can be pushed off screen.
+    val boardSide = minOf(maxWidth, maxHeight - ARENA_GROUP_CHROME - ARENA_LOWER_SLOT_RESERVE)
+        .coerceAtLeast(ARENA_MIN_BOARD_SIDE)
+    Column(Modifier.fillMaxSize()) {
         Spacer(Modifier.weight(1f))
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(
+            Modifier.width(boardSide).align(Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
         val upperSide = if (ui.orientation == ChessboardOrientation.WHITE) Color.BLACK else Color.WHITE
         val lowerSide = upperSide.opposite
         ArenaParticipantRow(upperSide, ui, runtime, setup)
@@ -477,17 +489,18 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
         }
         ArenaParticipantRow(lowerSide, ui, runtime, setup)
 
-            Row(Modifier.fillMaxWidth().height(54.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                ArenaAction("Flip", "arena-flip", viewModel::flipBoard, Modifier.weight(1f))
-                ArenaAction(
-                    if (runtime.paused) "Resume" else "Pause",
-                    "arena-pause",
-                    if (runtime.paused) viewModel::resume else viewModel::pause,
-                    Modifier.weight(1f),
+            // Same icon-and-label keys as the Live screen, so both game screens read as one product.
+            LumenActionStrip(Modifier.fillMaxWidth().height(ARENA_ACTION_STRIP_HEIGHT).testTag("arena-action-strip")) {
+                LumenActionTile("Flip", LumenActionGlyph.FLIP, "arena-flip", viewModel::flipBoard)
+                LumenActionTile(
+                    label = if (runtime.paused) "Resume" else "Pause",
+                    glyph = if (runtime.paused) LumenActionGlyph.PLAY else LumenActionGlyph.PAUSE,
+                    testTag = "arena-pause",
+                    onClick = if (runtime.paused) viewModel::resume else viewModel::pause,
                 )
-                ArenaAction("Control", "arena-control", { showManualControl = true }, Modifier.weight(1f))
-                ArenaAction("Branch", "arena-branch", viewModel::browseHistory, Modifier.weight(1f))
-                ArenaAction("Stop", "arena-stop", viewModel::stopArena, Modifier.weight(1f))
+                LumenActionTile("Control", LumenActionGlyph.CONTROL, "arena-control", { showManualControl = true })
+                LumenActionTile("Branch", LumenActionGlyph.BRANCH, "arena-branch", viewModel::browseHistory)
+                LumenActionTile("Stop", LumenActionGlyph.STOP, "arena-stop", viewModel::stopArena, destructive = true)
             }
     
         }
@@ -517,6 +530,7 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
             }
         }
         }
+    }
     }
     if (showManualControl) {
         ArenaManualControlDialog(
@@ -699,3 +713,10 @@ private fun arenaClockText(millis: Long?): String {
     val safe = millis.coerceAtLeast(0L)
     return "%d:%02d".format(safe / 60_000L, (safe % 60_000L) / 1_000L)
 }
+
+private val ARENA_ACTION_STRIP_HEIGHT = 72.dp
+/** Two 56 dp participant cards, the 20 dp evaluation bar, the action strip and four 5 dp gaps. */
+private val ARENA_GROUP_CHROME = 56.dp * 2 + 20.dp + ARENA_ACTION_STRIP_HEIGHT + 5.dp * 4
+/** Room kept for the lower slot's tallest state: history browsing plus "Branch from here". */
+private val ARENA_LOWER_SLOT_RESERVE = 136.dp
+private val ARENA_MIN_BOARD_SIDE = 200.dp

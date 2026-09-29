@@ -65,6 +65,9 @@ import dev.lumenchess.core.chess.Color
 import dev.lumenchess.core.chess.Move
 import dev.lumenchess.core.chess.PieceType
 import dev.lumenchess.core.chess.Square
+import dev.lumenchess.design.LumenActionGlyph
+import dev.lumenchess.design.LumenActionStrip
+import dev.lumenchess.design.LumenActionTile
 import dev.lumenchess.design.LumenClock
 import dev.lumenchess.design.LumenColors
 import dev.lumenchess.design.LumenEngineBadge
@@ -516,8 +519,6 @@ private fun BoardFirstPremoveOverlay(
     )
 }
 
-private enum class BoardFirstActionGlyph { PAUSE, PLAY, FLAG, CANCEL, FLIP, DRAW, MENU, NEW_GAME, REMATCH }
-
 @Composable
 private fun BoardFirstEssentialActions(
     runtime: RuntimeState,
@@ -529,234 +530,29 @@ private fun BoardFirstEssentialActions(
     viewModel: PlayViewModel,
     modifier: Modifier,
 ) {
-    val stripShape = RoundedCornerShape(7.dp)
     val playing = runtime.terminal == null
-    Row(
-        modifier
-            .background(LumenColors.SurfaceRaised.copy(alpha = .91f), stripShape)
-            .border(1.dp, LumenColors.Outline.copy(alpha = .70f), stripShape)
-            .padding(horizontal = 4.dp, vertical = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
+    LumenActionStrip(modifier) {
         if (hasPremove) {
-            BoardFirstAction(
-                label = "Cancel",
-                glyph = BoardFirstActionGlyph.CANCEL,
-                testTag = "p5-live-action-cancel",
-                onClick = viewModel::cancelPremove,
-            )
+            LumenActionTile("Cancel", LumenActionGlyph.CANCEL, "p5-live-action-cancel", viewModel::cancelPremove)
         }
         if (showPauseButton && playing) {
-            BoardFirstAction(
+            LumenActionTile(
                 label = if (runtime.paused) "Resume" else "Pause",
-                glyph = if (runtime.paused) BoardFirstActionGlyph.PLAY else BoardFirstActionGlyph.PAUSE,
+                glyph = if (runtime.paused) LumenActionGlyph.PLAY else LumenActionGlyph.PAUSE,
                 testTag = "p5-live-action-pause",
                 onClick = if (runtime.paused) viewModel::resume else viewModel::pause,
             )
         }
         if (playing) {
-            BoardFirstAction(
-                label = "Resign",
-                glyph = BoardFirstActionGlyph.FLAG,
-                destructive = true,
-                testTag = "p5-live-action-resign",
-                onClick = onResign,
-            )
-            BoardFirstAction(
-                label = "Draw",
-                glyph = BoardFirstActionGlyph.DRAW,
-                testTag = "p5-live-action-draw",
-                onClick = viewModel::offerDraw,
-            )
+            LumenActionTile("Resign", LumenActionGlyph.FLAG, "p5-live-action-resign", onResign, destructive = true)
+            LumenActionTile("Draw", LumenActionGlyph.DRAW, "p5-live-action-draw", viewModel::offerDraw)
         } else {
             // "New game" keeps the historical exit tag: it is the way out of a finished game.
-            BoardFirstAction(
-                label = "New game",
-                glyph = BoardFirstActionGlyph.NEW_GAME,
-                testTag = "p5-live-action-exit",
-                onClick = viewModel::backToSetup,
-            )
-            BoardFirstAction(
-                label = "Rematch",
-                glyph = BoardFirstActionGlyph.REMATCH,
-                testTag = "p5-live-action-rematch",
-                onClick = viewModel::rematch,
-            )
+            LumenActionTile("New game", LumenActionGlyph.NEW_GAME, "p5-live-action-exit", viewModel::backToSetup)
+            LumenActionTile("Rematch", LumenActionGlyph.REMATCH, "p5-live-action-rematch", viewModel::rematch)
         }
-        BoardFirstAction(
-            label = "Flip",
-            glyph = BoardFirstActionGlyph.FLIP,
-            testTag = "p5-live-action-flip",
-            onClick = onFlipBoard,
-        )
-        BoardFirstAction(
-            label = "Menu",
-            glyph = BoardFirstActionGlyph.MENU,
-            testTag = "p5-live-action-menu",
-            onClick = onMenu,
-        )
-    }
-}
-
-@Composable
-private fun RowScope.BoardFirstAction(
-    label: String,
-    glyph: BoardFirstActionGlyph,
-    destructive: Boolean = false,
-    testTag: String,
-    onClick: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) .955f else 1f,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "board-first-action-scale-$label",
-    )
-    val offset by animateDpAsState(
-        targetValue = if (pressed) 1.2.dp else 0.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "board-first-action-offset-$label",
-    )
-    val elevation by animateDpAsState(
-        targetValue = if (pressed) .2.dp else 1.8.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "board-first-action-shadow-$label",
-    )
-    val lowerEdge by animateDpAsState(
-        targetValue = if (pressed) .4.dp else 2.dp,
-        animationSpec = if (pressed) LumenMotion.pressTween() else LumenMotion.releaseTween(),
-        label = "board-first-action-edge-$label",
-    )
-    val shape = RoundedCornerShape(5.dp)
-    val tint = if (destructive) LumenColors.Destructive else LumenColors.OnSurfaceMuted
-    val faceTop = if (destructive) {
-        LumenColors.DestructiveSoft.copy(alpha = if (pressed) .36f else .24f)
-    } else if (pressed) {
-        LumenColors.SurfaceHighest.copy(alpha = .82f)
-    } else {
-        LumenColors.SurfaceHighest.copy(alpha = .66f)
-    }
-    val faceBottom = if (pressed) LumenColors.Surface.copy(alpha = .98f) else LumenColors.SurfaceRaised
-    val lowerEdgeColor = if (destructive) {
-        LumenColors.Destructive.copy(alpha = .23f)
-    } else {
-        LumenColors.OutlineStrong.copy(alpha = .72f)
-    }
-
-    Box(
-        Modifier.weight(1f).fillMaxSize().testTag(testTag)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationY = offset.toPx()
-            }
-            .shadow(elevation, shape, clip = false)
-            .clip(shape)
-            .background(LumenColors.Background)
-            .drawBehind {
-                drawRect(
-                    color = lowerEdgeColor,
-                    topLeft = Offset(0f, size.height - lowerEdge.toPx()),
-                )
-            }
-            .padding(bottom = lowerEdge)
-            .clip(shape)
-            .background(Brush.verticalGradient(listOf(faceTop, faceBottom)))
-            .border(
-                1.dp,
-                if (destructive) LumenColors.Destructive.copy(alpha = .46f)
-                else LumenColors.OutlineStrong.copy(alpha = if (pressed) .92f else .76f),
-                shape,
-            )
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                role = Role.Button,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            BoardFirstActionGlyph(glyph, if (pressed && !destructive) LumenColors.OnSurface else tint)
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                fontWeight = FontWeight.Medium,
-                color = if (pressed && !destructive) LumenColors.OnSurface else tint,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BoardFirstActionGlyph(glyph: BoardFirstActionGlyph, tint: UiColor) {
-    Canvas(Modifier.size(20.dp)) {
-        val stroke = 1.6.dp.toPx()
-        when (glyph) {
-            BoardFirstActionGlyph.PAUSE -> {
-                drawLine(tint, Offset(size.width * .36f, size.height * .24f), Offset(size.width * .36f, size.height * .76f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .64f, size.height * .24f), Offset(size.width * .64f, size.height * .76f), stroke, StrokeCap.Round)
-            }
-            BoardFirstActionGlyph.PLAY -> {
-                val path = Path().apply {
-                    moveTo(size.width * .36f, size.height * .24f)
-                    lineTo(size.width * .73f, size.height * .50f)
-                    lineTo(size.width * .36f, size.height * .76f)
-                    close()
-                }
-                drawPath(path, tint)
-            }
-            BoardFirstActionGlyph.FLAG -> {
-                drawLine(tint, Offset(size.width * .31f, size.height * .18f), Offset(size.width * .31f, size.height * .82f), stroke, StrokeCap.Round)
-                val flag = Path().apply {
-                    moveTo(size.width * .32f, size.height * .22f)
-                    lineTo(size.width * .72f, size.height * .30f)
-                    lineTo(size.width * .56f, size.height * .49f)
-                    lineTo(size.width * .32f, size.height * .44f)
-                    close()
-                }
-                drawPath(flag, tint)
-            }
-            BoardFirstActionGlyph.CANCEL -> {
-                drawLine(tint, Offset(size.width * .27f, size.height * .27f), Offset(size.width * .73f, size.height * .73f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .73f, size.height * .27f), Offset(size.width * .27f, size.height * .73f), stroke, StrokeCap.Round)
-            }
-            BoardFirstActionGlyph.FLIP -> {
-                // Two opposed vertical arrows: the board turns over.
-                drawLine(tint, Offset(size.width * .32f, size.height * .78f), Offset(size.width * .32f, size.height * .22f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .32f, size.height * .22f), Offset(size.width * .20f, size.height * .36f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .32f, size.height * .22f), Offset(size.width * .44f, size.height * .36f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .68f, size.height * .22f), Offset(size.width * .68f, size.height * .78f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .68f, size.height * .78f), Offset(size.width * .56f, size.height * .64f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .68f, size.height * .78f), Offset(size.width * .80f, size.height * .64f), stroke, StrokeCap.Round)
-            }
-            BoardFirstActionGlyph.DRAW -> {
-                // "=": the result of a drawn game.
-                drawLine(tint, Offset(size.width * .24f, size.height * .38f), Offset(size.width * .76f, size.height * .38f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .24f, size.height * .62f), Offset(size.width * .76f, size.height * .62f), stroke, StrokeCap.Round)
-            }
-            BoardFirstActionGlyph.MENU -> {
-                val radius = stroke * .85f
-                listOf(.25f, .5f, .75f).forEach { x ->
-                    drawCircle(tint, radius = radius, center = Offset(size.width * x, size.height * .5f))
-                }
-            }
-            BoardFirstActionGlyph.NEW_GAME -> {
-                drawLine(tint, Offset(size.width * .24f, size.height * .5f), Offset(size.width * .76f, size.height * .5f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .5f, size.height * .24f), Offset(size.width * .5f, size.height * .76f), stroke, StrokeCap.Round)
-            }
-            BoardFirstActionGlyph.REMATCH -> {
-                // Opposed horizontal arrows: same opponent, colours swapped.
-                drawLine(tint, Offset(size.width * .22f, size.height * .36f), Offset(size.width * .78f, size.height * .36f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .78f, size.height * .36f), Offset(size.width * .62f, size.height * .24f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .78f, size.height * .36f), Offset(size.width * .62f, size.height * .48f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .78f, size.height * .64f), Offset(size.width * .22f, size.height * .64f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .22f, size.height * .64f), Offset(size.width * .38f, size.height * .52f), stroke, StrokeCap.Round)
-                drawLine(tint, Offset(size.width * .22f, size.height * .64f), Offset(size.width * .38f, size.height * .76f), stroke, StrokeCap.Round)
-            }
-        }
+        LumenActionTile("Flip", LumenActionGlyph.FLIP, "p5-live-action-flip", onFlipBoard)
+        LumenActionTile("Menu", LumenActionGlyph.MENU, "p5-live-action-menu", onMenu)
     }
 }
 

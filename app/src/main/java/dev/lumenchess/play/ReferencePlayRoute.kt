@@ -1,7 +1,6 @@
 package dev.lumenchess.play
 
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,7 +36,6 @@ fun ReferencePlayRoute(
     val ui by viewModel.uiState
     var page by rememberSaveable { mutableStateOf(ReferencePlayPage.OVERVIEW) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val slideDistance = with(LocalDensity.current) { 10.dp.roundToPx() }
     val focusedSubpageCallback by rememberUpdatedState(onFocusedSubpageChanged)
 
@@ -92,7 +90,6 @@ fun ReferencePlayRoute(
                     ui = ui,
                     onPlayVsEngine = { page = ReferencePlayPage.SETUP },
                     onArenaPreview = onOpenArena,
-                    onBack = { backDispatcher?.onBackPressed() },
                     modifier = Modifier,
                 )
                 ReferencePlayPage.SETUP -> ReferenceSetupScreen(
