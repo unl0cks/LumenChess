@@ -80,6 +80,8 @@ data class EngineSearchInfo(
     val nodes: Long? = null,
     val nodesPerSecond: Long? = null,
     val principalVariation: List<String> = emptyList(),
+    /** 1 for the engine's best line; higher for further MultiPV lines, in the engine's order. */
+    val multiPvRank: Int = 1,
 )
 
 sealed interface EngineSessionCommand {

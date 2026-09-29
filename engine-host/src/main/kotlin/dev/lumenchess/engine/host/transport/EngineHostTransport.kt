@@ -231,6 +231,7 @@ private class RemoteEngineSession(
             nodes: Long,
             nodesPerSecond: Long,
             principalVariation: String,
+            multiPvRank: Int,
         ) {
             if (closed.get()) return
             if (callbackSessionId != sessionId.value || hostGeneration != expectedGeneration) {
@@ -273,6 +274,7 @@ private class RemoteEngineSession(
                     nodes = nodes.takeIf { it > 0L },
                     nodesPerSecond = nodesPerSecond.takeIf { it > 0L },
                     principalVariation = principalVariation.split(' ').filter(String::isNotBlank),
+                    multiPvRank = multiPvRank.coerceAtLeast(1),
                 ),
             )
         }

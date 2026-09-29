@@ -128,6 +128,7 @@ dependencies {
     debugImplementation(platform(libs.compose.bom))
 
     implementation(project(":core-chess"))
+    implementation(project(":analysis-core"))
     implementation(project(":game-runtime"))
     implementation(project(":engine-api"))
     implementation(project(":engine-host"))

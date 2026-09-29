@@ -131,6 +131,9 @@ class AndroidPlayEngineGateway(
                 }
 
                 override fun onSearchInfo(sessionId: EngineSessionId, info: EngineSearchInfo) {
+                    // Play and Arena show one evaluation: the engine's best line. Further MultiPV
+                    // lines (humanization candidates) are not presentation data here.
+                    if (info.multiPvRank != 1) return
                     handler.post {
                         if (isActive(token) && sessionId == this@AndroidPlayEngineGateway.sessionId) {
                             listener?.onEngineInfo(info)

@@ -352,7 +352,7 @@ private class HostSession(
                 val current = active
                 current?.candidateAccumulator?.observe(event.info)
                 if (current != null && !current.cancelled) {
-                    event.info.toRankOneSearchInfo()?.let { projected -> emitSearchInfo(current, projected) }
+                    event.info.toProjectedSearchInfo()?.let { projected -> emitSearchInfo(current, projected) }
                 }
             }
             is UciEvent.BestMove -> {
@@ -412,6 +412,7 @@ private class HostSession(
                 info.nodes,
                 info.nodesPerSecond,
                 info.principalVariation,
+                info.multiPvRank,
             )
         } catch (_: RemoteException) {
             // Analysis is disposable when the app-side transport has disappeared.
@@ -442,10 +443,15 @@ internal data class ProjectedSearchInfo(
     val nodes: Long,
     val nodesPerSecond: Long,
     val principalVariation: String,
+    val multiPvRank: Int,
 )
 
-internal fun dev.lumenchess.engine.api.UciInfo.toRankOneSearchInfo(): ProjectedSearchInfo? {
-    if ((multiPv ?: 1) != 1) return null
+/**
+ * Every scored line crosses the Binder boundary with its MultiPV rank. Consumers that show a single
+ * evaluation (Play, Arena) keep rank 1; Analysis and Review use every line.
+ */
+internal fun dev.lumenchess.engine.api.UciInfo.toProjectedSearchInfo(): ProjectedSearchInfo? {
+    val rank = multiPv ?: 1
     val (scoreKind, scoreValue, scoreBound) = when (val resolvedScore = score) {
         is UciScore.Centipawns -> Triple(1, resolvedScore.value, resolvedScore.bound.wireValue)
         is UciScore.Mate -> Triple(2, resolvedScore.moves, resolvedScore.bound.wireValue)
@@ -459,6 +465,7 @@ internal fun dev.lumenchess.engine.api.UciInfo.toRankOneSearchInfo(): ProjectedS
         nodes = nodes ?: 0L,
         nodesPerSecond = nodesPerSecond ?: 0L,
         principalVariation = principalVariation.joinToString(" "),
+        multiPvRank = rank,
     )
 }
 

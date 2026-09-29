@@ -19,7 +19,8 @@ oneway interface IEngineHostCallback {
         int scoreBound,
         long nodes,
         long nodesPerSecond,
-        String principalVariation
+        String principalVariation,
+        int multiPvRank
     );
     void onHostFailure(
         String sessionId,
