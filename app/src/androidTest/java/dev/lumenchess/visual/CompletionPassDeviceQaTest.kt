@@ -305,16 +305,23 @@ class CompletionPassDeviceQaTest {
 
     /**
      * Gradle uninstalls the app after the run, which deletes its external files. Copy the evidence to
-     * shell-owned storage so the lane can still pull it.
+     * shell-owned storage so the lane can still pull it. UiAutomation tokenises the command on spaces
+     * and does not understand quoting, so each command is a plain argument list.
      */
     private fun preserveEvidence() {
         File(out, "measurements.txt").writeText(notes.toString())
         runCatching {
-            val command = "mkdir -p $EVIDENCE_DIR && cp -r ${out.absolutePath}/. $EVIDENCE_DIR/ && chmod -R a+rX $EVIDENCE_DIR"
-            instrumentation.uiAutomation.executeShellCommand("sh -c '$command'").use { pipe ->
-                java.io.FileInputStream(pipe.fileDescriptor).use { it.readBytes() }
-            }
+            shell("mkdir -p $EVIDENCE_DIR")
+            shell("cp -r ${out.absolutePath}/. $EVIDENCE_DIR/")
+            shell("chmod -R a+rX $EVIDENCE_DIR")
+        }.onFailure { Log.w("CompletionQA", "evidence copy failed: $it") }
+    }
+
+    private fun shell(command: String) {
+        val output = instrumentation.uiAutomation.executeShellCommand(command).use { pipe ->
+            java.io.FileInputStream(pipe.fileDescriptor).use { String(it.readBytes()) }
         }
+        if (output.isNotBlank()) Log.w("CompletionQA", "`$command` -> ${output.trim()}")
     }
 
     private fun step(name: String, block: () -> Unit) {
@@ -327,8 +334,8 @@ class CompletionPassDeviceQaTest {
             note("FAIL $name: ${error::class.java.simpleName}: ${error.message}")
             runCatching { quickShot("zz-failure-${name.replace(' ', '-')}") }
             failureDetails += "$name -> ${error::class.java.simpleName}: ${error.message?.lineSequence()?.firstOrNull()}"
+            preserveEvidence()
         }
-        preserveEvidence()
     }
 
     private companion object {

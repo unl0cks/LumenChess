@@ -25,8 +25,8 @@ data class BoardDragVisuals(
 
 /**
  * Grounded Precision motion values. Easing (CrispEase), scale, lift and shadow are unchanged from
- * the approved P6.4 language; durations were lengthened after physical-device review found the
- * original 145-165 ms slides too brief to register, especially engine moves and castling, which the
+ * the approved P6.4 language; durations were lengthened because the original 145-165 ms slides were
+ * reported as too brief to register on a device, especially engine moves and castling, which the
  * eye is not already tracking. Geometry remains outside board measurement.
  */
 object GroundedPrecisionBoardMotion {
