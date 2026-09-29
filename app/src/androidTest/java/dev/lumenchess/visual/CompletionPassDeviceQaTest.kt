@@ -1,6 +1,7 @@
 package dev.lumenchess.visual
 
 import android.graphics.Bitmap
+import android.util.Log
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -39,6 +40,7 @@ class CompletionPassDeviceQaTest {
     private val out by lazy { File(compose.activity.getExternalFilesDir(null), "completion-qa").apply { mkdirs() } }
     private val notes = StringBuilder()
     private val failures = mutableListOf<String>()
+    private val failureDetails = mutableListOf<String>()
     private val startedAt = SystemClock.elapsedRealtime()
     private val density get() = compose.activity.resources.displayMetrics.density
 
@@ -114,8 +116,7 @@ class CompletionPassDeviceQaTest {
         }
 
         step("insights after a finished game") {
-            compose.runOnUiThread { vm.backToSetup() }
-            waitFor("main-tab-insights")
+            backToPlayOverview(vm)
             compose.onNodeWithTag("main-tab-insights").performClick()
             waitFor("insights-root")
             pollUntil(10_000) { has("insights-score-card") || has("insights-empty") }
@@ -174,8 +175,7 @@ class CompletionPassDeviceQaTest {
         }
 
         step("arena live game") {
-            compose.runOnUiThread { vm.backToSetup() }
-            waitFor("main-tab-arena")
+            backToPlayOverview(vm)
             compose.onNodeWithTag("main-tab-arena").performClick()
             waitFor("arena-setup")
             compose.onNodeWithTag("arena-start").performScrollTo().performClick()
@@ -205,13 +205,13 @@ class CompletionPassDeviceQaTest {
             shot("21-settings")
         }
 
-        File(out, "measurements.txt").writeText(notes.toString())
-        assertTrue("steps failed: $failures", failures.isEmpty())
+        preserveEvidence()
+        assertTrue("steps failed: ${failureDetails.joinToString(" | ")}", failures.isEmpty())
     }
 
     private fun startFromFen(vm: PlayViewModel, fen: String) {
         compose.runOnUiThread { vm.backToSetup() }
-        waitFor("main-tab-play")
+        compose.waitForIdle()
         compose.runOnUiThread {
             vm.updateTimeControl(PlayTimeControl(600_000L, 0L))
             vm.updateStartingFen(fen)
@@ -219,6 +219,19 @@ class CompletionPassDeviceQaTest {
         }
         waitFor(PLAY_LIVE_TEST_TAG, 20_000)
         Thread.sleep(600)
+    }
+
+    /**
+     * Leaves the finished game and returns to the Play overview, where the tab bar is shown. The New
+     * Game page is a focused sub-page that hides the bar, exactly as it does for a person using Back.
+     */
+    private fun backToPlayOverview(vm: PlayViewModel) {
+        compose.runOnUiThread { vm.backToSetup() }
+        compose.waitForIdle()
+        if (!has("main-tab-play")) {
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        }
+        waitFor("main-tab-play")
     }
 
     /** Three rapid frames right after a move, to catch the piece mid-travel. */
@@ -285,7 +298,23 @@ class CompletionPassDeviceQaTest {
     }
 
     private fun note(text: String) {
-        notes.appendLine("[+${SystemClock.elapsedRealtime() - startedAt}ms] $text")
+        val line = "[+${SystemClock.elapsedRealtime() - startedAt}ms] $text"
+        notes.appendLine(line)
+        Log.i("CompletionQA", line)
+    }
+
+    /**
+     * Gradle uninstalls the app after the run, which deletes its external files. Copy the evidence to
+     * shell-owned storage so the lane can still pull it.
+     */
+    private fun preserveEvidence() {
+        File(out, "measurements.txt").writeText(notes.toString())
+        runCatching {
+            val command = "mkdir -p $EVIDENCE_DIR && cp -r ${out.absolutePath}/. $EVIDENCE_DIR/ && chmod -R a+rX $EVIDENCE_DIR"
+            instrumentation.uiAutomation.executeShellCommand("sh -c '$command'").use { pipe ->
+                java.io.FileInputStream(pipe.fileDescriptor).use { it.readBytes() }
+            }
+        }
     }
 
     private fun step(name: String, block: () -> Unit) {
@@ -297,7 +326,12 @@ class CompletionPassDeviceQaTest {
             failures += name
             note("FAIL $name: ${error::class.java.simpleName}: ${error.message}")
             runCatching { quickShot("zz-failure-${name.replace(' ', '-')}") }
+            failureDetails += "$name -> ${error::class.java.simpleName}: ${error.message?.lineSequence()?.firstOrNull()}"
         }
-        File(out, "measurements.txt").writeText(notes.toString())
+        preserveEvidence()
+    }
+
+    private companion object {
+        const val EVIDENCE_DIR = "/data/local/tmp/completion-qa"
     }
 }

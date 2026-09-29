@@ -7,7 +7,9 @@ status=0
 ./gradlew :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.lumenchess.visual.CompletionPassDeviceQaTest \
   -Pandroid.testInstrumentationRunnerArguments.completionQa=true || status=1
-adb pull /sdcard/Android/data/dev.lumenchess/files/completion-qa/. completion-device/ >/dev/null 2>&1 || true
+adb pull /data/local/tmp/completion-qa/. completion-device/ >/dev/null 2>&1 || true
+# Notes are also logged, so they survive even if the pull finds nothing.
+adb logcat -d -s CompletionQA:I 2>/dev/null | sed 's/^/LOGCAT /' || true
 
 echo "=== MEASUREMENTS ==="
 cat completion-device/measurements.txt 2>/dev/null || echo "(no measurements were written)"
