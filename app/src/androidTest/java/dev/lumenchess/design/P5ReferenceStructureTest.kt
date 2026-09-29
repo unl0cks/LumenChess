@@ -138,7 +138,8 @@ class P5ReferenceStructureTest {
     fun playSettingsOwnsAppearanceBoardPiecesAndFeedbackDestinations() {
         openPlaySettings()
         composeRule.onNodeWithTag("play-settings-root").assertIsDisplayed()
-        composeRule.onNodeWithTag("play-settings-time-controls").assertIsDisplayed()
+        // Time control is chosen per game in New Game; Play settings no longer carries a dead row for it.
+        composeRule.onAllNodesWithTag("play-settings-time-controls").assertCountEquals(0)
         composeRule.onNodeWithTag("play-settings-appearance").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-board-pieces").assertIsDisplayed()
         composeRule.onNodeWithTag("settings-sounds-haptics").assertIsDisplayed()

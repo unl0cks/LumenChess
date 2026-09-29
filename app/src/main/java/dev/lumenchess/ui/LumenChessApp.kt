@@ -1,5 +1,6 @@
 package dev.lumenchess.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -41,9 +42,11 @@ import dev.lumenchess.insights.InsightsViewModel
 import dev.lumenchess.play.PlayScreenMode
 import dev.lumenchess.play.PlayViewModel
 import dev.lumenchess.play.ReferencePlayRoute
+import dev.lumenchess.settings.AboutSettingsScreen
 import dev.lumenchess.settings.AppearanceSettings
 import dev.lumenchess.settings.BoardAppearanceScreen
 import dev.lumenchess.settings.DataStoreAppearanceSettingsRepository
+import dev.lumenchess.settings.EnginesSettingsScreen
 import dev.lumenchess.settings.PlaySettingsScreen
 import dev.lumenchess.settings.SettingsScreen
 import dev.lumenchess.settings.SoundsHapticsScreen
@@ -56,7 +59,7 @@ internal enum class MainTab(val label:String) {
     Insights("Insights"),
     Settings("Settings"),
 }
-private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS }
+private enum class SettingsDestination { ROOT, PLAY, BOARD_APPEARANCE, SOUNDS_HAPTICS, ENGINES, ABOUT }
 
 @Composable
 fun LumenChessApp() {
@@ -76,6 +79,17 @@ fun LumenChessApp() {
     val liveArena=currentTab==MainTab.Arena&&arenaUi.mode==ArenaScreenMode.LIVE
     val focusedPlaySubpage=currentTab==MainTab.Play&&playFocusedSubpage
     val slideDistance=with(LocalDensity.current){10.dp.roundToPx()}
+
+    // System back walks up the hierarchy instead of leaving the app: Settings sub-pages return to their
+    // parent, any other tab returns to Play. Nested screens (Live, Arena, the Library viewer, New Game)
+    // register their own handlers later in composition and therefore take precedence.
+    BackHandler(enabled=currentTab!=MainTab.Play){currentTab=MainTab.Play}
+    BackHandler(enabled=currentTab==MainTab.Settings&&settingsDestination!=SettingsDestination.ROOT){
+        settingsDestination=when(settingsDestination){
+            SettingsDestination.BOARD_APPEARANCE,SettingsDestination.SOUNDS_HAPTICS->SettingsDestination.PLAY
+            else->SettingsDestination.ROOT
+        }
+    }
 
     LaunchedEffect(persistedAppearanceSettings){appearanceSettings=persistedAppearanceSettings}
     LaunchedEffect(currentTab){if(currentTab!=MainTab.Settings)settingsDestination=SettingsDestination.ROOT}
@@ -136,6 +150,8 @@ fun LumenChessApp() {
                                     onOpenSoundsHaptics={settingsDestination=SettingsDestination.SOUNDS_HAPTICS},
                                     modifier=Modifier.fillMaxSize(),
                                     onOpenPlaySettings={settingsDestination=SettingsDestination.PLAY},
+                                    onOpenEngines={settingsDestination=SettingsDestination.ENGINES},
+                                    onOpenAbout={settingsDestination=SettingsDestination.ABOUT},
                                 )
                                 SettingsDestination.PLAY -> PlaySettingsScreen(
                                     settings=appearanceSettings,
@@ -147,6 +163,8 @@ fun LumenChessApp() {
                                 )
                                 SettingsDestination.BOARD_APPEARANCE -> BoardAppearanceScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
                                 SettingsDestination.SOUNDS_HAPTICS -> SoundsHapticsScreen(appearanceSettings,::persist,{settingsDestination=SettingsDestination.PLAY},Modifier.fillMaxSize())
+                                SettingsDestination.ENGINES -> EnginesSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
+                                SettingsDestination.ABOUT -> AboutSettingsScreen({settingsDestination=SettingsDestination.ROOT},Modifier.fillMaxSize())
                             }
                             MainTab.Insights -> InsightsRoute(
                                 viewModel = viewModel<InsightsViewModel>(),

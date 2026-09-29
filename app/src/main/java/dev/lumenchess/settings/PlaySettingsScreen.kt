@@ -54,13 +54,6 @@ fun PlaySettingsScreen(
             )
 
             LumenDerivativeRow(
-                title = "Time Controls",
-                subtitle = "10 min · Rapid",
-                modifier = Modifier.testTag("play-settings-time-controls"),
-                showChevron = true,
-            )
-
-            LumenDerivativeRow(
                 title = "Appearance",
                 subtitle = when (settings.appearance) {
                     AppAppearance.SYSTEM -> "System"

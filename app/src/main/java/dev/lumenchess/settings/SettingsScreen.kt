@@ -58,6 +58,8 @@ fun SettingsScreen(
     onOpenSoundsHaptics: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenPlaySettings: () -> Unit = onOpenBoardAppearance,
+    onOpenEngines: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
 ) {
     // Root Settings remains category-only. These retained parameters are still owned by the deeper
     // Settings routes and intentionally remain part of the public screen contract.
@@ -100,46 +102,27 @@ fun SettingsScreen(
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.ENGINE,
                 title = "Engines",
-                subtitle = "Manage installed engines",
+                subtitle = "Stockfish 18 and Reckless 0.9.0",
                 uniqueTag = "settings-category-engines",
                 palette = palette,
+                onClick = onOpenEngines,
             )
             SettingsCategoryRow(
                 kind = SettingsGlyphKind.PLAY,
                 title = "Play",
-                subtitle = "Time controls, themes, sounds, board",
+                subtitle = "Themes, sounds, board",
                 uniqueTag = "settings-category-play",
                 legacyTag = "settings-play",
                 palette = palette,
                 onClick = onOpenPlaySettings,
             )
             SettingsCategoryRow(
-                kind = SettingsGlyphKind.REVIEW,
-                title = "Game Review",
-                subtitle = "Analysis settings, move classification",
-                uniqueTag = "settings-category-review",
-                palette = palette,
-            )
-            SettingsCategoryRow(
-                kind = SettingsGlyphKind.RATING,
-                title = "Ratings",
-                subtitle = "Rating mode, system, match options",
-                uniqueTag = "settings-category-ratings",
-                palette = palette,
-            )
-            SettingsCategoryRow(
-                kind = SettingsGlyphKind.ACCOUNT,
-                title = "Accounts & Sync",
-                subtitle = "Chess.com, Lichess",
-                uniqueTag = "settings-category-accounts",
-                palette = palette,
-            )
-            SettingsCategoryRow(
                 kind = SettingsGlyphKind.ADVANCED,
-                title = "Advanced",
-                subtitle = "Developer & advanced",
-                uniqueTag = "settings-category-advanced",
+                title = "About",
+                subtitle = "Version, licenses, device",
+                uniqueTag = "settings-category-about",
                 palette = palette,
+                onClick = onOpenAbout,
             )
         }
     }

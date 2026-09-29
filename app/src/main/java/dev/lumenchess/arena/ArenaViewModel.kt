@@ -93,6 +93,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private var sessionGeneration = 0L
     private var pendingBranchCapture: Any? = null
     private var pendingOriginalReturn: AndroidArenaPersistenceGateway? = null
+    private var delayedEngineResult: Runnable? = null
 
     private val clockTicker = object : Runnable {
         override fun run() {
@@ -503,6 +504,21 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
         refreshRuntimeProjection(checkTimeout = false)
     }
 
+    private fun deliverEngineResult(generation: Long, side: Color, result: EngineSearchResult) {
+        if (generation != sessionGeneration || coordinator == null) return
+        val previousRevision = coordinator?.state?.positionRevision
+        val dispatchResult = coordinator?.onEngineResult(side, result)
+        if (dispatchResult != null && dispatchResult.state.positionRevision != previousRevision) {
+            mutableUiState.value = mutableUiState.value.copy(lastMoveWasHuman = false)
+        }
+        refreshRuntimeProjection(checkTimeout = false)
+    }
+
+    private fun clearDelayedEngineResult() {
+        delayedEngineResult?.let(mainHandler::removeCallbacks)
+        delayedEngineResult = null
+    }
+
     private fun engineListener(side: Color, engine: PlayEngine, generation: Long) = object : AndroidPlayEngineGateway.Listener {
         override fun onEngineHostRecovered() {
             if (generation != sessionGeneration || coordinator == null) return
@@ -520,12 +536,19 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
 
         override fun onEngineResult(result: EngineSearchResult) {
             if (generation != sessionGeneration || coordinator == null) return
-            val previousRevision = coordinator?.state?.positionRevision
-            val dispatchResult = coordinator?.onEngineResult(side, result)
-            if (dispatchResult != null && dispatchResult.state.positionRevision != previousRevision) {
-                mutableUiState.value = mutableUiState.value.copy(lastMoveWasHuman = false)
+            val delay = coordinator?.presentationDelayMillis(side, result) ?: 0L
+            if (delay <= 0L) {
+                deliverEngineResult(generation, side, result)
+                return
             }
-            refreshRuntimeProjection(checkTimeout = false)
+            // Only one search is ever active, so at most one release is pending.
+            clearDelayedEngineResult()
+            val release = Runnable {
+                delayedEngineResult = null
+                deliverEngineResult(generation, side, result)
+            }
+            delayedEngineResult = release
+            mainHandler.postDelayed(release, delay)
         }
 
         override fun onEngineInfo(info: EngineSearchInfo) {
@@ -620,6 +643,7 @@ class ArenaViewModel(application: Application) : AndroidViewModel(application) {
     private fun stopLiveAdapters() {
         cancelBranchNavigation()
         mainHandler.removeCallbacks(clockTicker)
+        clearDelayedEngineResult()
         feedbackHandler.removeCallbacksAndMessages(null)
         feedbackObserver.resetBaseline(null)
         whiteGateway?.setListener(null)
