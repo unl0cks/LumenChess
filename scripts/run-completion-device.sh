@@ -19,11 +19,10 @@ echo "=== END MEASUREMENTS ==="
   || status=1
 
 emit() {
-  local name="$1" file="completion-device/$1.png"
+  local name="$1" file="completion-device/$1.jpg"
   if [ ! -f "$file" ]; then echo "IMG-MISSING $name"; return; fi
-  convert "$file" -resize 22% -strip -quality 60 "/tmp/$name.jpg"
-  echo "IMG-BEGIN $name $(stat -c%s "/tmp/$name.jpg")"
-  base64 -w 400 "/tmp/$name.jpg" | sed 's/^/B64 /'
+  echo "IMG-BEGIN $name $(stat -c%s "$file")"
+  base64 -w 400 "$file" | sed 's/^/B64 /'
   echo "IMG-END $name"
 }
 for name in ${EMIT_IMAGES:-03-live-start}; do emit "$name"; done

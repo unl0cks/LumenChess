@@ -63,6 +63,9 @@ class CompletionPassDeviceQaTest {
             Thread.sleep(700)
             shot("03-live-start")
             measureLiveLayout()
+            val cues = File(compose.activity.filesDir, "feedback/built-in").listFiles()
+                ?.sortedBy { it.name }?.joinToString { "${it.name}(${it.length()}B)" }
+            note("built-in sound cues preloaded on disk: ${cues ?: "none"}")
 
             val before = vm.uiState.value.clock
             note("clock at start: white=${before?.whiteRemainingMillis} black=${before?.blackRemainingMillis}")
@@ -170,13 +173,28 @@ class CompletionPassDeviceQaTest {
             shot("18d-captured")
         }
 
-        step("other tabs") {
+        step("arena live game") {
             compose.runOnUiThread { vm.backToSetup() }
             waitFor("main-tab-arena")
             compose.onNodeWithTag("main-tab-arena").performClick()
             waitFor("arena-setup")
+            compose.onNodeWithTag("arena-start").performScrollTo().performClick()
+            waitFor("arena-live", 20_000)
+            Thread.sleep(4_000)
+            shot("22-arena-live")
+            val board = compose.onNodeWithTag("arena-board-stage").fetchSemanticsNode().boundsInRoot
+            val actions = compose.onNodeWithTag("arena-flip").fetchSemanticsNode().boundsInRoot
+            note("arena board ${"%.1f".format(board.width / density)}dp square top=${"%.1f".format(board.top / density)}dp; " +
+                "actions top=${"%.1f".format(actions.top / density)}dp (${"%.1f".format((actions.top - board.bottom) / density)}dp under the board)")
+            compose.onNodeWithTag("arena-stop").performClick()
+        }
+
+        step("other tabs") {
+            waitFor("main-tab-arena")
+            compose.onNodeWithTag("main-tab-arena").performClick()
+            waitFor("arena-setup")
             Thread.sleep(300)
-            shot("19-arena")
+            shot("19-arena-setup")
             compose.onNodeWithTag("main-tab-games").performClick()
             waitFor("library-list")
             Thread.sleep(400)
@@ -261,6 +279,9 @@ class CompletionPassDeviceQaTest {
     private fun quickShot(name: String) {
         val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return
         FileOutputStream(File(out, "$name.png")).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        // A small JPEG travels through the CI log, where artifact storage may not be reachable.
+        val small = Bitmap.createScaledBitmap(bitmap, bitmap.width * 22 / 100, bitmap.height * 22 / 100, true)
+        FileOutputStream(File(out, "$name.jpg")).use { small.compress(Bitmap.CompressFormat.JPEG, 62, it) }
     }
 
     private fun note(text: String) {

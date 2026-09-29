@@ -435,14 +435,19 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
         !runtime.paused && runtime.terminal == null && ui.historyPly == null
     SideEffect { presentedRevision = runtime.positionRevision.value }
 
+    // The board group (participant cards, evaluation bar, board, actions) has a constant height and
+    // is centred between two equal slots, so the board never moves. Everything that varies with mode
+    // (messages, result, history browsing, sandbox controls) lives in the lower slot, under the
+    // actions, and grows downward without touching the board.
     Column(
         modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(LumenColors.BackgroundLift, LumenColors.Background)))
             .padding(horizontal = 7.dp, vertical = 5.dp)
             .testTag("arena-live"),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
+        Spacer(Modifier.weight(1f))
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         val upperSide = if (ui.orientation == ChessboardOrientation.WHITE) Color.BLACK else Color.WHITE
         val lowerSide = upperSide.opposite
         ArenaParticipantRow(upperSide, ui, runtime, setup)
@@ -478,6 +483,25 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
             }
         }
         ArenaParticipantRow(lowerSide, ui, runtime, setup)
+
+            Row(Modifier.fillMaxWidth().height(54.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                ArenaAction("Flip", "arena-flip", viewModel::flipBoard, Modifier.weight(1f))
+                ArenaAction(
+                    if (runtime.paused) "Resume" else "Pause",
+                    "arena-pause",
+                    if (runtime.paused) viewModel::resume else viewModel::pause,
+                    Modifier.weight(1f),
+                )
+                ArenaAction("Control", "arena-control", { showManualControl = true }, Modifier.weight(1f))
+                ArenaAction("Branch", "arena-branch", viewModel::browseHistory, Modifier.weight(1f))
+                ArenaAction("Stop", "arena-stop", viewModel::stopArena, Modifier.weight(1f))
+            }
+    
+        }
+        Column(
+            Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
         ui.message?.let {
             Text(it, color = if (it.startsWith("Saved")) LumenColors.OnSurfaceMuted else LumenColors.Destructive, style = MaterialTheme.typography.bodySmall, maxLines = 2)
         }
@@ -499,18 +523,6 @@ private fun ArenaLiveScreen(ui: ArenaUiState, viewModel: ArenaViewModel, modifie
                 ArenaAction("Original game", "arena-original", viewModel::returnToOriginal, Modifier.weight(1f))
             }
         }
-        Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth().height(54.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            ArenaAction("Flip", "arena-flip", viewModel::flipBoard, Modifier.weight(1f))
-            ArenaAction(
-                if (runtime.paused) "Resume" else "Pause",
-                "arena-pause",
-                if (runtime.paused) viewModel::resume else viewModel::pause,
-                Modifier.weight(1f),
-            )
-            ArenaAction("Control", "arena-control", { showManualControl = true }, Modifier.weight(1f))
-            ArenaAction("Branch", "arena-branch", viewModel::browseHistory, Modifier.weight(1f))
-            ArenaAction("Stop", "arena-stop", viewModel::stopArena, Modifier.weight(1f))
         }
     }
     if (showManualControl) {

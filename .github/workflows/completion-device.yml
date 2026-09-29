@@ -40,7 +40,6 @@ jobs:
           sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1" "system-images;android-37.0;google_apis_ps16k;x86_64" --channel=3
           rustup toolchain install 1.88.0 --profile minimal
           rustup target add --toolchain 1.88.0 aarch64-linux-android x86_64-linux-android
-          command -v convert >/dev/null || sudo apt-get install -y imagemagick
       - uses: gradle/actions/setup-gradle@v4
       - name: Boot device and run the completion session
         env:
